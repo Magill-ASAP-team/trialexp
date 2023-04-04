@@ -1,6 +1,5 @@
 from glob import glob
 from pathlib import Path
-
 configfile : 'workflows/config/config.yaml'
 # report: 'report/workflow.rst'
 
