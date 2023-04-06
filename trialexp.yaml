@@ -38,4 +38,5 @@ dependencies:
     - h5netcdf
     - snakemake
     - python-dotenv
+    - jupyterlab
 
