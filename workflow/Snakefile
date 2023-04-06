@@ -3,8 +3,9 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv() #load env variables using .env files
 
+#Ask snakemake to check these env variables are set
 envvars:
     'SNAKEMAKE_DEBUG_ROOT',
     'SESSION_ROOT_FOLDER'
