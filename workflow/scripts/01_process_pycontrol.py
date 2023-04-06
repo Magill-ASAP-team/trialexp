@@ -12,11 +12,12 @@ from datetime import datetime
 from snakehelper.SnakeIOHelper import getSnake
 from pathlib import Path
 from workflows.scripts import settings
+import os 
 
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflows/spout_bar_nov22.smk',
-  [settings.debug_folder + 'processed/df_events_cond.pkl'],
+  [os.path.join(settings.debug_folder,'processed','df_events_cond.pkl')],
   'process_pycontrol')
 
 #%% Read pycontrol file
@@ -37,9 +38,8 @@ df_pycontrol.to_pickle(soutput.pycontrol_dataframe)
 
 #%% Read task definition
 tasks = pd.read_csv('params/tasks_params.csv', usecols=[1, 2, 3, 4], index_col=False)
-
-trial_window = [-2000, 4000]
-timelim = [1000, 4000] # in ms
+trial_window = settings.trial_window
+timelim = settings.timelim
 
 conditions, triggers, events_to_process = get_task_specs(tasks,  task_name)
 
@@ -53,7 +53,8 @@ df_events_trials, df_events = extract_trial_by_trigger(df_pycontrol, triggers[0]
 
 df_conditions = compute_conditions_by_trial(df_events_trials, conditions)
 
-df_conditions = compute_success(df_events_trials, df_conditions, task_name)
+df_conditions = compute_success(df_events_trials, df_conditions, task_name, 
+                                triggers, timelim)
 
 #%%  Merge condition back with event dataframe
 
