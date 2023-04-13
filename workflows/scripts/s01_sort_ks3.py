@@ -33,8 +33,6 @@ sorter_name = 'kilosort3'
 rec_properties_path = Path(sinput.rec_properties)
 rec_properties = pd.read_csv(rec_properties_path, index_col= None)
 
-output_folder = rec_properties_path.parent / 'sorting'
-
 # Only select longest syncable recordings to sort
 idx_to_sort = rec_properties[rec_properties.longest == True].index.values
 
@@ -60,7 +58,7 @@ for idx_rec in idx_to_sort:
     relative_ephys_path = os.path.join(*ephys_path.parts[5:])
     ephys_path = os.path.join(root_data_path, relative_ephys_path)
     
-    recordings = se.read_openephys(ephys_path, block_index=exp_nb, stream_name=AP_stream)
+    recordings = se.read_openephys(ephys_path, block_index=exp_nb-1, stream_name=AP_stream)
     recording = select_segment_recording(recordings, segment_indices= int(rec_nb-1))
     print('Now sorting' ,recording)
     sorter_specific_params = {
@@ -74,15 +72,15 @@ for idx_rec in idx_to_sort:
     sorting = ss.run_sorter(
             sorter_name = sorter_name,
             recording = recording, 
-            output_folder = output_folder / 'output'/ probe_folder_name,
+            output_folder = Path(soutput.output) / probe_folder_name,
             remove_existing_folder = True, 
             delete_output_folder = False, 
             verbose = True,
             **sorter_specific_params)
 
-    sorting.save(folder= output_folder / probe_folder_name)
+    sorting.save(folder= Path(soutput.results) / probe_folder_name)
 
 # %% loading back the data for testing
 
-sorting_re = si.load_extractor(output_folder /probe_folder_name)
+sorting_re = si.load_extractor(Path(soutput.results) / probe_folder_name)
 # %%

@@ -20,7 +20,9 @@ rule spike_sorting:
     input:
         rec_properties = '{session_path}/{task_path}/{session_id}/ephys/rec_properties.csv'
     output:
-        spike_templateA = '{session_path}/{task_path}/{session_id}/ephys/sorting/probeA/spike_templates.npy',
-        spike_templateB = '{session_path}/{task_path}/{session_id}/ephys/sorting/probeB/spike_templates.npy',
+        results = directory('{session_path}/{task_path}/{session_id}/processed/sorting'),
+        output = directory('{session_path}/{task_path}/{session_id}/processed/output'),
         rule_complete = touch(r'{session_path}/{task_path}/{session_id}/processed/spike_sorting.done')
+    script:
+        'scripts/s01_sort_ks3.py'
 
