@@ -133,7 +133,9 @@ def create_sync_photo_ephys(pyphoto_pulse_time, sync_path: str, rsync_ephys_chan
     event_array = np.load(Path(sync_path, 'states.npy'))
     ts_array = np.load(Path(sync_path, 'timestamps.npy'))
     rsync_ephys_ts = ts_array[event_array == rsync_ephys_chan_idx]
-    
+    # print(np.diff(rsync_ephys_ts))
+    # print(rsync_ephys_ts)
+    # print(ts_array)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')        
         try:
