@@ -128,3 +128,16 @@ def create_ephys_rsync(pycontrol_file: str, sync_path: str, rsync_ephys_chan_idx
             pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
         except (RsyncError, ValueError):
             return None
+        
+def create_sync_photo_ephys(pyphoto_pulse_time, sync_path: str, rsync_ephys_chan_idx: int = 2):
+    event_array = np.load(Path(sync_path, 'states.npy'))
+    ts_array = np.load(Path(sync_path, 'timestamps.npy'))
+    rsync_ephys_ts = ts_array[event_array == rsync_ephys_chan_idx]
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')        
+        try:
+            return Rsync_aligner(pulse_times_A= rsync_ephys_ts*1000, 
+            pulse_times_B= pyphoto_pulse_time, plot=False) #align pycontrol time to pyphotometry time
+        except (RsyncError, ValueError):
+            return None
