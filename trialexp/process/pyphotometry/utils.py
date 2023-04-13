@@ -557,26 +557,38 @@ def extract_event_data(trigger_timestamp, window, aligner, dataArray, sampling_r
     ref_time = dataArray.time
     data = []
     event_found = []
+    max_data_length = dataArray.data.shape[0] 
+    pre_window = int(window[0]/1000*sampling_rate)
+    post_window = int(window[1]/1000*sampling_rate)
     
     for t in ts:
         d = abs((ref_time-t).data)
         #Find the most close matched time stamp and extend it both ends 
-        min_time = np.min(d)
-        if min_time < time_tolerance:
-            min_idx = np.argmin(d)
-            start_idx = min_idx +int(window[0]/1000*sampling_rate)
-            end_idx = min_idx + int(window[1]/1000*sampling_rate)
-            data.append(dataArray.data[start_idx:end_idx])
+        min_idx = np.argmin(d)
+        min_time = d[min_idx]
+        start_idx = min_idx + pre_window
+        end_idx = min_idx + post_window
+        if (min_time < time_tolerance) and (start_idx>=0) and (end_idx<max_data_length):
+            #make sure we have enough data
+            x = data.append(dataArray.data[start_idx:end_idx])
             event_found.append(True)
         else:
-            x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))
-            data.append([x])
+            #fill with NaN if the data is invalid
+            if dataArray.data.ndim==1:
+                x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.NaN
+                data.append([x])
+            else:
+                x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),dataArray.data.shape[1]))*np.NaN
+                data.append(x)
             event_found.append(False)
-            
+                        
     # align to the longest element
     # data =  np.vstack(list(itertools.zip_longest(*data)))
-    data  = np.vstack(data)
-    
+    if dataArray.data.ndim==1:
+        data  = np.vstack(data)
+    else:
+        data = np.stack(data)
+        
     # if data_len is provide, perform additional check or correct the data length
     if data_len is not None:
         if not data.shape[0]==data_len:
@@ -682,7 +694,8 @@ def make_rel_time_xr(event_time, windows, pyphoto_aligner, ref_time):
     return rel_time
 
 def make_event_xr(event_time, trial_window, pyphoto_aligner,
-                  event_time_coordinate,  dataArray, sampling_rate):
+                  event_time_coordinate,  dataArray, sampling_rate, 
+                  time_tolerance, extra_dim=None, extra_coord=None):
     '''
     Create xarray.DataArray object for the continuous data around provided timestamp. 
 
@@ -698,6 +711,10 @@ def make_event_xr(event_time, trial_window, pyphoto_aligner,
             List of trial numbers corresponding to each event_time
         dataArray : array_like
             Array containing time and data information
+        extra_dim: list 
+            Should be a list containing the dimension name
+        extra_dim: dict
+            Should be a list containing the coordinate 
             
     Returns:
         da : xarray.DataArray
@@ -708,17 +725,26 @@ def make_event_xr(event_time, trial_window, pyphoto_aligner,
     '''
     assert event_time.index.name =='trial_nb', 'event_time should have a trial_nb index'
     data, _ = extract_event_data(event_time, trial_window, pyphoto_aligner,
-                                dataArray, sampling_rate)
-    da = xr.DataArray(
-        data, coords={'event_time':event_time_coordinate, 
-                      'trial_nb':event_time.index.values},
-                        dims=('trial_nb','event_time'))
+                                dataArray, sampling_rate, time_tolerance=time_tolerance)
+    if data.ndim==2:
+        da = xr.DataArray(
+            data, coords={'event_time':event_time_coordinate, 
+                        'trial_nb':event_time.index.values},
+                            dims=('trial_nb','event_time'))
+    else:
+        assert extra_dim is not None, 'You need to specify the extra dimension in extra_dimen'
+        print(data.shape)
+        da = xr.DataArray(
+            data, coords={'event_time':event_time_coordinate, 
+                        'trial_nb':event_time.index.values, **extra_coord},
+                            dims=('trial_nb','event_time',*extra_dim))
         
     return da
 
 def add_event_data(df_event, filter_func, trial_window, aligner,
                    dataset, event_time_coordinate, data_var_name, 
-                   event_name, sampling_rate, filter_func_kwargs={}):
+                   event_name, sampling_rate, filter_func_kwargs,
+                   time_tolerance=5, extra_dimen=None, extra_coord = None):
     '''
     Add continuous data around provided timestamp to a dataset.
 
@@ -755,6 +781,7 @@ def add_event_data(df_event, filter_func, trial_window, aligner,
     event_time = extract_event_time(df_event, filter_func, filter_func_kwargs)
     xr_event_data = make_event_xr(event_time, trial_window, aligner,
                                             event_time_coordinate,
-                                            dataset[data_var_name], sampling_rate)
+                                            dataset[data_var_name], sampling_rate,
+                                            time_tolerance, extra_dimen, extra_coord)
     dataset[f'{event_name}_{data_var_name}'] = xr_event_data
 # %%
