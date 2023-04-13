@@ -83,6 +83,9 @@ dataset = dataset.sel(time = dataset.trial>=0) #remove data outside of task
 # add in all metadata
 dataset.attrs.update(df_pycontrol.attrs)
 dataset.attrs.update(df_event.attrs)
+
+#also save the rsync object for later
+dataset.attrs['pyphoto_rsync'] = pyphoto_aligner
 dataset.to_netcdf(soutput.xr_photometry, engine='h5netcdf')
 
 # %%
