@@ -36,8 +36,7 @@ rec_properties = pd.read_csv(rec_properties_path, index_col= None)
 # Only select longest syncable recordings to sort
 idx_to_sort = rec_properties[rec_properties.longest == True].index.values
 
-# root_data_path = r'/home/MRC.OX.AC.UK/phar0732/ettin/'
-root_data_path = r'/home/MRC.OX.AC.UK/ndcn1330/ettin/Julien'
+root_data_path = os.environ['DATA_ROOT_PATH']
 
 # %%
 for idx_rec in idx_to_sort:
@@ -55,7 +54,7 @@ for idx_rec in idx_to_sort:
     
     
     ephys_path = Path(rec_properties.full_path.iloc[idx_rec]).parent.parent.parent.parent.parent
-    relative_ephys_path = os.path.join(*ephys_path.parts[5:])
+    relative_ephys_path = os.path.join(*ephys_path.parts[5:])        
     ephys_path = os.path.join(root_data_path, relative_ephys_path)
     
     recordings = se.read_openephys(ephys_path, block_index=exp_nb-1, stream_name=AP_stream)
