@@ -23,7 +23,7 @@ def build_session_info(root_path):
     Returns:
     - df_session_info: A Pandas dataframe containing the session information.
     """
-    paths = glob(root_path)
+    paths = Path(root_path).glob('*/*')
     paths = [Path(p) for p in paths]
 
     # parse the folder name
