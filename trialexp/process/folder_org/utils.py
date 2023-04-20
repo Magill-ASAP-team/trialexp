@@ -85,7 +85,10 @@ def filter_sessions(df_session_info, animal_id=None, session_no=None, session_me
     session_no (int or list of int, optional): Filter by session number(s)
     session_method (str, optional): How to interpret session_no. 
         Must be one of 'exact', 'tail', 'head', or 'between'.
-        'exact' will extract
+        'exact' will choose the exact session_no specified,
+        'tail' will choose the last n of sessions
+        'head' will choose the first n of sessions
+        'between' will choose the session between two specified number
     task_name (str or list of str, optional): Filter by task name(s)
     
     Returns:
