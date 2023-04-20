@@ -1500,7 +1500,10 @@ class Session():
             if mtc is None:
                 raise Exception('smrx_filename has to end with .smrx')
 
-            MyFile = sp.SonFile(smrx_filename)
+            MyFile = sp.SonFile(smrx_filename, nChans = int(400)) #NOTE int() is required
+            #NOTE nChans = ctypes.c_uint16(400) # TypeError
+            #NOTE nChans = 400 # MyFile.MaxChannels() = -1
+            #NOTE sonpy 1.9.5 works with nChans (1.8.5. doesn't)
             CurChan = 0
             UsedChans = 0
             Scale = 65535/20
@@ -1514,22 +1517,27 @@ class Session():
             EventRate = 1/(dTimeBase*1e3)  # Hz, period is 1000 greater than the timebase
             SubDvd = 1                     # How many ticks between attached items in WaveMarks
 
-            max_time_ms1 = np.max([np.max(self.times[k]) for k in keys if any(self.times[k])]) #TODO when no data 
+            times_ = [np.max(self.times[k]) for k in keys if any(self.times[k])]
+            if times_ == []:
+                raise Exception('No time stamp found: Cannot determine MaxTime()')
 
-            list_of_match = [re.match('^\d+', L) for L in self.print_lines if re.match('^\d+', L) is not None]
-            max_time_ms2 = np.max([int(m.group(0)) for m in list_of_match])
+            else:
+                max_time_ms1 = np.max(times_) #TODO ValueError when np.max([]) 
 
-            max_time_ms = np.max([max_time_ms1, max_time_ms2])
-            time_vec_ms = np.arange(0, max_time_ms, 1000/EventRate)
-            # time_vec_micros = np.arange(0, max_time_ms*1000, 10**6 * 1/EventRate)
+                list_of_match = [re.match('^\d+', L) for L in self.print_lines if re.match('^\d+', L) is not None]
+                max_time_ms2 = np.max([int(m.group(0)) for m in list_of_match])
 
-            samples_per_s = EventRate
-            interval = 1/samples_per_s
+                max_time_ms = np.max([max_time_ms1, max_time_ms2])
+                time_vec_ms = np.arange(0, max_time_ms, 1000/EventRate)
+                # time_vec_micros = np.arange(0, max_time_ms*1000, 10**6 * 1/EventRate)
 
-            samples_per_ms = 1/1000 * EventRate
-            interval = 1/samples_per_s
+                samples_per_s = EventRate
+                interval = 1/samples_per_s
 
-            MyFile.SetTimeBase(dTimeBase)  # Set timebase
+                samples_per_ms = 1/1000 * EventRate
+                interval = 1/samples_per_s
+
+                MyFile.SetTimeBase(dTimeBase)  # Set timebase
 
 
         def write_event(MyFile, X_ms, title, y_index, EventRate, time_vec_ms):
