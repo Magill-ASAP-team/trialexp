@@ -36,6 +36,7 @@ dependencies:
   - xarray
   - python-dotenv
   - snakemake
+  - tables
   - pip:
     - "git+https://github.com/teristam/snakehelper.git"
     - sonpy
