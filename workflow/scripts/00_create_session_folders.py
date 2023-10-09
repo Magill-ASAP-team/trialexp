@@ -34,11 +34,12 @@ tasks_params_path = PROJECT_ROOT / 'params' / 'tasks_params.csv'
 tasks_params_df = pd.read_csv(tasks_params_path)
 tasks = tasks_params_df.task.values.tolist()
 
-skip_existing = False #whether to skip existing folders
-# task_to_copy = ['reaching_go_spout_bar_nov22', 
-#                 'reaching_go_spout_incr_break2_nov22',
-#                 'pavlovian_spontanous_reaching_march23'] #task name to copy, if empty then search for all tasks
-task_to_copy = ['reaching_go_spout_bar_nov22'] #task name to copy, if empty then search for all tasks
+skip_existing = True #whether to skip existing folders
+task_to_copy = ['reaching_go_spout_bar_nov22', 
+                'reaching_go_spout_incr_break2_nov22',
+                'pavlovian_spontanous_reaching_march23',
+                'pavlovian_reaching_oct23'] #task name to copy, if empty then search for all tasks
+# task_to_copy = ['reaching_go_spout_bar_nov22'] #task name to copy, if empty then search for all tasks
 #%%
 
 def get_df_video(video_folder):
