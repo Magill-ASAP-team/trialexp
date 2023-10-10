@@ -41,8 +41,11 @@ try:
         injection = animal_info.loc[animal_id].injection.split(';')
         if 'RdLight' in injection:
             if not 'analog_3' in data_photometry:
-                #Using red channel but no isosbestic control, only correct for photoblenching
-                baseline_correction_multicolor(data_photometry)
+                # Do not do motion correction
+                data_photometry['analog_1_corrected'] = data_photometry['analog_1_filt']
+                data_photometry['analog_2_corrected'] = data_photometry['analog_2_filt']
+                data_photometry['motion_corrected'] = 0
+
             else:
                 # Do multicolor correction
                 raise NotImplementedError('Multicolor correction is not yet implemented')
@@ -52,7 +55,7 @@ try:
         data_photometry = motion_correction_win(data_photometry)
     
     
-    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.001)
+    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01)
     data_photometry = compute_zscore(data_photometry)
     
     # Convert to xarray
@@ -71,6 +74,8 @@ event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period
 
 
 if has_photometry:
+
+    
     photo_rsync = dataset.attrs['pulse_times_2']
 
     #align pyphotometry time to pycontrol
@@ -80,27 +85,33 @@ if has_photometry:
 
     dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
 
+        
+    var2add = ['zscored_df_over_f']
+    if 'zscored_df_over_f_analog_2' in  dataset:
+        var2add.append('zscored_df_over_f_analog_2')
+        
 
-    # Add trigger
-    trigger = df_event.attrs['triggers'][0]
-    add_event_data(df_event, event_filters.get_first_event_from_name,
-                trial_window, dataset, event_time_coord, 
-                'zscored_df_over_f', trigger, dataset.attrs['sampling_rate'],
-                filter_func_kwargs={'evt_name':trigger})
+    for var in var2add:
+         # Add trigger
+        trigger = df_event.attrs['triggers'][0]
+        add_event_data(df_event, event_filters.get_first_event_from_name,
+                    trial_window, dataset, event_time_coord, 
+                    var, trigger, dataset.attrs['sampling_rate'],
+                    filter_func_kwargs={'evt_name':trigger})
+        
+        # Add first bar off
+        add_event_data(df_event, event_filters.get_first_bar_off, trial_window, dataset,event_time_coord, 
+                    var, 'first_bar_off', dataset.attrs['sampling_rate'])
 
-    # Add first bar off
-    add_event_data(df_event, event_filters.get_first_bar_off, trial_window, dataset,event_time_coord, 
-                'zscored_df_over_f', 'first_bar_off', dataset.attrs['sampling_rate'])
+        # Add first spout
+        add_event_data(df_event, event_filters.get_first_spout, trial_window, dataset, event_time_coord, 
+                    var, 'first_spout', dataset.attrs['sampling_rate'])
 
-    # Add first spout
-    add_event_data(df_event, event_filters.get_first_spout, trial_window, dataset, event_time_coord, 
-                'zscored_df_over_f', 'first_spout', dataset.attrs['sampling_rate'])
+        # Add last bar_off before first spout
 
-    # Add last bar_off before first spout
-
-    add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
-                dataset,event_time_coord, 
-                'zscored_df_over_f', 'last_bar_off', dataset.attrs['sampling_rate'])
+        add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
+                    dataset,event_time_coord, 
+                    var, 'last_bar_off', dataset.attrs['sampling_rate'])
 
 
     dataset = dataset.sel(time = dataset.trial>=0) #remove data outside of task
