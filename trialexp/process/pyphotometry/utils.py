@@ -18,9 +18,12 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
+import re
 
 from trialexp.process.pycontrol.event_filters import extract_event_time
 from trialexp.utils.rsync import *
+from scipy.optimize import curve_fit
+from scipy import signal
 
 '''
 Most of the photometry data processing functions are based on the intial design
@@ -50,14 +53,17 @@ Assumptions:
 # and normalization functions. The normalization functions assume that the
 # data has already been filtered.
 
+
+
 def denoise_filter(photometry_dict:dict, lowpass_freq = 20) -> dict:
     # apply a low-pass filter to remove high frequency noise
     b,a = get_filt_coefs(low_pass=lowpass_freq, sampling_rate=photometry_dict['sampling_rate'])
-    analog_1_filt = filtfilt(b, a, photometry_dict['analog_1'], padtype='even')
-    analog_2_filt = filtfilt(b, a, photometry_dict['analog_2'], padtype='even')
-    
-    photometry_dict['analog_1_filt'] = analog_1_filt
-    photometry_dict['analog_2_filt'] = analog_2_filt
+    pattern = re.compile('analog_[0-9]$')
+    signal_names = [ k for k in photometry_dict.keys() if pattern.match(k)]
+
+    for sig in signal_names:
+        sig_filt = filtfilt(b, a, photometry_dict[sig], padtype='even')
+        photometry_dict[f'{sig}_filt'] = sig_filt
     
     return photometry_dict
     
@@ -169,6 +175,8 @@ def motion_correction(photometry_dict: dict) -> dict:
 
     return photometry_dict
 
+
+
 def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> dict:
     
     if 'analog_1_corrected' not in photometry_dict:
@@ -180,7 +188,11 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
 
     # Now calculate the dF/F by dividing the motion corrected signal by the time varying baseline fluorescence.
     photometry_dict['analog_1_df_over_f'] = photometry_dict['analog_1_corrected'] / photometry_dict['analog_1_baseline_fluo'] 
-    photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_filt'] / photometry_dict['analog_2_baseline_fluo']
+    
+    if 'analog_2_corrected' in photometry_dict.keys():
+        photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_corrected'] / photometry_dict['analog_2_baseline_fluo']
+    else:
+        photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_filt'] / photometry_dict['analog_2_baseline_fluo']
     
     return photometry_dict
 
@@ -280,15 +292,27 @@ def import_ppd(file_path):
     # Extract signals.
     analog  = data >> 1                     # Analog signal is most significant 15 bits.
     digital = ((data & 1) == 1).astype(int) # Digital signal is least significant bit.
-    # Alternating samples are signals 1 and 2.
-    analog_1 = analog[ ::2] * volts_per_division[0]
-    analog_2 = analog[1::2] * volts_per_division[1]
-    digital_1 = digital[ ::2]
-    digital_2 = digital[1::2]
+    analog_3 = None
+
+    
+    if header_dict['mode'] == '1 colour continuous + 2 colour time div.' or header_dict['mode'] == '3 colour time div.':
+        # there are 3 analog signals, try to make the name compatible with exisiting recordings
+        analog_1 = analog[::3] * volts_per_division[0]  # GFP
+        analog_3 = analog[1::3] * volts_per_division[0] # isosbestic
+        analog_2 = analog[2::3] * volts_per_division[1] # RFP
+        
+        digital_1 = digital[::3]
+        digital_2 = digital[1::3]
+    else:
+        # Alternating samples are signals 1 and 2.
+        analog_1 = analog[::2] * volts_per_division[0]
+        analog_2 = analog[1::2] * volts_per_division[1]
+        digital_1 = digital[::2]
+        digital_2 = digital[1::2]
+        
     # Time relative to start of recording (ms).
     time = np.arange(analog_1.shape[0]).astype(np.int64)*1000/sampling_rate #warning: default data type np.int32 will lead to overflow
     # time = np.arange(analog_1.shape[0])*1000/sampling_rate #warning: default data type np.int32 will lead to overflow
-
    
     # Extract rising edges for digital inputs.
     pulse_inds_1 = 1+np.where(np.diff(digital_1) == 1)[0]
@@ -305,6 +329,11 @@ def import_ppd(file_path):
                  'pulse_times_1' : pulse_times_1,
                  'pulse_times_2' : pulse_times_2,
                  'time'          : time}
+    
+    if analog_3 is not None:
+        data_dict.update({
+            'analog_3': analog_3})
+    
     
     # Add metadata to dictionary.
     data_dict.update(header_dict)
@@ -1001,3 +1030,81 @@ def add_event_data(df_event, filter_func, trial_window,
                                             dataset[data_var_name], sampling_rate)
     dataset[f'{event_name}_{data_var_name}'] = xr_event_data
 # %%
+def fit_exp_baseline(curve, sampling_rate, smooth_window=4001):
+
+    def fitFn(x,a,b,c):
+        return a+(b*np.exp(-(1/c)*x))
+    
+    p0 = [1,5,5]
+    t = np.arange(len(curve))/sampling_rate
+    smooth_curve = signal.savgol_filter(curve,smooth_window,3)
+    popt,pcov = curve_fit(fitFn, t, smooth_curve,p0)
+    baseline = fitFn(t,*popt)
+
+    return baseline
+
+def fit_a2b(a,b):
+    # fit array a to b with linear regression
+    slope, intercept, r_value, p_value, std_err = linregress(x=a, y=b)
+    output = intercept + slope * a
+    return output
+    
+def motion_correction_multicolor(photometry_dict, motion_smooth_win=2001):
+    # analog1:  GFP
+    # analog2: isosbestic
+    # analog3: RFP
+    sampling_rate = photometry_dict['sampling_rate']
+    
+    if any(['analog_1_filt' not in photometry_dict, 'analog_2_filt' not in photometry_dict]):
+        raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
+
+    try:
+        slope, intercept, r_value, p_value, std_err = linregress(x=photometry_dict['analog_3_filt'], y=photometry_dict['analog_1_filt'])
+        photometry_dict['analog_1_est_motion'] = intercept + slope * photometry_dict['analog_3_filt']
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt'] - photometry_dict['analog_1_est_motion']
+
+        # For RFP, we remove baseline by fitting an expontential curve
+        RFP_baseline =  fit_exp_baseline(photometry_dict['analog_2_filt'],sampling_rate)
+        photometry_dict['analog_2_detrended']  = photometry_dict['analog_2_filt'] - RFP_baseline
+
+        # We remove the photoblenching from the isosbestic signal, smooth it and subtract it from the RFP
+        isos_baseline = fit_exp_baseline(photometry_dict['analog_3_filt'],sampling_rate)
+        analog3detrended = photometry_dict['analog_3_filt']-isos_baseline
+        photometry_dict['analog_3_detrended'] = analog3detrended
+        
+        smooth_curve = signal.savgol_filter(analog3detrended, motion_smooth_win,3)
+        photometry_dict['analog_2_est_motion'] = fit_a2b(smooth_curve,photometry_dict['analog_2_detrended'])
+        photometry_dict['analog_2_corrected'] = photometry_dict['analog_2_detrended'] -   photometry_dict['analog_2_est_motion'] 
+        
+        
+        photometry_dict['motion_corrected'] = 1
+    except ValueError:
+        print('Motion correction failed. Skipping motion correction')
+        # probably due to saturation , do not do motion correction
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt']
+        photometry_dict['motion_corrected'] = 0
+
+    return photometry_dict
+
+def lowpass_baseline(curve, sampling_rate):
+    # use an aggressive lowpass filter to find the baseline
+    b,a = get_filt_coefs(low_pass=0.02, sampling_rate=sampling_rate)
+    return signal.filtfilt(b,a,curve)
+
+def baseline_correction_multicolor(photometry_dict,baseline_method='lowpass'):
+    sampling_rate = photometry_dict['sampling_rate']
+    if baseline_method =='lowpass':
+        RFP_baseline = lowpass_baseline(photometry_dict['analog_2_filt'],sampling_rate)
+        GFP_baseline = lowpass_baseline(photometry_dict['analog_1_filt'],sampling_rate)
+    else:
+        RFP_baseline =  fit_exp_baseline(photometry_dict['analog_2_filt'],sampling_rate, sampling_rate*2)
+        GFP_baseline =  fit_exp_baseline(photometry_dict['analog_1_filt'],sampling_rate, sampling_rate*2)
+
+    photometry_dict['analog_2_corrected']  = photometry_dict['analog_2_filt'] - RFP_baseline
+    photometry_dict['analog_2_baseline_fluo'] = RFP_baseline
+
+    photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
+    photometry_dict['analog_1_baseline_fluo'] = GFP_baseline
+    
+    return photometry_dict
+

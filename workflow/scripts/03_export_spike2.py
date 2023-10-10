@@ -3,7 +3,7 @@ Export event data to spike2
 '''
 #%%
 import pandas as pd 
-from trialexp.process.pycontrol.utils import export_session
+from trialexp.process.pycontrol.utils import export_session, extract_v_line
 from snakehelper.SnakeIOHelper import getSnake
 from workflow.scripts import settings
 from re import match
@@ -39,28 +39,10 @@ df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
 
 pycontrol_time = df_pycontrol[df_pycontrol.name == 'rsync'].time
 
-# assuming just one txt file
-pycontrol_txt = list(Path(sinput.pycontrol_folder).glob('*.txt'))
+pycontrol_path = list(Path(sinput.pycontrol_folder).glob('*.txt'))[0]
 
-with open(pycontrol_txt[0], 'r') as f:
-    all_lines = [line.strip() for line in f.readlines() if line.strip()]
 
-count = 0
-print_lines = []
-while count < len(all_lines):
-    # all_lines[count][0] == 'P'
-    if bool(match('P\s\d+\s', all_lines[count])):
-        print_lines.append(all_lines[count][2:])
-        count += 1
-        while (count < len(all_lines)) and not (bool(match('[PVD]\s\d+\s', all_lines[count]))):
-            print_lines[-1] = print_lines[-1] + \
-                "\n" + all_lines[count]
-            count += 1
-    else:
-        count += 1
-
-v_lines = [line[2:] for line in all_lines if line[0] == 'V']
-
+v_lines, print_lines = extract_v_line(pycontrol_path)
 
 #%%
 if fn == []:

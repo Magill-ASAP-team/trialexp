@@ -20,6 +20,12 @@ import pickle
    [settings.debug_folder + '/processed/xr_photometry.nc'],
   'import_pyphotometry')
 
+ 
+#%% Load pycontrol file
+df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
+df_event = pd.read_pickle(sinput.event_dataframe)
+df_condition = pd.read_pickle(sinput.condition_dataframe)
+trial_window = df_event.attrs['trial_window']
 
 #%% Load pyphotometry file
 try:
@@ -27,7 +33,25 @@ try:
     has_photometry = True
     data_photometry = import_ppd(fn)
     data_photometry = denoise_filter(data_photometry)
-    data_photometry = motion_correction_win(data_photometry)
+    
+    # determine how to do motion correction
+    animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
+    animal_id = df_pycontrol.attrs['Subject ID'] 
+    if animal_id in animal_info.index:
+        injection = animal_info.loc[animal_id].injection.split(';')
+        if 'RdLight' in injection:
+            if not 'analog_3' in data_photometry:
+                #Using red channel but no isosbestic control, only correct for photoblenching
+                baseline_correction_multicolor(data_photometry)
+            else:
+                # Do multicolor correction
+                raise NotImplementedError('Multicolor correction is not yet implemented')
+        else:    
+            data_photometry = motion_correction_win(data_photometry)
+    else:
+        data_photometry = motion_correction_win(data_photometry)
+    
+    
     data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.001)
     data_photometry = compute_zscore(data_photometry)
     
@@ -36,14 +60,6 @@ try:
     dataset = photometry2xarray(data_photometry, skip_var = skip_var)
 except IndexError:
     has_photometry = False
-
-
- 
-#%% Load pycontrol file
-df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
-df_event = pd.read_pickle(sinput.event_dataframe)
-df_condition = pd.read_pickle(sinput.condition_dataframe)
-trial_window = df_event.attrs['trial_window']
 
 # %% synchornize pyphotometry with pycontrol
 rsync_time = df_pycontrol[df_pycontrol.name=='rsync'].time
@@ -139,3 +155,5 @@ if has_photometry:
 else:
     Path(soutput.pycontrol_aligner).touch()
 
+
+# %%
