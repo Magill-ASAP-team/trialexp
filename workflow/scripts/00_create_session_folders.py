@@ -38,8 +38,8 @@ skip_existing = True #whether to skip existing folders
 task_to_copy = ['reaching_go_spout_bar_nov22', 
                 'reaching_go_spout_incr_break2_nov22',
                 'pavlovian_spontanous_reaching_march23',
-                'pavlovian_reaching_oct23'] #task name to copy, if empty then search for all tasks
-# task_to_copy = ['reaching_go_spout_bar_nov22'] #task name to copy, if empty then search for all tasks
+                'pavlovian_reaching_Oct23'] #task name to copy, if empty then search for all tasks
+# task_to_copy = ['pavlovian_reaching_Oct23'] #task name to copy, if empty then search for all tasks
 #%%
 
 def get_df_video(video_folder):
@@ -89,7 +89,7 @@ for task_id, task in enumerate(tasks):
     df_pycontrol = df_pycontrol[(df_pycontrol.subject_id!='00') & (df_pycontrol.subject_id!='01')] # do not copy the test data
 
     try:
-        df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*5] #remove sessions that are too short
+        df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short
     except AttributeError:
         print(f'no session length for task {task}, skipping folder')
         continue
