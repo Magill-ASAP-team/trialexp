@@ -48,7 +48,7 @@ try:
 
             else:
                 # Do multicolor correction
-                raise NotImplementedError('Multicolor correction is not yet implemented')
+                data_photometry = motion_correction_multicolor(data_photometry)
         else:    
             data_photometry = motion_correction_win(data_photometry)
     else:
@@ -59,17 +59,34 @@ try:
     data_photometry = compute_zscore(data_photometry)
     
     # Convert to xarray
-    skip_var = ['analog_1_est_motion','analog_1_corrected', 'analog_1_baseline_fluo', 'analog_2_baseline_fluo']
+    skip_var = ['analog_1_est_motion','time',
+                'analog_1_corrected', 'analog_1_baseline_fluo', 
+                'analog_2_baseline_fluo',
+                'isos_bleach_baseline', 'analog_1_bleach_baseline',
+                'analog_1_detrend', 'isos_detrended']
+    
     dataset = photometry2xarray(data_photometry, skip_var = skip_var)
 except IndexError:
     has_photometry = False
+
+
+#%%
+
+# # plt.xlim([0,400*20])
+# plt.plot(data_photometry['analog_1_detrend'],'y')
+# # plt.plot(data_photometry['isos_detrended'],'b')
+# plt.plot(data_photometry['est_motion'],'r')
+
+# #%%
+# plt.plot(data_photometry['analog_1_corrected'],'r')
+
 
 # %% synchornize pyphotometry with pycontrol
 rsync_time = df_pycontrol[df_pycontrol.name=='rsync'].time
 
 # Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000
-sampling_freq = 1000
+sampling_freq = dataset.attrs['sampling_rate']
 event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
 
 
@@ -141,6 +158,7 @@ else:
 
 # Bin the data such that we only have 1 data point per time bin
 # bin according to 50ms time bin, original sampling frequency is at 1000Hz
+down_sample_ratio = dataset.attrs['sampling_rate']/50
 dataset_binned = dataset.coarsen(time=10, event_time=10, boundary='trim').mean()
 dataset_binned['event_time'] = dataset_binned.event_time.astype(int) #cast to int to avoid floating point error later
 dataset_binned.attrs.update(dataset.attrs)
