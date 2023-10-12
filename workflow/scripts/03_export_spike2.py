@@ -18,8 +18,8 @@ import os
 
 #%% Photometry dict
 
-#fn = glob(sinput.photometry_folder+'\*.ppd')[0]
 fn = list(Path(sinput.photometry_folder).glob('*.ppd'))
+
 if fn == []:
     data_photometry = None    
 else:
@@ -27,8 +27,25 @@ else:
     data_photometry = import_ppd(fn)
 
     data_photometry = denoise_filter(data_photometry)
-    # data_photometry = motion_correction(data_photometry)
-    data_photometry = motion_correction_win(data_photometry)
+    
+    # determine how to do motion correction
+    animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
+    animal_id = data_photometry['subject_ID'] 
+    if animal_id in animal_info.index:
+        injection = animal_info.loc[animal_id].injection.split(';')
+        if 'RdLight' in injection:
+            if not 'analog_3' in data_photometry:
+                baseline_correction_multicolor(data_photometry)
+                data_photometry['motion_corrected'] = 1
+            else:
+                # Do multicolor correction
+                data_photometry = motion_correction_multicolor(data_photometry)
+        else:    
+            data_photometry = motion_correction_win(data_photometry)
+    else:
+        data_photometry = motion_correction_win(data_photometry)
+
+    
     data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.001)
 
 
@@ -58,9 +75,7 @@ df2plot = df_pycontrol[df_pycontrol.type == 'event']
 
 keys = df2plot.name.unique()
 
-photometry_keys =  ['analog_1', 'analog_2',  'analog_1_filt', 'analog_2_filt',
-                  'analog_1_est_motion', 'analog_1_corrected', 'analog_1_baseline_fluo',
-                  'analog_1_df_over_f','analog_2_baseline_fluo', 'analog_2_df_over_f']
+photometry_keys =  [k for k in data_photometry.keys() if 'analog' in k]
 
 #%%
 '''

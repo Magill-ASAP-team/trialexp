@@ -41,10 +41,8 @@ try:
         injection = animal_info.loc[animal_id].injection.split(';')
         if 'RdLight' in injection:
             if not 'analog_3' in data_photometry:
-                # Do not do motion correction
-                data_photometry['analog_1_corrected'] = data_photometry['analog_1_filt']
-                data_photometry['analog_2_corrected'] = data_photometry['analog_2_filt']
-                data_photometry['motion_corrected'] = 0
+                baseline_correction_multicolor(data_photometry)
+                data_photometry['motion_corrected'] = 1
 
             else:
                 # Do multicolor correction
@@ -70,27 +68,16 @@ except IndexError:
     has_photometry = False
 
 
-#%%
-
-# # plt.xlim([0,400*20])
-# plt.plot(data_photometry['analog_1_detrend'],'y')
-# # plt.plot(data_photometry['isos_detrended'],'b')
-# plt.plot(data_photometry['est_motion'],'r')
-
-# #%%
-# plt.plot(data_photometry['analog_1_corrected'],'r')
-
-
 # %% synchornize pyphotometry with pycontrol
 rsync_time = df_pycontrol[df_pycontrol.name=='rsync'].time
 
 # Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000
-sampling_freq = dataset.attrs['sampling_rate']
-event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
 
 
 if has_photometry:
+    sampling_freq = dataset.attrs['sampling_rate']
+    event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
 
     
     photo_rsync = dataset.attrs['pulse_times_2']
@@ -144,6 +131,9 @@ else:
     dataset = xr.Dataset()
     t = df_pycontrol.time.values
     time_coords = np.arange(t[0], t[-1])
+    sampling_rate = 1000 # by default, pycontrol is samplied at 1000Hz
+    event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_rate)) 
+
     dataset = dataset.assign_coords(time=('time',time_coords))
     dataset = dataset.assign_coords(event_time=('event_time', event_time_coord))
     
@@ -151,15 +141,16 @@ else:
     dataset.attrs.update(df_pycontrol.attrs)
     dataset.attrs.update(df_event.attrs)
     
+    dataset.attrs['sampling_rate'] = sampling_rate
+    
     # save a dummpy photometry file to satisfy snakemake
     Path(soutput.xr_photometry).touch()
     
 
-
 # Bin the data such that we only have 1 data point per time bin
-# bin according to 50ms time bin, original sampling frequency is at 1000Hz
-down_sample_ratio = dataset.attrs['sampling_rate']/50
-dataset_binned = dataset.coarsen(time=10, event_time=10, boundary='trim').mean()
+# bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz
+down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
+dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
 dataset_binned['event_time'] = dataset_binned.event_time.astype(int) #cast to int to avoid floating point error later
 dataset_binned.attrs.update(dataset.attrs)
 

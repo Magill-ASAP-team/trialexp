@@ -1052,7 +1052,7 @@ def fit_a2b(a,b):
     output = intercept + slope * a
     return output
     
-def motion_correction_multicolor(photometry_dict, motion_smooth_win=2001, baseline_method='lowpass'):
+def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseline_method='lowpass'):
     # analog1:  GFP
     # analog2: isosbestic
     # analog3: RFP
@@ -1062,11 +1062,12 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=2001, baseli
         raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
 
     try:
-        slope, intercept, r_value, p_value, std_err = linregress(x=photometry_dict['analog_3_filt'], y=photometry_dict['analog_1_filt'])
-        photometry_dict['analog_1_est_motion'] = intercept + slope * photometry_dict['analog_3_filt']
-        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt'] - photometry_dict['analog_1_est_motion']
+        # method 1
+        # slope, intercept, r_value, p_value, std_err = linregress(x=photometry_dict['analog_3_filt'], y=photometry_dict['analog_1_filt'])
+        # photometry_dict['analog_1_est_motion'] = intercept + slope * photometry_dict['analog_3_filt']
+        # photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt'] - photometry_dict['analog_1_est_motion']
         
-        # correct motion after baseline removed from both analog1 and isosbestic
+        # method 2: correct motion after baseline removed from both analog1 and isosbestic
         isos_bleach_baseline = lowpass_baseline(photometry_dict['analog_3_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
         analog_1_bleach_baseline = lowpass_baseline(photometry_dict['analog_1_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
         analog_1_detrend = photometry_dict['analog_1_filt'] - analog_1_bleach_baseline
@@ -1077,13 +1078,14 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=2001, baseli
         photometry_dict['analog_1_detrend'] = analog_1_detrend
         photometry_dict['isos_detrend'] = isos_detrend
         
-        photometry_dict['est_motion'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
-        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['est_motion']
+        # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
+        photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion']
         
-        # also record the intermediate siganl for debugging purpose
+        # method 3
+        # GFP_baseline = lowpass_baseline(photometry_dict['analog_1_filt'],sampling_rate)
+        # photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
         
-        
-
         # For RFP, remove baseline
         if baseline_method == 'lowpass':
             RFP_baseline =  lowpass_baseline(photometry_dict['analog_2_filt'],sampling_rate)
@@ -1098,10 +1100,11 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=2001, baseli
         analog3detrended = photometry_dict['analog_3_filt']-isos_baseline
         photometry_dict['analog_3_detrended'] = analog3detrended
         
-        smooth_curve = signal.savgol_filter(analog3detrended, motion_smooth_win,3)
+        # smooth_curve = signal.savgol_filter(analog3detrended, motion_smooth_win,3)
+        smooth_curve  = lowpass_baseline(photometry_dict['analog_3_detrended'], sampling_rate, 5)
+        photometry_dict['analog_3_smoothed'] = smooth_curve
         photometry_dict['analog_2_est_motion'] = fit_a2b(smooth_curve,photometry_dict['analog_2_detrended'])
         photometry_dict['analog_2_corrected'] = photometry_dict['analog_2_detrended'] -   photometry_dict['analog_2_est_motion'] 
-        
         
         photometry_dict['motion_corrected'] = 1
         
@@ -1130,10 +1133,7 @@ def baseline_correction_multicolor(photometry_dict,baseline_method='lowpass'):
         GFP_baseline =  fit_exp_baseline(photometry_dict['analog_1_filt'],sampling_rate, sampling_rate*2)
 
     photometry_dict['analog_2_corrected']  = photometry_dict['analog_2_filt'] - RFP_baseline
-    photometry_dict['analog_2_baseline_fluo'] = RFP_baseline
-
     photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
-    photometry_dict['analog_1_baseline_fluo'] = GFP_baseline
     
     return photometry_dict
 
