@@ -61,6 +61,7 @@ for k in sorted(xr_session.data_vars.keys()):
         g.map_dataframe(annotate_trial_number)
         g.set_titles(col_template='{col_name}')
         g.set_xlabels('Time (ms)')
+        g.figure.suptitle(xr_session.attrs['mode'], y=1.05,x=0.2)
             
         g.figure.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=300, bbox_inches='tight')
         
