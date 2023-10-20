@@ -32,7 +32,7 @@ try:
     fn = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
     data_photometry = import_ppd(fn)
-    data_photometry = denoise_filter(data_photometry)
+    data_photometry = denoise_filter(data_photometry, 20)
     
     # determine how to do motion correction
     animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')

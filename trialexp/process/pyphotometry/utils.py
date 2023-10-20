@@ -24,7 +24,8 @@ from trialexp.process.pycontrol.event_filters import extract_event_time
 from trialexp.utils.rsync import *
 from scipy.optimize import curve_fit
 from scipy import signal
-
+import warnings
+from scipy.stats import median_abs_deviation
 '''
 Most of the photometry data processing functions are based on the intial design
 of the pyPhotometry package. They are stored in a dictionary containing both
@@ -55,14 +56,14 @@ Assumptions:
 
 
 
-def denoise_filter(photometry_dict:dict, lowpass_freq = 20) -> dict:
+def denoise_filter(photometry_dict:dict, lowpass_freq, highpass_freq=None) -> dict:
     # apply a low-pass filter to remove high frequency noise
-    b,a = get_filt_coefs(low_pass=lowpass_freq, sampling_rate=photometry_dict['sampling_rate'])
+    b,a = get_filt_coefs(low_pass=lowpass_freq, high_pass=highpass_freq, sampling_rate=photometry_dict['sampling_rate'])
     pattern = re.compile('analog_[0-9]$')
     signal_names = [ k for k in photometry_dict.keys() if pattern.match(k)]
 
     for sig in signal_names:
-        sig_filt = filtfilt(b, a, photometry_dict[sig], padtype='even')
+        sig_filt = filtfilt(b, a, photometry_dict[sig], padtype='even')        
         photometry_dict[f'{sig}_filt'] = sig_filt
     
     return photometry_dict
@@ -156,6 +157,126 @@ def motion_correction_win(photometry_dict: dict) -> dict:
     return photometry_dict
 
 
+def overlapping_chunks(data1, data2, n_win_size: int, n_overlap: int):
+    """
+    Generate overlapping chunks of data from two arrays.
+
+    Parameters:
+    -----------
+    data1 : array-like
+        First array of data.
+    data2 : array-like
+        Second array of data.
+    n_win_size : int
+        Size of the window used to extract chunks of data.
+    n_overlap : int
+        Number of samples to overlap between consecutive chunks.
+
+    Yields:
+    -------
+    tuple
+        A tuple containing the index of the first sample of the chunk, the chunk of data from `data1`, and the chunk of data from `data2`.
+
+    Raises:
+    -------
+    ValueError
+        If `n_win_size/n_overlap` is not an integer.
+
+    Notes:
+    ------
+    The function generates chunks of size `n_win_size` from the input arrays, with an overlap of `n_overlap` samples between consecutive chunks. If the last chunk is truncated, it is still returned.
+
+    Examples:
+    ---------
+    >>> data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    >>> data2 = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    >>> for i, chunk1, chunk2 in overlapping_chunks(data1, data2, n_win_size=4, n_overlap=2):
+    ...     print(i, chunk1, chunk2)
+    0 [1, 2, 3, 4] [10, 20, 30, 40]
+    2 [3, 4, 5, 6] [30, 40, 50, 60]
+    4 [5, 6, 7, 8] [50, 60, 70, 80]
+    6 [7, 8, 9, 10] [70, 80, 90, 100]
+    """
+
+    x = n_win_size/n_overlap
+
+    if isinstance(x, float) and not x.is_integer():
+        raise ValueError("1/overlap_ratio must be an integer")
+
+    step_size = n_win_size - int(n_win_size) // int(x)
+    # for i in range(0, len(data1) - n_win_size + 1, step_size): #TODO this will skip the last iteration
+    #     yield i, data1[i:i + n_win_size], data2[i:i + n_win_size]
+    for i in range(0, len(data1), step_size):
+        if i + n_win_size <= len(data1):  # If a full-sized chunk can be taken
+            yield i, data1[i:i + n_win_size], data2[i:i + n_win_size]
+        else:  # If only a truncated chunk can be taken
+            yield i, data1[i:], data2[i:]
+    
+    
+    
+def window_subtraction(analog1, analog2, sampling_rate, win_size_s=30) -> dict:
+    '''
+    subtract analog2 from analog1 by spitting into overlapping time windows, do a linear fit, and then subtract
+    Have the advantage of only affecting a limited region with shadow artifacts, for region where there is
+    no artifacts, the slope should be close to zero. Issue a warning when large negative slope is detected
+    '''
+    
+    n_win_size = int(win_size_s * sampling_rate)
+    n_overlap = int(n_win_size/2)  # 50% overlap
+
+
+    # Splitting the data into chucks and do fitting on each chunk
+    start_index_chunks = []
+    analog_1_est_motion_chunks = []
+    p_vals = []
+    r_vals = []
+    for start_ind, chunk1, chunk2 in overlapping_chunks(
+            analog1, analog2, 
+            n_win_size, n_overlap):
+        slope, intercept, r_value, p_value, std_err = linregress(chunk2, chunk1)
+
+        start_index_chunks.append(start_ind)
+
+        analog_1_est_motion_chunks.append(slope * chunk2 + intercept)
+        p_vals.append(p_value)
+        r_vals.append(r_value)
+        
+    if any(np.array(r_vals)< -0.2):
+        warnings.warn('Some slope has a large negative value!')
+
+    # Joining the fitted data together
+    analog_1_est_motion_joined = np.zeros(np.size(analog1))
+
+    step_size = n_win_size - int(n_win_size) // int(n_win_size/n_overlap)
+
+    for i, _ in enumerate(start_index_chunks):
+        ch = analog_1_est_motion_chunks[i] # the motion of analog_1 is estimated from analog_2
+        
+        if i == 0:
+            analog_1_est_motion_joined[0:step_size] = ch[0:step_size]
+
+        elif i > 0 and i < len(start_index_chunks) -1:
+            ch_prev = analog_1_est_motion_chunks[i-1]
+            ind_this =  start_index_chunks[i]
+            
+            # average two chunks
+            analog_1_est_motion_joined[ind_this:ind_this + step_size] \
+                = (ch[0:step_size] + ch_prev[step_size-1:-1])/2
+
+        elif i == len(start_index_chunks) -1 :
+            ind_this =  start_index_chunks[i]
+
+            # copy one chunk
+            analog_1_est_motion_joined[ind_this:ind_this + step_size] = ch
+
+        elif i == len(start_index_chunks):
+            raise ValueError('Accidental reaching the last chunk. Should not happen')
+
+    analog_1_est_motion = analog_1_est_motion_joined
+    analog_1_corrected = analog1 - analog_1_est_motion_joined
+    
+    return analog_1_est_motion, analog_1_corrected
+        
 
 def motion_correction(photometry_dict: dict) -> dict:
     
@@ -1051,11 +1172,38 @@ def fit_a2b(a,b):
     slope, intercept, r_value, p_value, std_err = linregress(x=a, y=b)
     output = intercept + slope * a
     return output
+
+def remove_outliner_mad(x,thres_factor):
+    '''
+    Remove the shadow artifact from the signal when the signal is above median+ median_abs_deviation*thres_factor
+    replace the signal with the median value 
+    For best result, the signal needs to be first high-pass filtered e.g. by 0.1Hz
+    '''
+    x = x.copy()
+    median_org = np.median(x)
+    
+    absx = np.abs(x)
+    median = np.median(absx)
+    mda = median_abs_deviation(absx)
+    
+    idx2remove = (absx>(median+mda*thres_factor))
+    
+    x[idx2remove] = median_org
+    
+    return x, idx2remove
     
 def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseline_method='lowpass'):
     # analog1:  GFP
     # analog2: isosbestic
     # analog3: RFP
+    '''
+    Analysis notes:
+    When the isosbestic channel is very noisy, and shadow artifact appears in the signal, it is be very difficult to cancel it.
+    When we stretch the isosbestic signal to match the shadow artifact in the RFP channel, the noise from the isosbestic channel will be 
+    stretched too. Substracting this amplified noise from the RFP will totally mask the original signal.
+    We can probably smooth the signal to avoid the noise but that it will affect the results when there are real motion-artifact
+    TODO: develop some specified way to remove the shadow artifact, probably by setting a threshold and just remove that data
+    '''
     sampling_rate = photometry_dict['sampling_rate']
     
     if any(['analog_1_filt' not in photometry_dict, 'analog_2_filt' not in photometry_dict]):
@@ -1095,17 +1243,20 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
             isos_baseline = fit_exp_baseline(photometry_dict['analog_3_filt'],sampling_rate)
             
         photometry_dict['analog_2_detrended']  = photometry_dict['analog_2_filt'] - RFP_baseline
+        photometry_dict['analog_3_detrended'] = photometry_dict['analog_3_filt'] - isos_baseline
+        
+        # we need to remove the shadow artifact first
+        photometry_dict['analog_2_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_2_detrended'],8)
+        photometry_dict['analog_3_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_3_detrended'],8)
 
-        # We remove the photoblenching from the isosbestic signal, smooth it and subtract it from the RFP
-        analog3detrended = photometry_dict['analog_3_filt']-isos_baseline
-        photometry_dict['analog_3_detrended'] = analog3detrended
         
-        # smooth_curve = signal.savgol_filter(analog3detrended, motion_smooth_win,3)
-        smooth_curve  = lowpass_baseline(photometry_dict['analog_3_detrended'], sampling_rate, 5)
-        photometry_dict['analog_3_smoothed'] = smooth_curve
-        photometry_dict['analog_2_est_motion'] = fit_a2b(smooth_curve,photometry_dict['analog_2_detrended'])
-        photometry_dict['analog_2_corrected'] = photometry_dict['analog_2_detrended'] -   photometry_dict['analog_2_est_motion'] 
+        analog_2_est_motion, analog_2_corrected = window_subtraction(photometry_dict['analog_2_deshadow'],
+                                                                     photometry_dict['analog_3_deshadow'],
+                                                                     sampling_rate)
         
+        photometry_dict['analog_2_est_motion'] = analog_2_est_motion
+        photometry_dict['analog_2_corrected'] = analog_2_corrected
+
         photometry_dict['motion_corrected'] = 1
         
         return photometry_dict

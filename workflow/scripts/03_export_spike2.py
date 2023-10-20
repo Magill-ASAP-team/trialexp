@@ -26,7 +26,8 @@ else:
     fn = fn[0]
     data_photometry = import_ppd(fn)
 
-    data_photometry = denoise_filter(data_photometry)
+    data_photometry = denoise_filter(data_photometry, 20) # cannot high-pass filter the signal here
+    
     
     # determine how to do motion correction
     animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
