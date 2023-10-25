@@ -16,6 +16,17 @@ import os
     [settings.debug_folder +'/processed/spike2_export.done'],
     'export_spike2')
 
+#%% Load data
+df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
+
+pycontrol_time = df_pycontrol[df_pycontrol.name == 'rsync'].time
+
+pycontrol_path = list(Path(sinput.pycontrol_folder).glob('*.txt'))[0]
+
+
+v_lines, print_lines = extract_v_line(pycontrol_path)
+df_dataformat = pd.read_csv('params/data_format.csv')
+
 #%% Photometry dict
 
 fn = list(Path(sinput.photometry_folder).glob('*.ppd'))
@@ -24,14 +35,14 @@ if fn == []:
     data_photometry = None    
 else:
     fn = fn[0]
-    data_photometry = import_ppd(fn)
-
+    data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
+    data_photometry = import_ppd(fn, data_format)
     data_photometry = denoise_filter(data_photometry, 20) # cannot high-pass filter the signal here
     
     
     # determine how to do motion correction
     animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
-    animal_id = data_photometry['subject_ID'] 
+    animal_id = df_pycontrol.attrs['Subject ID'] #use pycontrol instead, because pyphotometry data is difficult to change manually
     if animal_id in animal_info.index:
         injection = animal_info.loc[animal_id].injection.split(';')
         if 'RdLight' in injection:
@@ -52,15 +63,7 @@ else:
 
 # no down-sampling here
 
-#%% Load data
-df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
 
-pycontrol_time = df_pycontrol[df_pycontrol.name == 'rsync'].time
-
-pycontrol_path = list(Path(sinput.pycontrol_folder).glob('*.txt'))[0]
-
-
-v_lines, print_lines = extract_v_line(pycontrol_path)
 
 #%%
 if fn == []:

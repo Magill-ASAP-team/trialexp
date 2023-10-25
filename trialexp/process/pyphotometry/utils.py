@@ -26,6 +26,7 @@ from scipy.optimize import curve_fit
 from scipy import signal
 import warnings
 from scipy.stats import median_abs_deviation
+from datetime import datetime
 '''
 Most of the photometry data processing functions are based on the intial design
 of the pyPhotometry package. They are stored in a dictionary containing both
@@ -376,11 +377,29 @@ def fit_exp_func(data, fs: int = 100, medfilt_size: int = 3) -> np.ndarray:
     return fitted_data
 
 
+def get_dataformat(df_dataformat, session_id):
+
+    def parse_date(date_string):
+        return datetime.strptime(date_string, '%Y-%m-%d')
+
+    # use the session id to determine which dataformat to use
+    df_dataformat['date_cutoff'] = df_dataformat.date.apply(parse_date)
+    curr_date = '-'.join(session_id.split('-')[1:4])
+    curr_date = parse_date(curr_date)
+    idx = np.searchsorted(df_dataformat.date_cutoff, curr_date)
+    if idx>0:
+        data_format = df_dataformat.iloc[idx-1].photom_format
+    else:
+        data_format = 'v1'
+    
+    return data_format
+
+
 #----------------------------------------------------------------------------------
 # Load analog data
 #----------------------------------------------------------------------------------
 
-def import_ppd(file_path):
+def import_ppd(file_path, data_format='v1'):
     '''Function to import pyPhotometry binary data files into Python. The high_pass 
     and low_pass arguments determine the frequency in Hz of highpass and lowpass 
     filtering applied to the filtered analog signals. To disable highpass or lowpass
@@ -403,6 +422,9 @@ def import_ppd(file_path):
         'pulse_times_1' - Times of rising edges on digital input 1 (ms).
         'pulse_times_2' - Times of rising edges on digital input 2 (ms).
         'time'          - Time of each sample relative to start of recording (ms)
+        
+        data_format: v1 for hybrid recordig is GFP, isosbestic, RFP
+         v2 for hybrid recording is GFP, RFP isosbestic
     '''
     with open(file_path, 'rb') as f:
         header_size = int.from_bytes(f.read(2), 'little')
@@ -420,12 +442,18 @@ def import_ppd(file_path):
     
     if header_dict['mode'] == '1 colour continuous + 2 colour time div.' or header_dict['mode'] == '3 colour time div.':
         # there are 3 analog signals, try to make the name compatible with exisiting recordings
-        analog_1 = analog[::3] * volts_per_division[0]  # GFP
-        analog_3 = analog[1::3] * volts_per_division[0] # isosbestic
-        analog_2 = analog[2::3] * volts_per_division[1] # RFP
-        
+        if data_format == 'v1':
+            analog_1 = analog[::3] * volts_per_division[0]  # GFP
+            analog_3 = analog[1::3] * volts_per_division[0] # isosbestic
+            analog_2 = analog[2::3] * volts_per_division[1] # RFP
+        else:
+            analog_1 = analog[::3] * volts_per_division[0]  # GFP
+            analog_2 = analog[1::3] * volts_per_division[1] # RFP
+            analog_3 = analog[2::3] * volts_per_division[0] # isosbestic
+            
         digital_1 = digital[::3]
         digital_2 = digital[1::3]
+        digital_3 = digital[2::3] #workaround for wrong data format in some recording
     else:
         # Alternating samples are signals 1 and 2.
         analog_1 = analog[::2] * volts_per_division[0]
@@ -451,11 +479,16 @@ def import_ppd(file_path):
                  'pulse_inds_2'  : pulse_inds_2,
                  'pulse_times_1' : pulse_times_1,
                  'pulse_times_2' : pulse_times_2,
-                 'time'          : time}
+                 'time'          : time,
+                 'data_format' : data_format}
     
     if analog_3 is not None:
+        pulse_inds_3 = 1 + np.where(np.diff(digital_3)==1)[0]
+        pulse_times_3  = pulse_inds_3*1000/sampling_rate
         data_dict.update({
-            'analog_3': analog_3})
+            'analog_3': analog_3,
+            'digital_3': digital_3,
+            'pulse_times_3': pulse_times_3})
     
     
     # Add metadata to dictionary.

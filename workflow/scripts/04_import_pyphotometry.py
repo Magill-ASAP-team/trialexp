@@ -6,6 +6,7 @@ from snakehelper.SnakeIOHelper import getSnake
 from trialexp.process.pyphotometry.utils import *
 from glob import glob
 import xarray as xr
+from trialexp.utils.pyphotometry_utilities import create_photo_sync
 from trialexp.utils.rsync import *
 import pandas as pd 
 import numpy as np
@@ -14,6 +15,7 @@ from trialexp.process.pycontrol.event_filters import extract_event_time
 from workflow.scripts import settings
 from pathlib import Path
 import pickle
+from datetime import datetime
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
@@ -27,11 +29,15 @@ df_event = pd.read_pickle(sinput.event_dataframe)
 df_condition = pd.read_pickle(sinput.condition_dataframe)
 trial_window = df_event.attrs['trial_window']
 
+df_dataformat = pd.read_csv('params/data_format.csv')
+
+
 #%% Load pyphotometry file
 try:
-    fn = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
+    pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
-    data_photometry = import_ppd(fn)
+    data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
+    data_photometry = import_ppd(pyphotometry_file, data_format)
     data_photometry = denoise_filter(data_photometry, 20)
     
     # determine how to do motion correction
@@ -83,10 +89,8 @@ if has_photometry:
     photo_rsync = dataset.attrs['pulse_times_2']
 
     #align pyphotometry time to pycontrol
-    pycontrol_aligner = Rsync_aligner(pulse_times_A=  photo_rsync,
-                    pulse_times_B= rsync_time, plot=False) #align pycontrol time to pyphotometry time
-
-
+    pycontrol_aligner = create_photo_sync(df_pycontrol, data_photometry)
+    
     dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
 
         

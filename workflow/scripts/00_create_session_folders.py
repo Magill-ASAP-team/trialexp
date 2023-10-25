@@ -10,6 +10,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from trialexp.process.pycontrol.data_import import session_dataframe
+from trialexp.process.pyphotometry.utils import import_ppd
 
 from trialexp.utils.pycontrol_utilities import parse_pycontrol_fn
 from trialexp.utils.pyphotometry_utilities import parse_pyhoto_fn, create_photo_sync, parse_video_fn
@@ -228,7 +230,9 @@ for task_id, task in enumerate(tasks):
             
         #Copy pyphotometry file if they match
         if pyphotometry_file is not None:
-            if create_photo_sync(str(pycontrol_file), str(pyphotometry_file)) is not None:
+            data_pycontrol = session_dataframe(pycontrol_file)
+            data_pyphotmetry = import_ppd(pyphotometry_file)
+            if create_photo_sync(data_pycontrol, data_pyphotmetry) is not None:
                 copy_if_not_exist(pyphotometry_file, target_pyphoto_folder)
                 
         # write down the filename of the video file
