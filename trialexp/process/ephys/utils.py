@@ -12,8 +12,14 @@ import quantities as pq
 from trialexp.process.group_analysis.plot_utils import style_plot
 import seaborn as sns
 import neo 
-from scipy.stats import ttest_ind, wilcoxon, ranksums, permutation_test
+from scipy.stats import ttest_ind, wilcoxon, ranksums, permutation_test, variation
 from statsmodels.stats.multitest import multipletests
+from sklearn import decomposition, manifold, preprocessing, cluster
+import matplotlib.pylab as plt
+import pandas as pd
+import numpy as np
+from tqdm.auto import tqdm
+from scipy import signal, spatial
 
 def denest_string_cell(cell):
         if len(cell) == 0: 
@@ -487,3 +493,69 @@ def combine2dataframe(result):
     df_tuning = pd.DataFrame(pvalues_dict)
     
     return df_tuning
+
+def get_cell_mean_cv(x, coarsen_factor = 5):
+    # Get the mean coefficient of variation for a cell
+    cv_list = []
+    x = x.coarsen(spk_event_time=5,boundary="trim").mean()
+    for id in x.cluID:
+        x_cell = x.sel(cluID=id)
+        mean_cv = np.mean(variation(x_cell,axis=0,nan_policy='omit'))
+        cv_list.append(mean_cv)
+
+    return cv_list
+
+def plot_clusters(data_norm, labels, spk_event_time, var_name):
+    ncol=4
+    labels_unique = np.unique(labels)
+    nrow = (len(labels_unique)-1)//ncol+1
+    fig = plt.figure(figsize=(ncol*3,nrow*3))
+    colors = plt.cm.Accent.colors
+    
+    for idx,lbl in enumerate(labels_unique[1:]):
+        ax = fig.add_subplot(nrow, ncol, idx+1)
+        ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)})')
+        curves = data_norm[labels==lbl,:].T
+        x_coord = spk_event_time
+        ax.plot(x_coord, curves, color=colors[idx%len(colors)]);
+        ax.plot(x_coord, curves.mean(axis=1), color='k');
+        ax.axvline(x=0,ls='--', color='gray')
+    
+    
+    fig.suptitle(var_name)
+    fig.tight_layout()
+    return fig
+
+def smooth_response(da_sel):
+    #smooth the resopnse curve
+    data = da_sel.data.T
+    data_smooth = signal.savgol_filter(data,51,1)
+    data_norm = preprocessing.minmax_scale(data_smooth,axis=1) 
+    return data_norm
+
+def cluster_cell(data_norm, min_sample = 10, verbose=False):
+    # search for the best eps
+    metrics = []
+    nlabels_list = []
+    eps_list = np.linspace(0.003, 0.02, 10)
+    for eps in eps_list:
+        clustering = cluster.DBSCAN(min_samples=min_sample, eps=eps, metric='correlation').fit(data_norm)
+        nlabels = len(np.unique(clustering.labels_))
+        outliner_perc = np.mean(clustering.labels_==-1)
+        if verbose:
+            print(f'{eps}: {nlabels} clusters, outliner percent: {outliner_perc}')
+            
+        metrics.append(nlabels/(outliner_perc*5+1))
+        nlabels_list.append(nlabels)
+
+    best_idx = np.argmax(metrics)
+    best_eps = eps_list[best_idx]
+    if verbose:
+        print(f'best eps is {best_eps} with {nlabels_list[best_idx]} clusters')
+        # plt.plot(metrics)
+        
+    clustering = cluster.DBSCAN(min_samples=min_sample, eps=best_eps, metric='correlation').fit(data_norm)
+        
+    labels = clustering.labels_
+
+    return labels
