@@ -68,9 +68,12 @@ else:
 #%%
 if fn == []:
     photometry_times_pyc = None
+    photometry_keys= None
 else:
     photometry_aligner = Rsync_aligner(pycontrol_time, data_photometry['pulse_times_2'])
     photometry_times_pyc = photometry_aligner.B_to_A(data_photometry['time'])
+    photometry_keys =  [k for k in data_photometry.keys() if 'analog' in k]
+
 
 #remove all state change event
 df_pycontrol = df_pycontrol.dropna(subset='name')
@@ -78,8 +81,6 @@ df2plot = df_pycontrol[df_pycontrol.type == 'event']
 # state is handled separately with export_state, whereas parameters are handled vchange_to_text
 
 keys = df2plot.name.unique()
-
-photometry_keys =  [k for k in data_photometry.keys() if 'analog' in k]
 
 #%%
 '''

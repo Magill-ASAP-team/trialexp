@@ -313,6 +313,11 @@ def compute_trial_outcome(row, task_name):
             return 'success'
         else:
             return 'undefined'
+    elif task_name in ['pavlovian_reaching_Oct23', 'pavlovian_reaching_Oct26']:
+        if row.spout:
+            return 'success'
+        else:
+            return 'no_reach'
     else:
         if row.success:
             return 'success'

@@ -65,8 +65,10 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
         ax.set(xlim=xlim)
 
 
-        
-    sns.move_legend(ax, "upper left", bbox_to_anchor=(1.2, 1))
+    try: 
+        sns.move_legend(ax, "upper left", bbox_to_anchor=(1.2, 1))
+    except ValueError:
+        pass
     
     # add another legend manually for the markers
     g.figure.text(1,0.3, '|    spout touch')
