@@ -120,6 +120,16 @@ if has_photometry:
         add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
                     dataset,event_time_coord, 
                     var, 'last_bar_off', dataset.attrs['sampling_rate'])
+    
+        # Also add data from any additional event triggers
+        if 'extra_event_triggers' in df_event.attrs:
+            for evt_triggers in df_event.attrs['extra_event_triggers']:
+                add_event_data(df_event, event_filters.get_events_from_name,
+                    trial_window, dataset, event_time_coord, 
+                    var, evt_triggers, dataset.attrs['sampling_rate'],
+                    groupby_col=None,
+                    filter_func_kwargs={'evt_name':evt_triggers})
+            
 
 
     dataset = dataset.sel(time = dataset.trial>=0) #remove data outside of task
@@ -149,9 +159,8 @@ else:
     
     # save a dummpy photometry file to satisfy snakemake
     Path(soutput.xr_photometry).touch()
-    
-
-# Bin the data such that we only have 1 data point per time bin
+            
+#%% Bin the data such that we only have 1 data point per time bin
 # bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz
 down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
 dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
@@ -178,6 +187,3 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
-
-
-# %%

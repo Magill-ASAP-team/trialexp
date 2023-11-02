@@ -166,10 +166,10 @@ def get_task_specs(tasks_trig_and_events, task_name):
     
     trial_window = tasks_trig_and_events['trial_window'][task_idx].iloc[0].split(';')
     trial_window = list(map(float, trial_window))
-    # REMOVED, now only at Experiment level to avoid inconsistencies
-    # define trial_window parameter for extraction around triggers
-    # self.trial_window = trial_window        
-    return conditions, triggers, events_to_process, trial_window
+    
+    extra_event_trigger = tasks_trig_and_events['extra_trigger_events'][task_idx].iloc[0].split(';')
+         
+    return conditions, triggers, events_to_process, trial_window, extra_event_trigger
 
 def get_rel_time(df, trigger_name):
     # get the relative time to the trigger within a trial

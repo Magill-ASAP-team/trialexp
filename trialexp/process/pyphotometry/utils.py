@@ -1003,14 +1003,17 @@ def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate,
             event_found.append(False)
         
     # align to the longest element
-    data  = np.vstack(data)
+    if len(data)>0:
+        data  = np.vstack(data).astype(float)
+    else:
+        data = np.empty((0,int((window[1]-window[0])/1000*sampling_rate)))
     
     # if data_len is provide, perform additional check or correct the data length
     if data_len is not None:
         if not data.shape[0]==data_len:
             data = data[:data_len,:]
     
-    return data.astype(float),event_found #only float support NA
+    return data,event_found #only float support NA
 
 #%% Calulate the relative time
 def get_rel_time(trigger_timestamp, window, aligner, ref_time):
@@ -1110,7 +1113,7 @@ def make_rel_time_xr(event_time, windows, pyphoto_aligner, ref_time):
     return rel_time
 
 def make_event_xr(event_time, trial_window,
-                  event_time_coordinate,  dataArray, sampling_rate):
+                  event_time_coordinate,  dataArray, sampling_rate, group='trial_nb', dim_name=None):
     '''
     Create xarray.DataArray object for the continuous data around provided timestamp. 
 
@@ -1133,21 +1136,29 @@ def make_event_xr(event_time, trial_window,
     Note:
         It returns only data from extract_event_data() function ignoring the event_found.
     '''
-    
-   
-    assert event_time.index.name =='trial_nb', 'event_time should have a trial_nb index'
     data, _ = extract_event_data(event_time, trial_window, dataArray, sampling_rate)
+    if group =='trial_nb':
+        assert event_time.index.name =='trial_nb', 'event_time should have a trial_nb index'
+        da = xr.DataArray(
+            data, coords={'event_time':event_time_coordinate, 
+                        'trial_nb':event_time.index.values},
+                            dims=('trial_nb','event_time'))
+    else:
+        # do not care about the trial structure, just extract everything
 
-    da = xr.DataArray(
-        data, coords={'event_time':event_time_coordinate, 
-                      'trial_nb':event_time.index.values},
-                        dims=('trial_nb','event_time'))
-        
+        if dim_name is None:
+            raise ValueError('If not using trial_nb as group, you need to specify the group name for the datarray coordiante')
+        da = xr.DataArray(
+            data, 
+            coords={'event_time':event_time_coordinate, 
+                        f'{dim_name}_idx':np.arange(len(event_time))},
+            dims=(f'{dim_name}_idx','event_time')
+        )
     return da
 
 def add_event_data(df_event, filter_func, trial_window,
                    dataset, event_time_coordinate, data_var_name, 
-                   event_name, sampling_rate, filter_func_kwargs={}):
+                   event_name, sampling_rate, groupby_col='trial_nb',filter_func_kwargs={}):
     '''
     Add continuous data around provided timestamp to a dataset.
 
@@ -1181,10 +1192,12 @@ def add_event_data(df_event, filter_func, trial_window,
         each timestamp.  It requires two supporting functions make_event_xr() & extract_event_time().
     '''
 
-    event_time = extract_event_time(df_event, filter_func, filter_func_kwargs)
+    event_time = extract_event_time(df_event, filter_func, filter_func_kwargs, groupby_col=groupby_col)
     xr_event_data = make_event_xr(event_time, trial_window,
                                             event_time_coordinate,
-                                            dataset[data_var_name], sampling_rate)
+                                            dataset[data_var_name], sampling_rate,
+                                            group=groupby_col,
+                                            dim_name=event_name)
     dataset[f'{event_name}_{data_var_name}'] = xr_event_data
 # %%
 def fit_exp_baseline(curve, sampling_rate, smooth_window=4001):
