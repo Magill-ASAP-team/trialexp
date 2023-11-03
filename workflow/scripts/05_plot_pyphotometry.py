@@ -56,7 +56,7 @@ var2plot = [k for k in xr_session.data_vars.keys() if 'event_time' in xr_session
 #%%
 
 for k in var2plot:    
-    print(k)
+    # print(k)
     if 'trial_nb' in xr_session[k].coords:
         df2plot = xr_session[[k,'trial_outcome']].to_dataframe().reset_index()
         df2plot = df2plot[~df2plot.trial_outcome.isin(skip_outcome)]

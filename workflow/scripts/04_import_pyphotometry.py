@@ -98,6 +98,9 @@ if has_photometry:
     if 'zscored_df_over_f_analog_2' in  dataset:
         var2add.append('zscored_df_over_f_analog_2')
         
+    if 'zscored_df_over_f_analog_3' in dataset:
+        var2add.append('zscored_df_over_f_analog_3')
+
 
     for var in var2add:
          # Add trigger
@@ -187,3 +190,5 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
+
+# %%

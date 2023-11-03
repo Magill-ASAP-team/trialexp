@@ -316,6 +316,11 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
     else:
         photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_filt'] / photometry_dict['analog_2_baseline_fluo']
     
+    if 'analog_3_detrended' in photometry_dict:
+        photometry_dict['analog_3_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_3_filt'], padtype='even')
+        photometry_dict['analog_3_df_over_f'] = photometry_dict['analog_3_detrended'] / photometry_dict['analog_3_baseline_fluo']
+
+    
     return photometry_dict
 
 #----------------------------------------------------------------------------------
@@ -324,8 +329,13 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
 
 def compute_zscore(photometry_dict):
     photometry_dict['zscored_df_over_f'] = zscore(photometry_dict['analog_1_df_over_f'])
-    if 'analog_2_corrected' in photometry_dict.keys():
+    
+    if 'analog_2_corrected' in photometry_dict:
         photometry_dict['zscored_df_over_f_analog_2'] = zscore(photometry_dict['analog_2_df_over_f'])
+        
+    if 'analog_3_detrended' in photometry_dict:
+        photometry_dict['zscored_df_over_f_analog_3'] = zscore(photometry_dict['analog_3_df_over_f'])
+
     return photometry_dict
 
 def median_filtering(data, medfilt_size: int = 3) -> np.ndarray:
