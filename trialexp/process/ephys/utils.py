@@ -20,6 +20,10 @@ import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
 from scipy import signal, spatial
+from fastdtw import fastdtw
+from tslearn.barycenters import softdtw_barycenter
+
+
 
 def denest_string_cell(cell):
         if len(cell) == 0: 
@@ -505,20 +509,36 @@ def get_cell_mean_cv(x, coarsen_factor = 5):
 
     return cv_list
 
-def plot_clusters(data_norm, labels, spk_event_time, var_name):
+def plot_clusters(data_norm, labels, spk_event_time, var_name, use_dtw_average=False, smooth_average=True):
+    
     ncol=4
     labels_unique = np.unique(labels)
+    labels_unique = [x for x in labels if x!=-1] #remove the outliner cluster
     nrow = (len(labels_unique)-1)//ncol+1
     fig = plt.figure(figsize=(ncol*3,nrow*3))
     colors = plt.cm.Accent.colors
     
-    for idx,lbl in enumerate(labels_unique[1:]):
+    if use_dtw_average:
+        # need to precompute the mean curve with joblib because it takes time
+        print('I will now compute the barycenters of clusters')
+        def compute_mean_curve(curves):
+            return softdtw_barycenter(curves, gamma=1, max_iter=20, tol=1e-3)  
+        
+        mean_curves = Parallel(n_jobs=10,verbose=10)(delayed(compute_mean_curve)(data_norm[labels==lbl,:]) for lbl in labels_unique)
+        
+    for idx,lbl in tqdm(enumerate(labels_unique)):
+        print(idx)
         ax = fig.add_subplot(nrow, ncol, idx+1)
         ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)})')
         curves = data_norm[labels==lbl,:].T
         x_coord = spk_event_time
         ax.plot(x_coord, curves, color=colors[idx%len(colors)]);
-        ax.plot(x_coord, curves.mean(axis=1), color='k');
+        if not use_dtw_average:
+            ax.plot(x_coord, curves.mean(axis=1), color='k');
+        else:
+            # use soft-DTW Barycenter for the average, it is smoother than original Barycenter
+            ax.plot(x_coord, mean_curves[idx], color='k');
+            
         ax.axvline(x=0,ls='--', color='gray')
     
     
@@ -559,3 +579,38 @@ def cluster_cell(data_norm, min_sample = 10, verbose=False):
     labels = clustering.labels_
 
     return labels
+
+def parse_cluID(s):
+    ss = s.split('_')
+    session_id = ss[0]
+    probe = ss[1]
+    id = ss[2]
+    animal_id = session_id.split('-')[0]
+    date = '-'.join(session_id.split('-')[1:5])
+
+    return {'animal_id':animal_id,
+            'probe':probe,
+            'id': id,
+            'date': date}
+    
+def make_symmetric(results):
+    #
+    max_len = max(map(len,results))
+    out = np.zeros((max_len,max_len))
+    
+    for i in range(len(results)):
+        out[i,:len(results[i])] = results[i]
+
+    out = np.vstack(out)
+    
+    #make diagonal matrix
+    out = out + out.T-np.diag(out.diagonal())
+    return out
+
+def cal_dtw(da_norm, i):
+    dist = np.zeros((i+1,))
+    x = da_norm.copy()
+    for j in range(i):
+        dist[j],_= fastdtw(x[i,:], x[j,:])
+
+    return dist
