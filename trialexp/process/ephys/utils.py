@@ -513,7 +513,7 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, use_dtw_average=F
     
     ncol=4
     labels_unique = np.unique(labels)
-    labels_unique = [x for x in labels if x!=-1] #remove the outliner cluster
+    labels_unique = [x for x in labels_unique if x!=-1] #remove the outliner cluster
     nrow = (len(labels_unique)-1)//ncol+1
     fig = plt.figure(figsize=(ncol*3,nrow*3))
     colors = plt.cm.Accent.colors
