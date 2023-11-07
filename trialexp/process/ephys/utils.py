@@ -526,7 +526,7 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, use_dtw_average=F
         
         mean_curves = Parallel(n_jobs=10,verbose=10)(delayed(compute_mean_curve)(data_norm[labels==lbl,:]) for lbl in labels_unique)
         
-    for idx,lbl in tqdm(enumerate(labels_unique)):
+    for idx,lbl in enumerate(labels_unique):
         ax = fig.add_subplot(nrow, ncol, idx+1)
         ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)})')
         curves = data_norm[labels==lbl,:].T
