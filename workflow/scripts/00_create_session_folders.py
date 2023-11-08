@@ -41,7 +41,7 @@ skip_existing = True #whether to skip existing folders
 #                 'reaching_go_spout_incr_break2_nov22',
 #                 'pavlovian_spontanous_reaching_march23',
 #                 'pavlovian_reaching_Oct23'] #task name to copy, if empty then search for all tasks
-task_to_copy = ['pavlovian_reaching_Oct23'] #task name to copy, if empty then search for all tasks
+task_to_copy = ['pavlovian_reaching_Oct23','Spontanous_reaching_nov23'] #task name to copy, if empty then search for all tasks
 #%%
 
 def get_df_video(video_folder):
@@ -66,13 +66,9 @@ def get_matched_timestamp(df, df_pycontrol_row, camera_no=2, min_minute=3):
 
 # %%
 
-for task_id, task in enumerate(tasks):
-    
-    if len(task_to_copy)>0:
-        if not task in task_to_copy:
-            continue
+for task_id, task in enumerate(task_to_copy):
 
-    print(f'task {task_id+1}/{len(tasks)}: {task}')
+    print(f'task {task_id+1}/{len(task_to_copy)}: {task}')
     export_base_path = SESSION_ROOT_DIR/f'{task}'
 
     pycontrol_folder = ETTIN_DATA_FOLDER/'head-fixed'/'pycontrol'/f'{task}'
