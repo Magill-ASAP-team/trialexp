@@ -134,3 +134,19 @@ def get_session_date(session_id):
     if type(session_id) is str:
     # only return the date of the session
         return '-'.join(session_id.split('-')[:-1])
+    
+def ccfmm2ccf(ap_mm, dv_mm, ml_mm, bregma=[5400, 0, 5700], atlas_resolution=0.001):
+    # covert back the ap_mm etc. back to the original CCF coordinate
+    ap = (-ap_mm/atlas_resolution+bregma[0])
+    dv = (dv_mm/atlas_resolution+bregma[1])
+    ml = (ml_mm/atlas_resolution+bregma[2])
+    
+    return ap,dv,ml
+
+def ccf2ccfmm(ap, dv, ml, bregma=[5400, 0, 5700]):
+    # convert breg centered coordinate back to the original CCF coordinate
+    # unit for bregma is in um
+    ap_mm = -(ap-bregma[0])/1000
+    dv_mm = (dv-bregma[1])/1000
+    ml_mm = (ml-bregma[2])/1000
+    return (ap_mm, dv_mm, ml_mm)

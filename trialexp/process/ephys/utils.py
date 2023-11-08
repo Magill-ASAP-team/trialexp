@@ -509,14 +509,14 @@ def get_cell_mean_cv(x, coarsen_factor = 5):
 
     return cv_list
 
-def plot_clusters(data_norm, labels, spk_event_time, var_name, use_dtw_average=False, smooth_average=True):
-    
-    ncol=4
+def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4, 
+                  use_dtw_average=False, smooth_average=True):
+
     labels_unique = np.unique(labels)
     labels_unique = [x for x in labels_unique if x!=-1] #remove the outliner cluster
     nrow = (len(labels_unique)-1)//ncol+1
     fig = plt.figure(figsize=(ncol*3,nrow*3))
-    colors = plt.cm.Accent.colors
+    colors = plt.cm.tab20.colors
     
     if use_dtw_average:
         # need to precompute the mean curve with joblib because it takes time
