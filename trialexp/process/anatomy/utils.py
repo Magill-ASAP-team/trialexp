@@ -150,3 +150,70 @@ def ccf2ccfmm(ap, dv, ml, bregma=[5400, 0, 5700]):
     dv_mm = (dv-bregma[1])/1000
     ml_mm = (ml-bregma[2])/1000
     return (ap_mm, dv_mm, ml_mm)
+
+def get_ap_extent(mask):
+    """
+    This is a function for calculating the anterior and posterior extent of a mask.
+
+    Args:
+        mask (numpy.ndarray): A three-dimensional array where non-zero values represent the region of interest.
+
+    Returns:
+        tuple: A tuple containing two elements - the start point (anterior extent) and the end point (posterior extent) of the mask along the AP axis.
+    """
+
+    ap_extent = mask.max(1).max(1) #collapse to AP axis only
+    idx = np.where(ap_extent!=0)[0] # find the beginning and end point of mask
+    start,end = idx[0], idx[-1]
+    return (start, end)
+
+
+def draw_brain_regions(region_names, bg_atlas, ax=None, draw_coord_range=None,
+                       plane='transverse', cmap='tab20', alpha=1, hemisphere_only=True):
+    # plot specified brain regions
+    
+    ap_coords, dv_coords, ml_coords = [np.arange(bg_atlas.shape[i])*bg_atlas.resolution[i] for i in range(3)]
+    ap_mm_coords, dv_mm_coords, ml_mm_coords = ccf2ccfmm(ap_coords, dv_coords, ml_coords)
+    
+    if type(region_names) is not list:
+        region_names = [region_names]
+
+    mask = None
+    mask_idx = 1
+    for name in region_names:
+        region_mask = bg_atlas.get_structure_mask(name)
+        if mask is None:
+            mask = region_mask
+        else:
+            mask += (region_mask + mask_idx)
+            mask_idx += 1
+            
+
+    if draw_coord_range is None:
+        start,end = get_ap_extent(mask)
+        draw_coord_range = ap_mm_coords[start], ap_mm_coords[end]
+
+    # search for the specified range
+    start_idx = np.searchsorted(-ap_mm_coords,-draw_coord_range[0]) # searchsort only works on ascending array, but ap is descending
+    end_idx = np.searchsorted(-ap_mm_coords, -draw_coord_range[1])
+    if end_idx <= start_idx:
+        end_idx = start_idx +1
+    
+    img = mask[start_idx:end_idx,:,:].max(0)
+
+        
+    if hemisphere_only:
+        img = img[:,:img.shape[1]//2]
+        extent = [ml_mm_coords[0], 0,dv_mm_coords[-1], 0]
+    else:
+        extent = [ml_mm_coords[0], ml_mm_coords[-1],dv_mm_coords[-1], 0]
+        
+        
+    if ax is not None:
+        ax2plot = ax
+    else:
+        ax2plot = plt
+        
+    ax2plot.imshow(img,cmap=cmap, extent=extent, alpha=alpha)
+
+    return ax
