@@ -9,6 +9,7 @@ import xarray as xr
 from trialexp.process.ephys.spikes_preprocessing import build_evt_fr_xarray
 from elephant.conversion import BinnedSpikeTrain
 import quantities as pq
+from trialexp.process.figures.plot_utils import create_plot_grid
 from trialexp.process.group_analysis.plot_utils import style_plot
 import seaborn as sns
 import neo 
@@ -22,6 +23,7 @@ from tqdm.auto import tqdm
 from scipy import signal, spatial
 from fastdtw import fastdtw
 from tslearn.barycenters import softdtw_barycenter
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
 
@@ -509,6 +511,9 @@ def get_cell_mean_cv(x, coarsen_factor = 5):
 
     return cv_list
 
+def std_score(w,axis):
+    return np.max(np.std(w,axis=1),axis=1)
+
 def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4, 
                   use_dtw_average=False, smooth_average=True):
 
@@ -613,3 +618,28 @@ def cal_dtw(da_norm, i):
         dist[j],_= fastdtw(x[i,:], x[j,:])
 
     return dist
+
+def plot_cell_waveforms(xa_waveforms, cluIDs, ncol=3, metrics=None, figsize_subplot=(3,3)):
+    # plot the spike waveform of specified IDs
+
+    fig, axes = create_plot_grid(len(cluIDs), ncol, dpi=100, figsize_plot=figsize_subplot)
+
+    for i in range(len(cluIDs)):
+        ax = axes[i]
+        cell2plot = xa_waveforms.sel(cluID=cluIDs[i])
+        cell2plot.plot(ax=ax)
+        
+        ax_insert = inset_axes(ax, width='40%', height='40%', loc='lower left')
+        ax_insert.plot(cell2plot.data.T)
+        
+        if metrics is not None:
+            ax.set_title(f'{metrics[i]:.2f}')
+        else:
+            title = '_'.join(cluIDs[i].split('_')[-2:])
+            ax.set_title(title)
+
+    fig.tight_layout()
+    
+def prominence_score(w,axis):
+    # ratio of the peak to peak to the standard deviation
+    return np.log(np.max(np.ptp(w,axis=1)/(np.median(w,axis=1)+0.001),axis=1))
