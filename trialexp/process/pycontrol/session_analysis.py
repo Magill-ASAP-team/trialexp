@@ -168,7 +168,7 @@ def get_task_specs(tasks_trig_and_events, task_name):
     trial_window = list(map(float, trial_window))
     
     extra_trigger_info = tasks_trig_and_events['extra_trigger_events'][task_idx].iloc[0]
-    extra_event_trigger = extra_trigger_info.split(';') if not np.isnan(extra_trigger_info) else []
+    extra_event_trigger = extra_trigger_info.split(';') if type(extra_trigger_info) is str else []
          
     return conditions, triggers, events_to_process, trial_window, extra_event_trigger
 
