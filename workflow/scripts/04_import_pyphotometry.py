@@ -127,7 +127,8 @@ if has_photometry:
         # Also add data from any additional event triggers
         if 'extra_event_triggers' in df_event.attrs:
             for evt_triggers in df_event.attrs['extra_event_triggers']:
-                add_event_data(df_event, event_filters.get_events_from_name,
+                #Note: df_event only contains event extract around the trigger
+                add_event_data(df_pycontrol, event_filters.get_events_from_name,
                     trial_window, dataset, event_time_coord, 
                     var, evt_triggers, dataset.attrs['sampling_rate'],
                     groupby_col=None,
@@ -162,7 +163,15 @@ else:
     
     # save a dummpy photometry file to satisfy snakemake
     Path(soutput.xr_photometry).touch()
-            
+    
+#%%
+# evt_triggers='spout'
+# add_event_data(df_pycontrol, event_filters.get_events_from_name,
+#     trial_window, dataset, event_time_coord, 
+#     var, evt_triggers, dataset.attrs['sampling_rate'],
+#     groupby_col=None,
+#     filter_func_kwargs={'evt_name':evt_triggers})
+        
 #%% Bin the data such that we only have 1 data point per time bin
 # bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz
 down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
