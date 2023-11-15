@@ -24,6 +24,7 @@ from scipy import signal, spatial
 from fastdtw import fastdtw
 from tslearn.barycenters import softdtw_barycenter
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import pingouin as pg
 
 
 
@@ -643,3 +644,60 @@ def plot_cell_waveforms(xa_waveforms, cluIDs, ncol=3, metrics=None, figsize_subp
 def prominence_score(w,axis):
     # ratio of the peak to peak to the standard deviation
     return np.log(np.max(np.ptp(w,axis=1)/(np.median(w,axis=1)+0.001),axis=1))
+
+def get_random_evt_data(xr_fr, da, trial_window, num_sample=1000):
+    timestamps = sorted(np.random.choice(xr_fr.time, size=num_sample, replace=False))
+    trial_nb = np.arange(len(timestamps))
+    bin_duration = xr_fr.attrs['bin_duration']
+    da_rand = build_evt_fr_xarray(xr_fr.spikes_FR_session, timestamps, trial_nb, f'{da.name}', 
+                                                trial_window, bin_duration)
+
+    return da_rand
+
+def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5):
+    da1 = da_rand.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
+    da1 = da1.to_dataframe().reset_index()
+    da1['group'] = 'random'
+    da1 = da1.dropna()
+
+    da2 = da.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
+    da2 = da2.to_dataframe().reset_index()
+    da2['group'] = 'event'
+    da2['trial_nb'] += da1.trial_nb.max()
+
+    data2test = pd.concat([da1, da2])
+    
+    data2test = data2test.rename(columns={dpvar_name:'dv'})
+    return data2test
+
+def do_mix_anova_analysis(data2test):
+
+    # First do mixed anova test
+    anova_result = pg.mixed_anova(dv='dv', within='spk_event_time',between='group', 
+                   subject='trial_nb', 
+                   data=data2test)
+    anova_result = anova_result.set_index('Source')
+    
+    comparison_result = {
+        'cluID': data2test.iloc[0].cluID,
+        'group_p': anova_result.loc['group','p-unc'],
+        'spk_event_time_p': anova_result.loc['spk_event_time','p-unc'],
+        'interaction_p': anova_result.loc['Interaction','p-unc']
+    }
+
+    # then do postdoc test with multiple comparison correction
+    paired_test_result = pg.pairwise_tests(data2test, dv='dv', 
+                  within='spk_event_time',between='group', 
+               subject='trial_nb', padjust='bonf')
+
+    #only focus on the time period where there is siginficant interaction between group and time
+    time_sig = paired_test_result[(paired_test_result['p-corr']<0.05) & (paired_test_result.Paired==False)]
+
+    comparison_result.update(
+        {
+            'sig_interaction_time': time_sig.spk_event_time.values,
+            'sig_interaction_time_p': time_sig['p-corr'].values,
+            'interaction_padjust': time_sig.iloc[0]['p-adjust'] if len(time_sig)>0 else None
+        })
+
+    return comparison_result
