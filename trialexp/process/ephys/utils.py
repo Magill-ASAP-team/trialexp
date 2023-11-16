@@ -662,7 +662,7 @@ def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5
 
     da2 = da.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
     da2 = da2.to_dataframe().reset_index()
-    da2['group'] = 'event'
+    da2['group'] = 'event-triggered'
     da2['trial_nb'] += da1.trial_nb.max()
 
     data2test = pd.concat([da1, da2])
@@ -701,3 +701,12 @@ def do_mix_anova_analysis(data2test):
         })
 
     return comparison_result
+
+def get_chan_coords(xr_spikes_trials):
+    # return a dataframe of the coordinations of each unit based on its maxWaveformCh
+    waveform_chan = xr_spikes_trials.maxWaveformCh.to_dataframe()
+    chanCoords_x = xr_spikes_trials.attrs['chanCoords_x']
+    chanCoords_y = xr_spikes_trials.attrs['chanCoords_y']
+    waveform_chan['pos_x'] = chanCoords_x[waveform_chan.maxWaveformCh.astype(int)]
+    waveform_chan['pos_y'] = chanCoords_y[waveform_chan.maxWaveformCh.astype(int)]
+    return waveform_chan.reset_index()

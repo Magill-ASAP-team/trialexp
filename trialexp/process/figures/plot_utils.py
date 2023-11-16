@@ -1,6 +1,8 @@
 from scipy.cluster.hierarchy import dendrogram
 import matplotlib.pylab as plt 
 import numpy as np
+import PIL
+from io import BytesIO
 
 def create_plot_grid(n_plots, ncol, figsize_plot=(3,3), **kwargs):
     nrow = n_plots//ncol + 1
@@ -32,3 +34,26 @@ def plot_dendrogram(model, **kwargs):
 
     # Plot the corresponding dendrogram
     dendrogram(linkage_matrix, **kwargs)
+    
+    
+def combine_figures(figs, ncol=6):
+    #combine figures together, figures are assumed to be the same size
+    if len(figs)>0:
+        nrow = np.ceil(len(figs)/ncol).astype(int)
+        width, height = figs[0].canvas.get_width_height()
+        combined = PIL.Image.new('RGB', (width*ncol, height*nrow),'white')
+        
+        for i, fig in enumerate(figs):
+            
+            # save the figure as buf
+            buf = BytesIO()
+            fig.savefig(buf, format='png')
+            buf.seek(0)
+            image = PIL.Image.open(buf)
+
+            # paste to final images
+            combined.paste(image, (width*(i%ncol), height*(i//ncol)))
+    else:
+        combined = PIL.Image.new('RGB', (100,100),'white')
+
+    return combined

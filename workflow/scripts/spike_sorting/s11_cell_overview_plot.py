@@ -11,7 +11,7 @@ import xarray as xr
 from matplotlib import gridspec
 from snakehelper.SnakeIOHelper import getSnake
 from trialexp.process.ephys.spikes_preprocessing import build_evt_fr_xarray
-from trialexp.process.ephys.utils import combine2dataframe, compare_fr_with_random, compute_tuning_prop, diff_permutation_test, get_max_sig_region_size, get_pvalue_random_events, plot_firing_rate
+from trialexp.process.ephys.utils import *
 from trialexp.process.group_analysis.plot_utils import style_plot
 from joblib import Parallel, delayed
 
@@ -20,8 +20,8 @@ from workflow.scripts import settings
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/cell_trial_responses.done'],
-  'cell_trial_responses_plot')
+  [settings.debug_folder + r'/processed/cell_overview.done'],
+  'cell_overview_plot')
 
 
 # %% Define variables and folders
@@ -42,11 +42,8 @@ df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
 
 #%% Overall firing rate plot
 # need to get the channel map and plot them in the correct depth
-waveform_chan = xr_spikes_trials.maxWaveformCh.to_dataframe()
-chanCoords_x = xr_spikes_trials.attrs['chanCoords_x']
-chanCoords_y = xr_spikes_trials.attrs['chanCoords_y']
-waveform_chan['pos_x'] = chanCoords_x[waveform_chan.maxWaveformCh.astype(int)]
-waveform_chan['pos_y'] = chanCoords_y[waveform_chan.maxWaveformCh.astype(int)]
+waveform_chan = get_chan_coords(xr_spikes_trials)
+waveform_chan = waveform_chan.set_index('cluID')
 xr_fr_coord = xr_fr.merge(waveform_chan)
 xr_fr_coord.attrs['probe_names'] = xr_spikes_trials.attrs['probe_names']
 xr_fr_coord = xr_fr_coord.sortby('pos_y')
@@ -89,58 +86,3 @@ for probe_name in probe_names:
     fig.savefig(figures_path/f'firing_map_{probe_name}_2min.png',dpi=200)
     
     
-
-#%% compute tuning prop
-var2plot = [x for x in xr_spikes_trials if x.startswith('spikes_FR')]
-bin_duration = xr_fr.attrs['bin_duration']
-trial_window = xr_spikes_trials.attrs['trial_window']
-
-#%%
-style_plot()
-
-def draw_response_curve(var_name):
-    print(f'Drawing the response curve for {var_name}')
-    da = xr_spikes_trials[var_name]
-
-    da_rand, pvalues, pvalue_ratio = get_pvalue_random_events(da, xr_fr, trial_window, bin_duration)
-    
-    max_region_size = get_max_sig_region_size(pvalues, p_threshold=0.05)
-
-    max_region_size[(max_region_size>100)|(max_region_size<10)] = 0 #only focus on region between 1s and 100ms
-    sortIdx = np.argsort(max_region_size)[::-1]
-    cluID_sorted = da.cluID[sortIdx]
-    pvalues_sorted = pvalues[sortIdx,:]
-
-
-    fig, ax = plt.subplots(4,4,dpi=200, figsize=(4*3,4*3))
-
-    for cellIdx2plot in range(len(ax.flat)):
-        compare_fr_with_random(da, da_rand, 
-                            cluID_sorted[cellIdx2plot], pvalues_sorted[cellIdx2plot,:],
-                            ax=ax.flat[cellIdx2plot])
-
-    fig.tight_layout()
-    fig.savefig(figures_path/f'event_response_{var_name}.png',dpi=200)
-    
-    return {var_name:{
-        'pvalues': pvalues.tolist(),
-        'pvalue_ratio': pvalue_ratio,
-        'max_region_size':max_region_size
-    }}
-    
-    #TODO also draw the heatmaps
-    #TODO: save the resutls of the significance analysis to another dataframe
-    
-# use joblib to speed up the processing
-# generator expression
-result = Parallel(n_jobs=len(var2plot))(delayed(draw_response_curve)(var_name) for var_name in var2plot)
-df_tuning = combine2dataframe(result)
-df_tuning['cluID'] = xr_spikes_trials.cluID
-
-# %%
-# Extract additional cell characteristics
-df_chan_coords  = xr_fr_coord[['pos_x','pos_y','maxWaveformCh']].to_dataframe()
-
-# save
-df_cell_prop = df_tuning.merge(df_chan_coords, on='cluID')
-df_cell_prop.to_pickle(Path(soutput.df_cell_prop))
