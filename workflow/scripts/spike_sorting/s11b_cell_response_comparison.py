@@ -52,7 +52,6 @@ for varname in var2plot:
 
         data2test = create_comparison_dataframe(da_rand,da, id, varname)
         data2test = data2test[(data2test.spk_event_time>-500 ) & (data2test.spk_event_time<500)]
-        
         comparison_result = do_mix_anova_analysis(data2test)
         
         # also plot the response curve, depending on a probability
@@ -85,6 +84,7 @@ for varname in var2plot:
     combined_fig = plot_utils.combine_figures(fig2plot)
     combined_fig.save(Path(soutput.response_curves_path)/f'response_curve_{varname}.png')
 
+#%%
 #%% Combine the comparison results into a dataframe and then save
 df_tuning = pd.concat(df_list)
 waveform_chan = get_chan_coords(xr_spikes_trials)

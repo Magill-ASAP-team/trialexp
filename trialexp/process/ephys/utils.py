@@ -668,6 +668,7 @@ def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5
     data2test = pd.concat([da1, da2])
     
     data2test = data2test.rename(columns={dpvar_name:'dv'})
+    data2test = data2test.dropna()
     return data2test
 
 def do_mix_anova_analysis(data2test):
