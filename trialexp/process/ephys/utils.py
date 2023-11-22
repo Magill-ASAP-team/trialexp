@@ -25,7 +25,7 @@ from fastdtw import fastdtw
 from tslearn.barycenters import softdtw_barycenter
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pingouin as pg
-
+from trialexp.process.ephys.spikes_preprocessing import get_spike_trains
 
 
 def denest_string_cell(cell):
@@ -711,3 +711,50 @@ def get_chan_coords(xr_spikes_trials):
     waveform_chan['pos_x'] = chanCoords_x[waveform_chan.maxWaveformCh.astype(int)]
     waveform_chan['pos_y'] = chanCoords_y[waveform_chan.maxWaveformCh.astype(int)]
     return waveform_chan.reset_index()
+
+
+def get_pss(data, axis):
+    # calculate the post-spike supression
+    #assumption is that post-spike suppression ends after 100ms
+    fr_exceed = data[500:1000,:] > np.mean(data[600:900,:],axis=0)
+    
+    # find out when the firing rate return to mean after suppression
+    # i.e. the first True value after the comparison
+    return list(map(lambda x: np.where(x)[0][0], fr_exceed.T))
+
+def long_isi_ratio_(spiketimes, total_time):
+    isi = np.diff(spiketimes)
+    return np.sum(isi[isi>2000])/total_time
+    
+def cal_long_isi_ratio(sorting_path):
+    synced_timestamp_files = list(sorting_path.glob('*/sorter_output/rsync_corrected_spike_times.npy'))
+    spike_clusters_files = list(sorting_path.glob('*/sorter_output/spike_clusters.npy'))
+    spike_trains, all_clusters_UIDs = get_spike_trains(synced_timestamp_files, spike_clusters_files)
+
+    # calculate the long isi ratio
+    long_isi_ratio = np.zeros((len(spike_trains),))
+    for i, spktrain in enumerate(spike_trains):
+        long_isi_ratio[i] =  long_isi_ratio_(spktrain.times, spktrain.t_stop)
+
+    df = pd.DataFrame({'cluID': all_clusters_UIDs, 'long_isi_ratio': long_isi_ratio})
+    df = df.set_index('cluID')
+    
+    return df
+
+def classify_cell_type(cell):
+    '''
+    According to Andrew Peters et. al (Nature 2021)
+    '''
+    if cell['troughToPeak'] <0.4:
+        if cell['acg_pss']>40:
+            return 'unknown'
+            
+        if cell['long_isi_ratio']>0.1:
+            return 'UIN'
+        else:
+            return 'FSI'
+    else:
+        if cell['acg_pss'] > 40: #assume 1 bin is 1ms
+            return 'TAN'
+        else:
+            return 'MSN'
