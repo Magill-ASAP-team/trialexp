@@ -13,10 +13,7 @@ def create_plot_grid(n_plots, ncol, figsize_plot=(3,3), **kwargs):
         axes.append(ax)
     return fig, axes
 
-def plot_dendrogram(model, **kwargs):
-    # Create linkage matrix and then plot the dendrogram
-
-    # create the counts of samples under each node
+def make_linkage(model):
     counts = np.zeros(model.children_.shape[0])
     n_samples = len(model.labels_)
     for i, merge in enumerate(model.children_):
@@ -31,9 +28,18 @@ def plot_dendrogram(model, **kwargs):
     linkage_matrix = np.column_stack(
         [model.children_, model.distances_, counts]
     ).astype(float)
+    
+    return linkage_matrix
+    
+
+def plot_dendrogram(model, **kwargs):
+    # Create linkage matrix and then plot the dendrogram
+
+    # create the counts of samples under each node
+    linkage_matrix = make_linkage(model)
 
     # Plot the corresponding dendrogram
-    dendrogram(linkage_matrix, **kwargs)
+    return dendrogram(linkage_matrix, **kwargs)
     
     
 def combine_figures(figs, ncol=6):
