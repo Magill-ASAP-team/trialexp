@@ -419,8 +419,10 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
 
     # To perform for delayed tasks (check whether a US_end_timer was preceded by a spout)
     elif task_name in ['reaching_go_spout_bar_dual_all_reward_dec22', 
-        'reaching_go_spout_bar_dual_dec22', 'reaching_go_spout_bar_nov22',
-        'reaching_go_spout_bar_mar23']:
+                        'reaching_go_spout_bar_dual_dec22', 
+                        'reaching_go_spout_bar_nov22',
+                        'reaching_go_spout_bar_mar23',
+                        'reaching_go_spout_bar_june05']:
 
         if 'spout_trial_time' in df_events.columns and 'US_end_timer_trial_time' in df_events.columns:
 
