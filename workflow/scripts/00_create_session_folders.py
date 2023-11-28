@@ -84,6 +84,8 @@ for task_id, task in enumerate(task_to_copy):
     open_ephys_folders = os.listdir(ephys_base_path)
 
     df_pycontrol = pd.DataFrame(list(map(parse_pycontrol_fn, pycontrol_files)))
+    assert len(df_pycontrol) == len(pycontrol_files)
+    
     df_pycontrol = df_pycontrol[(df_pycontrol.subject_id!='00') & (df_pycontrol.subject_id!='01')] # do not copy the test data
 
     try:
@@ -162,9 +164,19 @@ for task_id, task in enumerate(task_to_copy):
         if not df_ephys_exp.empty:
             df_ephys_exp_subject = df_ephys_exp[df_ephys_exp.subject_id == row.subject_id]
             if not df_ephys_exp_subject.empty:
+                
+                # need to be more careful about the matching because ephys can start
+                # much earlier than pycontrol session
+                # find all potential match, choose the one that is earlier and closest
+                td = (row.timestamp - df_ephys_exp_subject.exp_datetime)
+                td = np.array([t.total_seconds() for t in td])
+                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1]
                 min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                
                 idx = np.argmin(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
-
+                
+                
+                
                 if min_td < timedelta(days=0.25):
                     matched_ephys_path.append(ephys_base_path / df_ephys_exp_subject.iloc[idx].foldername)
                     matched_ephys_fn.append(df_ephys_exp_subject.iloc[idx].foldername)
