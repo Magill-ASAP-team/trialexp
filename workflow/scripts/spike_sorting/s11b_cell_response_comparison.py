@@ -44,6 +44,10 @@ df_list = []
 for varname in var2plot:
     print('I will now do the comparison for ', varname)
     da = xr_spikes_trials[varname]
+    
+    #only select successful trial
+    da = da.sel(trial_nb = xr_spikes_trials.trial_outcome=='success')
+    
     da_rand = get_random_evt_data(xr_fr, da, trial_window)
 
     def compare_random(id):
