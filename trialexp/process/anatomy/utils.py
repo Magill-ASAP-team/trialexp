@@ -240,4 +240,4 @@ def draw_brain_regions(region_names, bg_atlas, ax=None, draw_coord_range=None,
         ax2plot.imshow(img.T,cmap=cmap, extent=extent, alpha=alpha)
 
 
-    return ax, mask
+    return ax, mask, extent
