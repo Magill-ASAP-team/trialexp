@@ -16,14 +16,14 @@ def rec_properties_input(wildcards):
     else:
         return []
 
-def gather_metrics_to_aggregate(wildcards):
-    # determine if there is processed cell metrics in that folder
-    # cell_metrics_df_clustering = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl')
-    # if len(recording_csv) > 0:
-    #     return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl'
-    # else:
-    #     return []
-    ...
+# def gather_metrics_to_aggregate(wildcards):
+#     # determine if there is processed cell metrics in that folder
+#     # cell_metrics_df_clustering = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl')
+#     # if len(recording_csv) > 0:
+#     #     return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl'
+#     # else:
+#     #     return []
+#     ...
 
 def task2analyze(tasks:list=None):
     #specify the list of task to analyze to save time.
@@ -33,7 +33,7 @@ def task2analyze(tasks:list=None):
         tasks=['*']
 
     for t in tasks:
-        total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{t}/*'))        
+        total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{t}/TT001-2023-06-20-155707*'))        
 
     return total_sessions
 
@@ -118,6 +118,7 @@ rule cell_overview_plot:
     output:
         figures_path = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/overview'),
         cell_overview_complete = touch('{sessions}/{task_path}/{session_id}/processed/cell_overview.done'),
+    threads: 8
     script:
         "scripts/spike_sorting/s11_cell_overview_plot.py"
 
@@ -158,7 +159,7 @@ rule spikesort_done:
     input:
         # corr_plot = session_correlations_input, 
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
-        cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_trial_responses.done',
+        cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
         si_quality_complete = '{sessions}/{task_path}/{session_id}/processed/si_quality.done'
     priority: 20
     output:
