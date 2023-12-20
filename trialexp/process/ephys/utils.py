@@ -746,8 +746,6 @@ def classify_cell_type(cell):
     According to Andrew Peters et. al (Nature 2021)
     '''
     if cell['troughToPeak'] <0.4:
-        if cell['acg_pss']>40:
-            return 'unknown'
             
         if cell['long_isi_ratio']>0.1:
             return 'UIN'
@@ -757,4 +755,27 @@ def classify_cell_type(cell):
         if cell['acg_pss'] > 40: #assume 1 bin is 1ms
             return 'TAN'
         else:
-            return 'MSN'
+            return 'SPN'
+        
+def get_leaves(node):
+    # return all the leaves from this node
+    if not node.is_leaf():
+        return get_leaves(node.left) + get_leaves(node.right)
+    else:
+        return [node.id]
+
+def get_clus_at_level(node, lvl):
+    clus_list =[]
+    def get_clusters_at_level_(node, lvl):
+        #return all the cluster at specified level
+        if lvl>0:
+            if node.left is not None:
+                get_clusters_at_level_(node.left, lvl-1)
+            if node.right is not None:
+                get_clusters_at_level_(node.right, lvl-1)
+        else:
+            clus_list.append(get_leaves(node))
+
+    get_clusters_at_level_(node,lvl)
+            
+    return clus_list

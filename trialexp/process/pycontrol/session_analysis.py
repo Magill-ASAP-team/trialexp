@@ -251,7 +251,8 @@ def compute_trial_outcome(row, task_name):
 
     if task_name in ['reaching_go_spout_bar_nov22', 
                      'reaching_go_spout_bar_mar23', 
-                     'reaching_go_spout_bar_apr23']:
+                     'reaching_go_spout_bar_apr23',
+                     'reaching_go_spout_bar_VR_Dec23']:
         
         if row.break_after_abort:
             return 'aborted'
@@ -365,9 +366,14 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
         # df_events.loc[(nogo_success_idx),'success'] = True
 
     # To perform for simple pavlovian Go task, 
-    elif task_name in ['train_Go_CS-US_pavlovian','reaching_yp', 'reaching_test','reaching_test_CS',
-        'train_CSgo_US_coterminated','train_Go_CS-US_pavlovian', 'train_Go_CS-US_pavlovian_with_bar', 
-        'pavlovian_nobar_nodelay']:
+    elif task_name in ['train_Go_CS-US_pavlovian',
+                       'reaching_yp',
+                       'reaching_test',
+                       'reaching_test_CS',
+                        'train_CSgo_US_coterminated',
+                        'train_Go_CS-US_pavlovian',
+                        'train_Go_CS-US_pavlovian_with_bar', 
+                        'pavlovian_nobar_nodelay']:
 
         # self.triggers[0] refers to CS_Go triggering event most of the time whereas self.triggers[1] refers to CS_NoGo
         # find if spout event within timelim for go trials
@@ -422,7 +428,8 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
                         'reaching_go_spout_bar_dual_dec22', 
                         'reaching_go_spout_bar_nov22',
                         'reaching_go_spout_bar_mar23',
-                        'reaching_go_spout_bar_june05']:
+                        'reaching_go_spout_bar_june05',
+                        'reaching_go_spout_bar_VR_Dec23']:
 
         if 'spout_trial_time' in df_events.columns and 'US_end_timer_trial_time' in df_events.columns:
 
@@ -437,17 +444,6 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
                 df_conditions.loc[(reach_success_bool), 'success'] = True
         else:
             df_conditions['success'] = False
-    
-
-
-    # Reorder columns putting trigger, valid and success first for more clarity
-    # col_list = list(df_conditions.columns.values)
-    # col_to_put_first = ['trigger', 'success','valid']
-    # for c in col_to_put_first:
-    #     col_list.remove(c)
-    # col_list = ['trigger', 'success','valid'] + col_list
-    # df_conditions = df_conditions[col_list]
-
     
 
     return df_conditions

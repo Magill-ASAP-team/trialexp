@@ -41,7 +41,13 @@ skip_existing = True #whether to skip existing folders
 #                 'reaching_go_spout_incr_break2_nov22',
 #                 'pavlovian_spontanous_reaching_march23',
 #                 'pavlovian_reaching_Oct23'] #task name to copy, if empty then search for all tasks
-task_to_copy = ['pavlovian_reaching_Oct23','Spontanous_reaching_nov23'] #task name to copy, if empty then search for all tasks
+
+# task_to_copy = ['reaching_go_spout_bar_nov22']
+task_to_copy = ['pavlovian_reaching_Oct23',
+                'spontanous_reaching_nov23',
+                'reaching_go_spout_bar_june05',
+                'reaching_go_spout_bar_VR_Dec23',
+                'reaching_go_spout_incr_break2_nov22'] #task name to copy, if empty then search for all tasks
 #%%
 
 def get_df_video(video_folder):
@@ -283,7 +289,7 @@ for task_id, task in enumerate(task_to_copy):
 
             recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
 
-            
+
 # %%
 # idx = [False if df_pycontrol.ephys_folder_name.iloc[i] is None else True for i in range(len(df_pycontrol))]
 # path = df_pycontrol[idx].ephys_folder_name.iloc[0]

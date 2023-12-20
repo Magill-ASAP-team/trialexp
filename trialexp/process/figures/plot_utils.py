@@ -63,3 +63,16 @@ def combine_figures(figs, ncol=6):
         combined = PIL.Image.new('RGB', (100,100),'white')
 
     return combined
+
+
+def plot_pie_chart(data, col, palette=None):
+    ax = plt.gca()
+    count = data.groupby(col)[col].count()
+    labels = count.index
+    sizes = count.values
+    if palette is not None:
+        colors = [palette[lbl] for lbl in palette]
+    else:
+        colors = plt.cm.tab20.colors
+        
+    ax.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors)

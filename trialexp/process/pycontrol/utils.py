@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from pandas import Timestamp
 from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
-
+import warnings
 from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 
 Event = namedtuple('Event', ['time','name'])
@@ -43,9 +43,14 @@ def print2event(df_events, conditions):
     df = df_events.copy()
     
     #Extract print event matched by conditions and turn them into events for later analysis
-    idx = (df.type=='print') & (df.value.isin(conditions))
-    df.loc[idx, 'name'] = df.loc[idx,'value'] 
-    
+    for idx, row in df.iterrows():
+        if row.type == 'print':
+            matched_con = [c for c in conditions if c == row.value]
+            if len(matched_con)>0:
+                if len(matched_con)>1:
+                    warnings.warn(f'Warning: more than one conditionas found {matched_con}')  
+                df.loc[idx,'name'] = matched_con[0]
+                
     return df   
 
 def parse_events(session, conditions):
