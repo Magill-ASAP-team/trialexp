@@ -5,22 +5,24 @@ from dotenv import load_dotenv
 
 load_dotenv() 
 
-def task2analyze(tasks:list=None):
+def session2analyze(tasks:list=None, cohort:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []
 
     if tasks is None:
         tasks=['*']
 
-    for t in tasks:
-        total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{t}/*'))        
+    if cohort is None:
+        cohort = ['*']
+
+    for c in cohort:
+        for t in tasks:
+            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
 
     return total_sessions
 
 rule pycontrol_all:
-    # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22', 'pavlovian_spontanous_reaching_march23','pavlovian_reaching_Oct23'])
-    # input: task2analyze(['spontanous_reaching_nov23','pavlovian_reaching_Oct23','reaching_go_spout_bar_june05','reaching_go_spout_bar_VR_Dec23'])
-    input: task2analyze(['reaching_go_spout_bar_VR_Dec23','spontanous_reaching_nov23','reaching_go_spout_incr_break2_nov22'])
+    input: session2analyze(cohort=['2023_Oct_cohort'])
 
 rule process_pycontrol:
     input:
