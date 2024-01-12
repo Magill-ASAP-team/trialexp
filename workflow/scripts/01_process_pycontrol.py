@@ -36,11 +36,11 @@ df_pycontrol.attrs['session_id'] = session_id
 df_pycontrol.to_pickle(soutput.pycontrol_dataframe)
 
 #%% Read task definition
-tasks = pd.read_csv('params/tasks_params.csv', usecols=[1, 2, 3, 4,5], index_col=False)
+tasks = pd.read_csv('params/tasks_params.csv', index_col=0)
 
 timelim = [1000, 4000] # in ms
 
-conditions, triggers, events_to_process, trial_window = get_task_specs(tasks,  task_name)
+conditions, triggers, events_to_process, trial_window, extra_trigger_events = get_task_specs(tasks,  task_name)
 
 #%% Extract trial-related information from events
 df_pycontrol = df_pycontrol[~(df_pycontrol.name=='rsync')] #remove the sync pulse
@@ -74,6 +74,7 @@ df_events_cond.attrs.update(df_events.attrs)
 df_events_cond.attrs.update(
     {'conditions': conditions,
      'triggers': triggers,
+     'extra_event_triggers': extra_trigger_events, # used to average over additional events without considering the trial structure
      'events_to_process': events_to_process}
 )
 
@@ -83,3 +84,5 @@ df_events_cond.to_pickle(soutput.event_dataframe)
 df_conditions.to_pickle(soutput.condition_dataframe)
 df_events_trials.to_pickle(soutput.trial_dataframe)
 
+
+# %%

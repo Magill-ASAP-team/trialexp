@@ -105,7 +105,7 @@ def load_datasets(session_paths, load_behaviour_dataset=False):
     for p in tqdm(session_paths):
         fn = p/'processed'/'xr_session.nc'
         try:
-            ds = xr.open_dataset(fn) 
+            ds = xr.open_dataset(fn,engine='h5netcdf') 
             # print(np.unique(np.diff(ds.event_time.data)), ds.event_time.data[-1], p)
             ds = ds.drop_dims('time') # for performance reason
             
@@ -113,7 +113,7 @@ def load_datasets(session_paths, load_behaviour_dataset=False):
             if load_behaviour_dataset:
                 fn_be = p/'processed'/'xr_behaviour.nc'
                 if fn_be.exists():
-                    ds_be = xr.open_dataset(fn_be)
+                    ds_be = xr.open_dataset(fn_be,engine='h5netcdf')
                     ds = xr.merge([ds,ds_be])
             
             ds_list.append(ds)

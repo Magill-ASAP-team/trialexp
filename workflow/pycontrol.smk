@@ -18,8 +18,9 @@ def task2analyze(tasks:list=None):
     return total_sessions
 
 rule pycontrol_all:
-    input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    # input: task2analyze(['reaching_go_spout_bar_nov22'])
+    # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22', 'pavlovian_spontanous_reaching_march23','pavlovian_reaching_Oct23'])
+    # input: task2analyze(['spontanous_reaching_nov23','pavlovian_reaching_Oct23','reaching_go_spout_bar_june05','reaching_go_spout_bar_VR_Dec23'])
+    input: task2analyze(['reaching_go_spout_bar_VR_Dec23','spontanous_reaching_nov23','reaching_go_spout_incr_break2_nov22'])
 
 rule process_pycontrol:
     input:

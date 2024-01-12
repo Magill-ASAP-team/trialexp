@@ -17,13 +17,14 @@ from trialexp.process.pycontrol.data_import import session_dataframe
 def parse_pycontrol_fn(fn):
     pattern = r'(\w+)-(.*)\.txt'
     m = search(pattern, fn.name)
+    
     if m:
         subject_id = m.group(1)
         date_string = m.group(2)
         expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
         
         try:
-            df = session_dataframe(fn)
+            df = session_dataframe(fn) #note: this may run into error
             session_length = df.time.iloc[-1]
             
             return { 'subject_id': subject_id,
@@ -39,6 +40,8 @@ def parse_pycontrol_fn(fn):
                     'filename': fn.stem, 
                     'timestamp': expt_datetime,
                     'session_length': 0 }
+    else:
+        print('Error for ', fn)
 '''
 following is depracted until possible re-use elsewhere
 #----------------------------------------------------------------------------------
