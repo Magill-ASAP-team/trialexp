@@ -9,11 +9,24 @@ import xarray as xr
 from trialexp.process.ephys.spikes_preprocessing import build_evt_fr_xarray
 from elephant.conversion import BinnedSpikeTrain
 import quantities as pq
+from trialexp.process.figures.plot_utils import create_plot_grid
 from trialexp.process.group_analysis.plot_utils import style_plot
 import seaborn as sns
 import neo 
-from scipy.stats import ttest_ind, wilcoxon, ranksums, permutation_test
+from scipy.stats import ttest_ind, wilcoxon, ranksums, permutation_test, variation
 from statsmodels.stats.multitest import multipletests
+from sklearn import decomposition, manifold, preprocessing, cluster
+import matplotlib.pylab as plt
+import pandas as pd
+import numpy as np
+from tqdm.auto import tqdm
+from scipy import signal, spatial
+from fastdtw import fastdtw
+from tslearn.barycenters import softdtw_barycenter
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import pingouin as pg
+from trialexp.process.ephys.spikes_preprocessing import get_spike_trains
+
 
 def denest_string_cell(cell):
         if len(cell) == 0: 
@@ -487,3 +500,282 @@ def combine2dataframe(result):
     df_tuning = pd.DataFrame(pvalues_dict)
     
     return df_tuning
+
+def get_cell_mean_cv(x, coarsen_factor = 5):
+    # Get the mean coefficient of variation for a cell
+    cv_list = []
+    x = x.coarsen(spk_event_time=5,boundary="trim").mean()
+    for id in x.cluID:
+        x_cell = x.sel(cluID=id)
+        mean_cv = np.mean(variation(x_cell,axis=0,nan_policy='omit'))
+        cv_list.append(mean_cv)
+
+    return cv_list
+
+def std_score(w,axis):
+    return np.max(np.std(w,axis=1),axis=1)
+
+def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4, 
+                  use_dtw_average=False, smooth_average=True):
+
+    labels_unique = np.unique(labels)
+    labels_unique = [x for x in labels_unique if x!=-1] #remove the outliner cluster
+    nrow = (len(labels_unique)-1)//ncol+1
+    fig = plt.figure(figsize=(ncol*3,nrow*3))
+    colors = plt.cm.tab20.colors
+    
+    if use_dtw_average:
+        # need to precompute the mean curve with joblib because it takes time
+        print('I will now compute the barycenters of clusters')
+        def compute_mean_curve(curves):
+            return softdtw_barycenter(curves, gamma=1, max_iter=20, tol=1e-3)  
+        
+        mean_curves = Parallel(n_jobs=10,verbose=10)(delayed(compute_mean_curve)(data_norm[labels==lbl,:]) for lbl in labels_unique)
+        
+    for idx,lbl in enumerate(labels_unique):
+        ax = fig.add_subplot(nrow, ncol, idx+1)
+        ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)})')
+        curves = data_norm[labels==lbl,:].T
+        x_coord = spk_event_time
+        ax.plot(x_coord, curves, color=colors[idx%len(colors)]);
+        if not use_dtw_average:
+            ax.plot(x_coord, curves.mean(axis=1), color='k');
+        else:
+            # use soft-DTW Barycenter for the average, it is smoother than original Barycenter
+            ax.plot(x_coord, mean_curves[idx], color='k');
+            
+        ax.axvline(x=0,ls='--', color='gray')
+    
+    
+    fig.suptitle(var_name)
+    fig.tight_layout()
+    return fig
+
+def smooth_response(da_sel):
+    #smooth the resopnse curve
+    data = da_sel.data.T
+    data_smooth = signal.savgol_filter(data,51,1)
+    data_norm = preprocessing.minmax_scale(data_smooth,axis=1) 
+    return data_norm
+
+def cluster_cell(data_norm, min_sample = 10, verbose=False):
+    # search for the best eps
+    metrics = []
+    nlabels_list = []
+    eps_list = np.linspace(0.003, 0.02, 10)
+    for eps in eps_list:
+        clustering = cluster.DBSCAN(min_samples=min_sample, eps=eps, metric='correlation').fit(data_norm)
+        nlabels = len(np.unique(clustering.labels_))
+        outliner_perc = np.mean(clustering.labels_==-1)
+        if verbose:
+            print(f'{eps}: {nlabels} clusters, outliner percent: {outliner_perc}')
+            
+        metrics.append(nlabels/(outliner_perc*5+1))
+        nlabels_list.append(nlabels)
+
+    best_idx = np.argmax(metrics)
+    best_eps = eps_list[best_idx]
+    if verbose:
+        print(f'best eps is {best_eps} with {nlabels_list[best_idx]} clusters')
+        # plt.plot(metrics)
+        
+    clustering = cluster.DBSCAN(min_samples=min_sample, eps=best_eps, metric='correlation').fit(data_norm)
+        
+    labels = clustering.labels_
+
+    return labels
+
+def parse_cluID(s):
+    ss = s.split('_')
+    session_id = ss[0]
+    probe = ss[1]
+    id = ss[2]
+    animal_id = session_id.split('-')[0]
+    date = '-'.join(session_id.split('-')[1:5])
+
+    return {'animal_id':animal_id,
+            'probe':probe,
+            'id': id,
+            'date': date}
+    
+def make_symmetric(results):
+    #
+    max_len = max(map(len,results))
+    out = np.zeros((max_len,max_len))
+    
+    for i in range(len(results)):
+        out[i,:len(results[i])] = results[i]
+
+    out = np.vstack(out)
+    
+    #make diagonal matrix
+    out = out + out.T-np.diag(out.diagonal())
+    return out
+
+def cal_dtw(da_norm, i):
+    dist = np.zeros((i+1,))
+    x = da_norm.copy()
+    for j in range(i):
+        dist[j],_= fastdtw(x[i,:], x[j,:])
+
+    return dist
+
+def plot_cell_waveforms(xa_waveforms, cluIDs, ncol=3, metrics=None, figsize_subplot=(3,3)):
+    # plot the spike waveform of specified IDs
+
+    fig, axes = create_plot_grid(len(cluIDs), ncol, dpi=100, figsize_plot=figsize_subplot)
+
+    for i in range(len(cluIDs)):
+        ax = axes[i]
+        cell2plot = xa_waveforms.sel(cluID=cluIDs[i])
+        cell2plot.plot(ax=ax)
+        
+        ax_insert = inset_axes(ax, width='40%', height='40%', loc='lower left')
+        ax_insert.plot(cell2plot.data.T)
+        
+        if metrics is not None:
+            ax.set_title(f'{metrics[i]:.2f}')
+        else:
+            title = '_'.join(cluIDs[i].split('_')[-2:])
+            ax.set_title(title)
+
+    fig.tight_layout()
+    
+def prominence_score(w,axis):
+    # ratio of the peak to peak to the standard deviation
+    return np.log(np.max(np.ptp(w,axis=1)/(np.median(w,axis=1)+0.001),axis=1))
+
+def get_random_evt_data(xr_fr, da, trial_window, num_sample=1000):
+    timestamps = sorted(np.random.choice(xr_fr.time, size=num_sample, replace=False))
+    trial_nb = np.arange(len(timestamps))
+    bin_duration = xr_fr.attrs['bin_duration']
+    da_rand = build_evt_fr_xarray(xr_fr.spikes_FR_session, timestamps, trial_nb, f'{da.name}', 
+                                                trial_window, bin_duration)
+
+    return da_rand
+
+def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5):
+    da1 = da_rand.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
+    da1 = da1.to_dataframe().reset_index()
+    da1['group'] = 'random'
+    da1 = da1.dropna()
+
+    da2 = da.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
+    da2 = da2.to_dataframe().reset_index()
+    da2['group'] = 'event-triggered'
+    da2['trial_nb'] += da1.trial_nb.max()
+
+    data2test = pd.concat([da1, da2])
+    
+    data2test = data2test.rename(columns={dpvar_name:'dv'})
+    data2test = data2test.dropna()
+    return data2test
+
+def do_mix_anova_analysis(data2test):
+
+    # First do mixed anova test
+    anova_result = pg.mixed_anova(dv='dv', within='spk_event_time',between='group', 
+                   subject='trial_nb', 
+                   data=data2test)
+    anova_result = anova_result.set_index('Source')
+    
+    comparison_result = {
+        'cluID': data2test.iloc[0].cluID,
+        'group_p': anova_result.loc['group','p-unc'],
+        'spk_event_time_p': anova_result.loc['spk_event_time','p-unc'],
+        'interaction_p': anova_result.loc['Interaction','p-unc']
+    }
+
+    # then do postdoc test with multiple comparison correction
+    paired_test_result = pg.pairwise_tests(data2test, dv='dv', 
+                  within='spk_event_time',between='group', 
+               subject='trial_nb', padjust='bonf')
+
+    #only focus on the time period where there is siginficant interaction between group and time
+    time_sig = paired_test_result[(paired_test_result['p-corr']<0.05) & (paired_test_result.Paired==False)]
+
+    comparison_result.update(
+        {
+            'sig_interaction_time': time_sig.spk_event_time.values,
+            'sig_interaction_time_p': time_sig['p-corr'].values,
+            'interaction_padjust': time_sig.iloc[0]['p-adjust'] if len(time_sig)>0 else None
+        })
+
+    return comparison_result
+
+def get_chan_coords(xr_spikes_trials):
+    # return a dataframe of the coordinations of each unit based on its maxWaveformCh
+    waveform_chan = xr_spikes_trials.maxWaveformCh.to_dataframe()
+    chanCoords_x = xr_spikes_trials.attrs['chanCoords_x']
+    chanCoords_y = xr_spikes_trials.attrs['chanCoords_y']
+    waveform_chan['pos_x'] = chanCoords_x[waveform_chan.maxWaveformCh.astype(int)]
+    waveform_chan['pos_y'] = chanCoords_y[waveform_chan.maxWaveformCh.astype(int)]
+    return waveform_chan.reset_index()
+
+
+def get_pss(data, axis):
+    # calculate the post-spike supression
+    #assumption is that post-spike suppression ends after 100ms
+    fr_exceed = data[500:1000,:] > np.mean(data[600:900,:],axis=0)
+    
+    # find out when the firing rate return to mean after suppression
+    # i.e. the first True value after the comparison
+    return list(map(lambda x: np.where(x)[0][0], fr_exceed.T))
+
+def long_isi_ratio_(spiketimes, total_time):
+    isi = np.diff(spiketimes)
+    return np.sum(isi[isi>2000])/total_time
+    
+def cal_long_isi_ratio(sorting_path):
+    synced_timestamp_files = list(sorting_path.glob('*/sorter_output/rsync_corrected_spike_times.npy'))
+    spike_clusters_files = list(sorting_path.glob('*/sorter_output/spike_clusters.npy'))
+    spike_trains, all_clusters_UIDs = get_spike_trains(synced_timestamp_files, spike_clusters_files)
+
+    # calculate the long isi ratio
+    long_isi_ratio = np.zeros((len(spike_trains),))
+    for i, spktrain in enumerate(spike_trains):
+        long_isi_ratio[i] =  long_isi_ratio_(spktrain.times, spktrain.t_stop)
+
+    df = pd.DataFrame({'cluID': all_clusters_UIDs, 'long_isi_ratio': long_isi_ratio})
+    df = df.set_index('cluID')
+    
+    return df
+
+def classify_cell_type(cell):
+    '''
+    According to Andrew Peters et. al (Nature 2021)
+    '''
+    if cell['troughToPeak'] <0.4:
+            
+        if cell['long_isi_ratio']>0.1:
+            return 'UIN'
+        else:
+            return 'FSI'
+    else:
+        if cell['acg_pss'] > 40: #assume 1 bin is 1ms
+            return 'TAN'
+        else:
+            return 'SPN'
+        
+def get_leaves(node):
+    # return all the leaves from this node
+    if not node.is_leaf():
+        return get_leaves(node.left) + get_leaves(node.right)
+    else:
+        return [node.id]
+
+def get_clus_at_level(node, lvl):
+    clus_list =[]
+    def get_clusters_at_level_(node, lvl):
+        #return all the cluster at specified level
+        if lvl>0:
+            if node.left is not None:
+                get_clusters_at_level_(node.left, lvl-1)
+            if node.right is not None:
+                get_clusters_at_level_(node.right, lvl-1)
+        else:
+            clus_list.append(get_leaves(node))
+
+    get_clusters_at_level_(node,lvl)
+            
+    return clus_list

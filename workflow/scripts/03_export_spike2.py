@@ -3,7 +3,7 @@ Export event data to spike2
 '''
 #%%
 import pandas as pd 
-from trialexp.process.pycontrol.utils import export_session
+from trialexp.process.pycontrol.utils import export_session, extract_v_line
 from snakehelper.SnakeIOHelper import getSnake
 from workflow.scripts import settings
 from re import match
@@ -16,58 +16,64 @@ import os
     [settings.debug_folder +'/processed/spike2_export.done'],
     'export_spike2')
 
-#%% Photometry dict
-
-#fn = glob(sinput.photometry_folder+'\*.ppd')[0]
-fn = list(Path(sinput.photometry_folder).glob('*.ppd'))
-if fn == []:
-    data_photometry = None    
-else:
-    fn = fn[0]
-    data_photometry = import_ppd(fn)
-
-    data_photometry = denoise_filter(data_photometry)
-    # data_photometry = motion_correction(data_photometry)
-    data_photometry = motion_correction_win(data_photometry)
-    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.001)
-
-
-# no down-sampling here
-
 #%% Load data
 df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
 
 pycontrol_time = df_pycontrol[df_pycontrol.name == 'rsync'].time
 
-# assuming just one txt file
-pycontrol_txt = list(Path(sinput.pycontrol_folder).glob('*.txt'))
+pycontrol_path = list(Path(sinput.pycontrol_folder).glob('*.txt'))[0]
 
-with open(pycontrol_txt[0], 'r') as f:
-    all_lines = [line.strip() for line in f.readlines() if line.strip()]
 
-count = 0
-print_lines = []
-while count < len(all_lines):
-    # all_lines[count][0] == 'P'
-    if bool(match('P\s\d+\s', all_lines[count])):
-        print_lines.append(all_lines[count][2:])
-        count += 1
-        while (count < len(all_lines)) and not (bool(match('[PVD]\s\d+\s', all_lines[count]))):
-            print_lines[-1] = print_lines[-1] + \
-                "\n" + all_lines[count]
-            count += 1
+v_lines, print_lines = extract_v_line(pycontrol_path)
+df_dataformat = pd.read_csv('params/data_format.csv')
+
+#%% Photometry dict
+
+fn = list(Path(sinput.photometry_folder).glob('*.ppd'))
+
+if fn == []:
+    data_photometry = None    
+else:
+    fn = fn[0]
+    data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
+    data_photometry = import_ppd(fn, data_format)
+    data_photometry = denoise_filter(data_photometry, 20) # cannot high-pass filter the signal here
+    
+    
+    # determine how to do motion correction
+    animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
+    animal_id = df_pycontrol.attrs['Subject ID'] #use pycontrol instead, because pyphotometry data is difficult to change manually
+    if animal_id in animal_info.index:
+        injection = animal_info.loc[animal_id].injection.split(';')
+        if 'RdLight' in injection:
+            if not 'analog_3' in data_photometry:
+                baseline_correction_multicolor(data_photometry)
+                data_photometry['motion_corrected'] = 1
+            else:
+                # Do multicolor correction
+                data_photometry = motion_correction_multicolor(data_photometry)
+        else:    
+            data_photometry = motion_correction_win(data_photometry)
     else:
-        count += 1
+        data_photometry = motion_correction_win(data_photometry)
 
-v_lines = [line[2:] for line in all_lines if line[0] == 'V']
+    
+    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.001)
+
+
+# no down-sampling here
+
 
 
 #%%
 if fn == []:
     photometry_times_pyc = None
+    photometry_keys= None
 else:
     photometry_aligner = Rsync_aligner(pycontrol_time, data_photometry['pulse_times_2'])
     photometry_times_pyc = photometry_aligner.B_to_A(data_photometry['time'])
+    photometry_keys =  [k for k in data_photometry.keys() if 'analog' in k]
+
 
 #remove all state change event
 df_pycontrol = df_pycontrol.dropna(subset='name')
@@ -75,10 +81,6 @@ df2plot = df_pycontrol[df_pycontrol.type == 'event']
 # state is handled separately with export_state, whereas parameters are handled vchange_to_text
 
 keys = df2plot.name.unique()
-
-photometry_keys =  ['analog_1', 'analog_2',  'analog_1_filt', 'analog_2_filt',
-                  'analog_1_est_motion', 'analog_1_corrected', 'analog_1_baseline_fluo',
-                  'analog_1_df_over_f','analog_2_baseline_fluo', 'analog_2_df_over_f']
 
 #%%
 '''

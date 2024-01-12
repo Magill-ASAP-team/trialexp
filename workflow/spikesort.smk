@@ -16,14 +16,14 @@ def rec_properties_input(wildcards):
     else:
         return []
 
-def gather_metrics_to_aggregate(wildcards):
-    # determine if there is processed cell metrics in that folder
-    # cell_metrics_df_clustering = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl')
-    # if len(recording_csv) > 0:
-    #     return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl'
-    # else:
-    #     return []
-    ...
+# def gather_metrics_to_aggregate(wildcards):
+#     # determine if there is processed cell metrics in that folder
+#     # cell_metrics_df_clustering = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl')
+#     # if len(recording_csv) > 0:
+#     #     return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl'
+#     # else:
+#     #     return []
+#     ...
 
 def task2analyze(tasks:list=None):
     #specify the list of task to analyze to save time.
@@ -97,37 +97,6 @@ rule cell_metrics_processing:
         "scripts/spike_sorting/s05_cell_metrics_processing.py"
 
 
-# rule cell_metrics_aggregation:
-#     input:
-#         cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.pkl'
-#     output:
-#         cell_metrics_aggregation_complete =  touch('{sessions}/{task_path}/{session_id}/processed/cell_metrics_aggregation.done')
-#     threads: 32
-#     priority: 60
-#     script:
-#         "scripts/spike_sorting/s06_cell_metrics_aggregation.py"
-
-# rule cell_metrics_dim_reduction:
-#     input:
-#         cell_metrics_aggregation_complete = '{sessions}/{task_path}/{session_id}/processed/cell_metrics_aggregation.done'
-#     output:
-#         cell_metrics_dim_reduction_complete =  touch('{sessions}/{task_path}/{session_id}/processed/cell_metrics_dim_reduction.done')
-#     threads: 32
-#     priority: 70
-#     script:
-#         "scripts/spike_sorting/s07_cell_metrics_dim_reduction.py"
-
-# rule cell_metrics_clustering:
-#     input:
-#         cell_metrics_dim_reduction_complete = '{sessions}/{task_path}/{session_id}/processed/cell_metrics_dim_reduction.done' 
-#     output:
-#         cell_metrics_clustering_complete =  touch('{sessions}/{task_path}/{session_id}/processed/cell_metrics_clustering.done')
-#     threads: 32
-#     priority: 80
-#     script:
-#         "scripts/spike_sorting/s08_cell_metrics_clustering.py"
-
-
 rule cells_to_xarray:
     input:
         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
@@ -140,32 +109,33 @@ rule cells_to_xarray:
     script:
         "scripts/spike_sorting/s09_cell_to_xarray.py"
 
-# rule cell_anatomy:
-#     input:
-#         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
-#         xr_spikes_trials_phases = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials_phases.nc',
-#         xr_spikes_full_session = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_full_session.nc'
-#     output:
-#         cell_anatomy_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_anatomy.done'
-
-#     threads: 32
-
-#     script:
-#         "scripts/spike_sorting/s10_cell_anatomy.py"
-
-rule cell_trial_responses_plot:
+rule cell_overview_plot:
     input:
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         pycontrol_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_pycontrol.pkl',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',       
     output:
-        figures_path = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/response_curves'),
-        df_cell_prop = '{sessions}/{task_path}/{session_id}/processed/df_cell_prop.pkl',
-        cell_trial_responses_complete = touch('{sessions}/{task_path}/{session_id}/processed/cell_trial_responses.done'),
+        figures_path = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/overview'),
+        cell_overview_complete = touch('{sessions}/{task_path}/{session_id}/processed/cell_overview.done'),
+    threads: 8
     script:
-        "scripts/spike_sorting/s11_cell_trial_responses_plot.py"
+        "scripts/spike_sorting/s11_cell_overview_plot.py"
 
+rule cell_response_comparison:
+    input:
+        cell_overview_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
+        xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
+        xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
+        pycontrol_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_pycontrol.pkl',
+        xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',       
+    output:
+        response_curves_path = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/response_curves'),
+        df_cell_prop = '{sessions}/{task_path}/{session_id}/processed/df_cell_prop.pkl',
+        cell_trial_responses_complete = touch('{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done'),
+    threads: 96
+    script:
+        "scripts/spike_sorting/s11b_cell_response_comparison.py"
 
 def session_correlations_input(wildcards):
     # only run if photometry file is present
@@ -188,7 +158,8 @@ rule session_correlations:
 rule spikesort_done:
     input:
         # corr_plot = session_correlations_input, 
-        cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_trial_responses.done',
+        comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
+        cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
         si_quality_complete = '{sessions}/{task_path}/{session_id}/processed/si_quality.done'
     priority: 20
     output:

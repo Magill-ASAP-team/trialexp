@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from pandas import Timestamp
 from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
-
+import warnings
 from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 
 Event = namedtuple('Event', ['time','name'])
@@ -43,9 +43,14 @@ def print2event(df_events, conditions):
     df = df_events.copy()
     
     #Extract print event matched by conditions and turn them into events for later analysis
-    idx = (df.type=='print') & (df.value.isin(conditions))
-    df.loc[idx, 'name'] = df.loc[idx,'value'] 
-    
+    for idx, row in df.iterrows():
+        if row.type == 'print':
+            matched_con = [c for c in conditions if c == row.value]
+            if len(matched_con)>0:
+                if len(matched_con)>1:
+                    warnings.warn(f'Warning: more than one conditionas found {matched_con}')  
+                df.loc[idx,'name'] = matched_con[0]
+                
     return df   
 
 def parse_events(session, conditions):
@@ -298,6 +303,33 @@ def plot_session(df:pd.DataFrame, keys: list = None, state_def: list = None, pri
             margin=dict(l=20, r=20, t=20, b=20) )
 
         fig.show()
+        
+
+def extract_v_line(pycontrol_path):
+
+    # # assuming just one txt file
+    # pycontrol_txt = list(Path(sinput.pycontrol_folder).glob('*.txt'))
+
+    with open(pycontrol_path, 'r') as f:
+        all_lines = [line.strip() for line in f.readlines() if line.strip()]
+
+    count = 0
+    print_lines = []
+    while count < len(all_lines):
+        # all_lines[count][0] == 'P'
+        if bool(match('P\s\d+\s', all_lines[count])):
+            print_lines.append(all_lines[count][2:])
+            count += 1
+            while (count < len(all_lines)) and not (bool(match('[PVD]\s\d+\s', all_lines[count]))):
+                print_lines[-1] = print_lines[-1] + \
+                    "\n" + all_lines[count]
+                count += 1
+        else:
+            count += 1
+
+    v_lines = [line[2:] for line in all_lines if line[0] == 'V']
+    
+    return v_lines, print_lines
 
 
 def export_session(df:pd.DataFrame, keys: list = None, export_state=True, print_expr: list = None, 
