@@ -25,11 +25,9 @@ def copy_if_not_exist(src, dest):
     if not (dest/src.name).exists():
         shutil.copy(src, dest)
 
-
-
 #%% Retrieve all task names from the tasks_params.csv
 SESSION_ROOT_DIR = Path(os.environ['SESSION_ROOT_DIR'])
-ETTIN_DATA_FOLDER = SESSION_ROOT_DIR.parents[1]
+ETTIN_DATA_FOLDER = Path(os.environ['ETTIN_DATA_FOLDER'])
 PROJECT_ROOT = Path(os.environ['SNAKEMAKE_DEBUG_ROOT'])
 
 tasks_params_path = PROJECT_ROOT / 'params' / 'tasks_params.csv'
@@ -37,17 +35,10 @@ tasks_params_df = pd.read_csv(tasks_params_path)
 tasks = tasks_params_df.task.values.tolist()
 
 skip_existing = True #whether to skip existing folders
-# task_to_copy = ['reaching_go_spout_bar_nov22', 
-#                 'reaching_go_spout_incr_break2_nov22',
-#                 'pavlovian_spontanous_reaching_march23',
-#                 'pavlovian_reaching_Oct23'] #task name to copy, if empty then search for all tasks
 
-# task_to_copy = ['reaching_go_spout_bar_nov22']
-task_to_copy = ['pavlovian_reaching_Oct23',
-                'spontanous_reaching_nov23',
-                'reaching_go_spout_bar_june05',
-                'reaching_go_spout_bar_VR_Dec23',
-                'reaching_go_spout_incr_break2_nov22'] #task name to copy, if empty then search for all tasks
+# cohort to copy, if empty then search for all cohorts
+cohort_to_copy = ['2023_Oct_cohort'] 
+
 #%%
 
 def get_df_video(video_folder):
@@ -72,13 +63,13 @@ def get_matched_timestamp(df, df_pycontrol_row, camera_no=2, min_minute=3):
 
 # %%
 
-for task_id, task in enumerate(task_to_copy):
+for cohort_id, cohort in enumerate(cohort_to_copy):
 
-    print(f'task {task_id+1}/{len(task_to_copy)}: {task}')
-    export_base_path = SESSION_ROOT_DIR/f'{task}'
+    print(f'cohort {cohort_id+1}/{len(cohort_to_copy)}: {cohort}')
+    export_base_path = SESSION_ROOT_DIR/f'{cohort}'
 
-    pycontrol_folder = ETTIN_DATA_FOLDER/'head-fixed'/'pycontrol'/f'{task}'
-    pyphoto_folder = ETTIN_DATA_FOLDER/'head-fixed'/'pyphotometry'/'data'/f'{task}'
+    pycontrol_folder = SESSION_ROOT_DIR/f'{cohort}'/'pycontrol'
+    pyphoto_folder = SESSION_ROOT_DIR/f'{cohort}'/'pyphotometry'
     ephys_base_path = ETTIN_DATA_FOLDER/'head-fixed'/'neuropixels'
     video_folder = ETTIN_DATA_FOLDER/'head-fixed'/'videos'
 
@@ -97,7 +88,7 @@ for task_id, task in enumerate(task_to_copy):
     try:
         df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short
     except AttributeError:
-        print(f'no session length for task {task}, skipping folder')
+        print(f'no session length, skipping folder')
         continue
 
     df_pyphoto = pd.DataFrame(list(map(parse_pyhoto_fn, pyphoto_files)))
@@ -124,7 +115,8 @@ for task_id, task in enumerate(task_to_copy):
         for i in df_pycontrol.index:
             # filter out folders that are already there
             session_id = df_pycontrol.loc[i].filename
-            if Path(export_base_path, session_id).exists():
+            task_name = df_pycontrol.loc[i].task_name
+            if Path(export_base_path,task_name, session_id).exists():
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
@@ -206,15 +198,17 @@ for task_id, task in enumerate(task_to_copy):
     
     df_pycontrol['video_names'] = matched_video_names
 
+    # Move folders
     for i in tqdm(range(len(df_pycontrol))):
         row = df_pycontrol.iloc[i]
         session_id = row.session_id
         subject_id = row.subject_id
+        task_name = row.task_name
         
-        target_pycontrol_folder = Path(export_base_path, session_id, 'pycontrol')
-        target_pyphoto_folder = Path(export_base_path, session_id, 'pyphotometry')
-        target_ephys_folder = Path(export_base_path, session_id, 'ephys')
-        target_video_folder = Path(export_base_path, session_id, 'video')
+        target_pycontrol_folder = Path(export_base_path, task_name, session_id, 'pycontrol')
+        target_pyphoto_folder = Path(export_base_path, task_name, session_id, 'pyphotometry')
+        target_ephys_folder = Path(export_base_path, task_name, session_id, 'ephys')
+        target_video_folder = Path(export_base_path, task_name, session_id, 'video')
         
         if not target_pycontrol_folder.exists():
             # create the base folder
@@ -289,9 +283,3 @@ for task_id, task in enumerate(task_to_copy):
 
             recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
 
-
-# %%
-# idx = [False if df_pycontrol.ephys_folder_name.iloc[i] is None else True for i in range(len(df_pycontrol))]
-# path = df_pycontrol[idx].ephys_folder_name.iloc[0]
-# df = get_recordings_properties(ephys_base_path, str(path))
-# %%
