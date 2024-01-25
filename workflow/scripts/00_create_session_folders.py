@@ -37,7 +37,7 @@ tasks = tasks_params_df.task.values.tolist()
 skip_existing = True #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2023_Oct_cohort'] 
+cohort_to_copy = ['2023_Oct_cohort','2024_Jan_cohort'] 
 
 #%%
 
@@ -66,7 +66,7 @@ def get_matched_timestamp(df, df_pycontrol_row, camera_no=2, min_minute=3):
 for cohort_id, cohort in enumerate(cohort_to_copy):
 
     print(f'cohort {cohort_id+1}/{len(cohort_to_copy)}: {cohort}')
-    export_base_path = SESSION_ROOT_DIR/f'{cohort}'
+    export_base_path = SESSION_ROOT_DIR/f'{cohort}'/'by_sessions'
 
     pycontrol_folder = SESSION_ROOT_DIR/f'{cohort}'/'pycontrol'
     pyphoto_folder = SESSION_ROOT_DIR/f'{cohort}'/'pyphotometry'
@@ -116,7 +116,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
             # filter out folders that are already there
             session_id = df_pycontrol.loc[i].filename
             task_name = df_pycontrol.loc[i].task_name
-            if Path(export_base_path,task_name, session_id).exists():
+            if Path(export_base_path, task_name, session_id).exists():
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
@@ -205,9 +205,9 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
         subject_id = row.subject_id
         task_name = row.task_name
         
-        target_pycontrol_folder = Path(export_base_path, task_name, session_id, 'pycontrol')
+        target_pycontrol_folder = Path(export_base_path,task_name, session_id, 'pycontrol')
         target_pyphoto_folder = Path(export_base_path, task_name, session_id, 'pyphotometry')
-        target_ephys_folder = Path(export_base_path, task_name, session_id, 'ephys')
+        target_ephys_folder = Path(export_base_path,  task_name, session_id, 'ephys')
         target_video_folder = Path(export_base_path, task_name, session_id, 'video')
         
         if not target_pycontrol_folder.exists():
@@ -283,3 +283,5 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
 
             recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
 
+
+# %%

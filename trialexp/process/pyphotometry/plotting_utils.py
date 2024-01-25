@@ -23,8 +23,9 @@ def plot_pyphoto_heatmap(dataArray):
     fig = plt.figure(figsize=(4,4), dpi=300)
     x = dataArray.data
     x = x[~np.isnan(x)]
+    ndim = np.squeeze(dataArray.data).ndim
     
-    if len(x)>0:
+    if len(x)>0 and ndim>1:
         vmax = np.percentile(x,99)
         vmin = np.percentile(x,1)
         
