@@ -163,19 +163,14 @@ else:
     
     # save a dummpy photometry file to satisfy snakemake
     Path(soutput.xr_photometry).touch()
-    
-#%%
-# evt_triggers='spout'
-# add_event_data(df_pycontrol, event_filters.get_events_from_name,
-#     trial_window, dataset, event_time_coord, 
-#     var, evt_triggers, dataset.attrs['sampling_rate'],
-#     groupby_col=None,
-#     filter_func_kwargs={'evt_name':evt_triggers})
         
 #%% Bin the data such that we only have 1 data point per time bin
 # bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz
 down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
-dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
+if down_sample_ratio>0:
+    dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
+else:
+    dataset_binned = dataset
 dataset_binned['event_time'] = dataset_binned.event_time.astype(int) #cast to int to avoid floating point error later
 dataset_binned.attrs.update(dataset.attrs)
 
@@ -199,5 +194,3 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
-
-# %%
