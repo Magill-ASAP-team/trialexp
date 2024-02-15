@@ -139,14 +139,6 @@ def get_task_specs(tasks_trig_and_events, task_name):
     """
     All the df columns named in this function, events and opto_categories must 
     follow columns of the indicated tasksfile
-    
-    This function sets the values of 
-        self.triggers
-        self.events_to_process
-        self.conditions
-        self.trial_window
-        self.timelim
-
     """
 
     # match triggers (events/state used for t0)
@@ -158,11 +150,13 @@ def get_task_specs(tasks_trig_and_events, task_name):
     
            
     # events to extract
-    events_to_process = np.array2string(tasks_trig_and_events['events'][task_idx].values).strip("'[]").split('; ')
+    events_to_process = np.array2string(tasks_trig_and_events['events'][task_idx].values).strip("'[]").split(';')
+    events_to_process = list(map(str.strip, events_to_process))
     # printed line in task file indicating
     # the type of optogenetic stimulation
     # used to group_by trials with same stim/sham
-    conditions = np.array2string(tasks_trig_and_events['conditions'][task_idx].values).strip("'[]").split('; ')
+    conditions = np.array2string(tasks_trig_and_events['conditions'][task_idx].values).strip("'[]").split(';')
+    conditions = list(map(str.strip, conditions))
     
     trial_window = tasks_trig_and_events['trial_window'][task_idx].iloc[0].split(';')
     trial_window = list(map(float, trial_window))
