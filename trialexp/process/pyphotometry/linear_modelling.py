@@ -118,8 +118,18 @@ def extract_data(dataArray, start_time, end_time):
     return dataArray[np.arange(start_idx, end_idx)]
 
 def time_warp_data(df_events_cond, xr_signal, extraction_specs, Fs):
-    # time warp between events so that they can be aligned together
+    """
+    Time warps the data between events so that they can be aligned together.
 
+    Parameters:
+    - df_events_cond (pandas DataFrame): DataFrame containing event conditions.
+    - xr_signal (xarray DataArray): DataArray containing the signal data.
+    - extraction_specs (dict): Dictionary containing extraction specifications.
+    - Fs (int): Sampling frequency.
+
+    Returns:
+    - xa (xarray DataArray): DataArray containing the time-warped data.
+    """
     data_list = []
     trial_nb = []
     signal_var = 'analog_2_df_over_f'
@@ -172,7 +182,16 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs, ax=None):
         cur_time += (post_time-pre_time)+padding
         
 def prepare_regression_data(xa_cond, signal_var):
+    """
+    Prepare the data for regression analysis.
 
+    Parameters:
+    xa_cond (xarray.DataArray): The input xarray containing the condition data.
+    signal_var (str): The name of the variable to be used as the signal.
+
+    Returns:
+    tuple: A tuple containing the data array and a dictionary of predictor variables.
+    """
     xr_data = xa_cond.dropna(dim='trial_nb')
     data = np.squeeze(xr_data[signal_var].data)
 
@@ -187,35 +206,47 @@ def prepare_regression_data(xa_cond, signal_var):
     
     return (data, {'trial_outcome': x_event, 'trial_nb':x_trial_nb})
 
-def perform_linear_regression(xa_cond,data, **predictor_vars):
+def perform_linear_regression(xa_cond, data, **predictor_vars):
+    """
+    Perform linear regression on the given data.
+
+    Args:
+        xa_cond (Xarray): Xarray object containing time data.
+        data (ndarray): 2D array of shape (n_samples, n_timepoints) containing the dependent variable.
+        **predictor_vars: Keyword arguments containing predictor variables as 2D arrays of shape (n_samples, n_timepoints).
+
+    Returns:
+        regress_res (DataFrame): DataFrame containing the regression results for each timepoint.
+    """
     regress_res = []
     
     for t in range(data.shape[1]):
-        y = data[:,t]
+        y = data[:, t]
     
         # construct the dataframe for linear regression
         df2fit = pd.DataFrame({
-            'signal':y,
-            })
+            'signal': y,
+        })
         
-        for k,v in predictor_vars.items():
-            df2fit[k] = v[:,t]
+        for k, v in predictor_vars.items():
+            df2fit[k] = v[:, t]
                     
-        mod = smf.ols(formula = 'signal ~ trial_outcome + trial_nb', data=df2fit)
+        mod = smf.ols(formula='signal ~ trial_outcome + trial_nb', data=df2fit)
         res = mod.fit()
 
         for factor in ['trial_outcome', 'trial_nb']:
             regress_res.append({
-                'beta':res.params[factor],
-                'intercept': res.params['Intercept'], # the intercept represent the mean value
+                'beta': res.params[factor],
+                'intercept': res.params['Intercept'],  # the intercept represent the mean value
                 'pvalue': res.pvalues[factor],
                 'factor': factor,
                 'CI': res.conf_int().loc[factor].tolist(),
-                'time': xa_cond.time.data[t]})
+                'time': xa_cond.time.data[t]
+            })
 
     regress_res = pd.DataFrame(regress_res)
 
-    return regress_res,res
+    return regress_res
 
 
 def highlight_pvalues(df_reg_res, ax, threshold=0.05):
