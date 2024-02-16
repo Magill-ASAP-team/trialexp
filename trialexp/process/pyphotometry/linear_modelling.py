@@ -4,6 +4,7 @@ from sklearn import linear_model
 import matplotlib.pylab as plt
 import pandas as pd
 import seaborn as sns
+import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
@@ -146,7 +147,8 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, Fs):
 
 def plot_warpped_data(xa_cond, signal_var, extraction_specs, ax=None):
     df = xa_cond[[signal_var,'trial_outcome']].to_dataframe().reset_index()
-    ax= sns.lineplot(df,  x='time',y=signal_var, hue='trial_outcome',ax=ax)
+    sns.lineplot(df, x='time',y=signal_var, 
+                   hue='trial_outcome', ax = ax)
     
     # add a bit of padding for text later
     ylim = ax.get_ylim()
@@ -182,8 +184,10 @@ def prepare_regression_data(xa_cond, signal_var):
 
     # trial_nb (a proxy for time)
     x_trial_nb = np.tile(xr_data.trial_nb, [data.shape[1],1]).T
-    # print(x_event.shape, x_trial_nb.shape)
+    
+    return (data, {'trial_outcome': x_event, 'trial_nb':x_trial_nb})
 
+def perform_linear_regression(xa_cond,data, **predictor_vars):
     regress_res = []
     
     for t in range(data.shape[1]):
@@ -192,10 +196,11 @@ def prepare_regression_data(xa_cond, signal_var):
         # construct the dataframe for linear regression
         df2fit = pd.DataFrame({
             'signal':y,
-            'trial_outcome': x_event[:,t],
-            'trial_nb' : x_trial_nb[:,t]
-        })
-    
+            })
+        
+        for k,v in predictor_vars.items():
+            df2fit[k] = v[:,t]
+                    
         mod = smf.ols(formula = 'signal ~ trial_outcome + trial_nb', data=df2fit)
         res = mod.fit()
 
@@ -205,11 +210,12 @@ def prepare_regression_data(xa_cond, signal_var):
                 'intercept': res.params['Intercept'], # the intercept represent the mean value
                 'pvalue': res.pvalues[factor],
                 'factor': factor,
+                'CI': res.conf_int().loc[factor].tolist(),
                 'time': xa_cond.time.data[t]})
 
     regress_res = pd.DataFrame(regress_res)
 
-    return regress_res
+    return regress_res,res
 
 
 def highlight_pvalues(df_reg_res, ax, threshold=0.05):

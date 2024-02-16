@@ -104,6 +104,17 @@ rule behavorial_analysis:
         'scripts/06_behavorial_analysis.py'
 
 
+rule time_warping:
+    input:
+        xr_photometry = '{session_path}/{task}/{session_id}/processed/xr_photometry.nc',
+        condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
+        event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
+    output:
+        xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
+        figure_dir= directory('{session_path}/{task}/{session_id}/processed/figures/timewarp'),
+    script:
+        'scripts/07_time_warping.py'
+
 def photometry_input(wildcards):
     #determine if photometry needs to run in the current folder
     ppd_files = glob(f'{wildcards.session_path}/{wildcards.task}/{wildcards.session_id}/pyphotometry/*.ppd')
@@ -118,6 +129,7 @@ rule pycontrol_final:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
         pycontrol_done = '{session_path}/{task}/{session_id}/processed/log/pycontrol.done',
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
-        spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done'
+        spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
+        xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
     output:
         done = touch('{session_path}/{task}/{session_id}/processed/pycontrol_workflow.done')
