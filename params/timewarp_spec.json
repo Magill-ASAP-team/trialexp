@@ -1,0 +1,87 @@
+{
+    "reaching_go_spout_bar": {
+        "hold_for_water": {
+            "event_window": [
+                -500,
+                500
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue"
+        },
+        "bar_off": {
+            "event_window": [
+                -200,
+                200
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 200,
+            "label": "last bar off"
+        },
+        "spout": {
+            "event_window": [
+                -500,
+                300
+            ],
+            "order": "first",
+            "padding": 100,
+            "label": "first spout"
+        },
+        "lick": {
+            "event_window": [
+                -100,
+                500
+            ],
+            "order": "first_after_last",
+            "dependent_event": "US_end_timer",
+            "padding": 0
+        }
+    },
+    "spontanous_reaching": {
+        "US_timer": {
+            "event_window": [
+                -500,
+                200
+            ],
+            "order": "only",
+            "padding": 20,
+            "label": "reward"
+
+        },
+        "bar_off": {
+            "event_window": [
+                -100,
+                100
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 50,
+            "label": "last bar off"
+
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                300
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "first spout"
+
+        }
+    },
+    "default": {
+        "US_timer": {
+            "event_window": [
+                -500,
+                100
+            ],
+            "order": "only",
+            "padding": 100,
+            "label": "reward"
+
+        }
+    }
+
+}

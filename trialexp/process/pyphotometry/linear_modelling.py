@@ -7,12 +7,13 @@ import seaborn as sns
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from collections import Counter
 
 def extract_event(df_events, event, order, dependent_event=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
     # if order is 'last_before', you need to specify the depedent_event as well, it will always be
     # result is a pandas series
-    events = df_events[df_events.name==event]
+    events = df_events[(df_events.name==event) & (df_events.trial_time>0)]
 
     if len(events) == 0:
         return None
@@ -55,7 +56,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     total_len = total_padding_len+event_window_len
 
     if len(trial_data) < total_len:
-        raise ValueError('There is not enough data for interpolation')
+        raise ValueError(f'There is not enough data for interpolation required: {total_len}, available: {len(trial_data)}')
         
     t = np.zeros((total_len),)
     cur_idx = 0
@@ -84,12 +85,16 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         else:
             t_event = cur_time+padding-specs['event_window'][0]
             
-        #TODO, detect when there is overlap between t_event and padding
         # find a way to warp between two events
         # Note: note there will be nan when the animal touch the spout too close to the start of next trial
         # e.g. in aborted trial
         
         # warp the inter-event period
+        # Raise error if the padding is too long
+        # TODO: handle this gracefully
+        if cur_time + padding > t_event+specs['event_window'][0]:
+            raise ValueError(f'Padding too long. {evt}  time diff: {cur_time + padding - t_event+specs["event_window"][0]}')
+
         t[cur_idx:(cur_idx+padding_len)] = np.linspace(cur_time, t_event+specs['event_window'][0], padding_len)
         cur_idx += padding_len
         cur_time = cur_time + padding
@@ -117,7 +122,7 @@ def extract_data(dataArray, start_time, end_time):
     end_idx = np.searchsorted(ref_time, end_time)
     return dataArray[np.arange(start_idx, end_idx)]
 
-def time_warp_data(df_events_cond, xr_signal, extraction_specs, Fs):
+def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verbose=False):
     """
     Time warps the data between events so that they can be aligned together.
 
@@ -131,55 +136,72 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, Fs):
     - xa (xarray DataArray): DataArray containing the time-warped data.
     """
     data_list = []
-    trial_nb = []
-    signal_var = 'analog_2_df_over_f'
     
-    for i in range(1, int(df_events_cond.trial_nb.max()+1)):
+    for i in df_events_cond.trial_nb.unique():
         df_trial = df_events_cond[df_events_cond.trial_nb==i]
     
-        pre_time = extraction_specs['hold_for_water']['event_window'][0]-500
+        pre_time = extraction_specs[trigger]['event_window'][0]-500
         # extract photometry data around trial
         trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time)
         
         #time wrap it
         try:
-            data_p = interp_data(trial_data, df_trial, 'hold_for_water', extraction_specs, Fs)
+            data_p = interp_data(trial_data, df_trial, trigger, extraction_specs, Fs)
             data_p = data_p.expand_dims({'trial_nb':[i]})
             data_list.append(data_p)
         except NotImplementedError as e:
             print(e)
-        except ValueError:
-            pass
+        except ValueError as e:
+            if verbose:
+                print(f'Skipping trial {i}', e)
+            
         
     xa = xr.concat(data_list,dim='trial_nb')
 
     return xa
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs, ax=None):
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
     df = xa_cond[[signal_var,'trial_outcome']].to_dataframe().reset_index()
-    sns.lineplot(df, x='time',y=signal_var, 
-                   hue='trial_outcome', ax = ax)
-    
-    # add a bit of padding for text later
-    ylim = ax.get_ylim()
-    ax.set_ylim(ylim[0], ylim[1]*1.1)
-    
-    # plot the time point in the extraction_specs
-    
-    trigger_window = extraction_specs['hold_for_water']['event_window']
-    cur_time = -500
-    colors = (c for c in plt.cm.tab10.colors)
-    
-    for evt, specs in extraction_specs.items():
-        pre_time, post_time = specs['event_window']
-        padding = specs['padding']
         
-        color = next(colors)
-        ax.axvline(cur_time-pre_time,color= color, ls='--')
-        ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
-        ax.text(cur_time-pre_time-10, ax.get_ylim()[1], evt.replace('_', ' '), rotation = 90, ha='right', va='top')
+    
+    if len(df.dropna())>0:
+        # sometime when the event time doesn't matter the extraction_specs
+        # no trial can be extracted
         
-        cur_time += (post_time-pre_time)+padding
+         #add in the trial number information
+        df_outcome = df.groupby('trial_nb').first().dropna()
+        df_outcome_count = df_outcome.groupby('trial_outcome').count().time
+        labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
+        df['trial_outcome'] = df.trial_outcome.replace(labels)
+
+        sns.lineplot(df, x='time',y=signal_var, 
+                    hue='trial_outcome', ax = ax)
+        
+        sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
+
+        
+        # add a bit of padding for text later
+        ylim = ax.get_ylim()
+        ax.set_ylim(ylim[0], ylim[1]*1.3)
+        
+        # plot the time point in the extraction_specs
+        
+        trigger_window = extraction_specs[trigger]['event_window']
+        cur_time = trigger_window[0]
+        colors = (c for c in plt.cm.tab10.colors)
+        
+        for evt, specs in extraction_specs.items():
+            pre_time, post_time = specs['event_window']
+            padding = specs['padding']
+            
+            color = next(colors)
+            ax.axvline(cur_time-pre_time,color= color, ls='--')
+            ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
+            label = specs.get('label', evt.replace('_', ' '))
+            ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
+            
+            cur_time += (post_time-pre_time)+padding
+        
         
 def prepare_regression_data(xa_cond, signal_var):
     """

@@ -246,6 +246,7 @@ def compute_trial_outcome(row, task_name):
     if task_name in ['reaching_go_spout_bar_nov22', 
                      'reaching_go_spout_bar_mar23', 
                      'reaching_go_spout_bar_apr23',
+                     'reaching_go_spout_bar_june05',
                      'reaching_go_spout_bar_VR_Dec23']:
         
         if row.break_after_abort:
@@ -309,7 +310,10 @@ def compute_trial_outcome(row, task_name):
             return 'success'
         else:
             return 'undefined'
-    elif task_name in ['pavlovian_reaching_Oct23', 'pavlovian_reaching_Oct26']:
+    elif task_name in ['pavlovian_reaching_Oct23',
+                       'pavlovian_reaching_Oct26',
+                       'pavlovian_spontanous_reaching_oct23',
+                       'pavlovian_spontanous_reaching_march23']:
         if row.spout:
             return 'success'
         else:
