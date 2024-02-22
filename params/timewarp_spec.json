@@ -71,6 +71,39 @@
 
         }
     },
+    "break2": {
+        "busy_win": {
+            "event_window": [
+                -500,
+                200
+            ],
+            "order": "only",
+            "padding": 20,
+            "label": "cue"
+
+        },
+        "bar_off": {
+            "event_window": [
+                -100,
+                100
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 50,
+            "label": "last bar off"
+
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                300
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "first spout"
+
+        }
+    },
     "default": {
         "trigger": {
             "event_window": [

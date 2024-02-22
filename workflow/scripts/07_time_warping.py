@@ -49,7 +49,9 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
                    'reaching_go_spout_bar_june05']:
     extraction_specs = specs['reaching_go_spout_bar']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
-
+elif task_name in ['reaching_go_spout_incr_break2_nov22']:
+    extraction_specs = specs['break2']
+    outcome2plot = df_conditions.trial_outcome.unique()
 else:
     extraction_specs = specs['default']
     #update the trigger
