@@ -52,6 +52,8 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
 
 else:
     extraction_specs = specs['default']
+    #update the trigger
+    extraction_specs[trigger] = extraction_specs.pop('trigger')
     outcome2plot = df_conditions.trial_outcome.unique()
 
 
@@ -61,7 +63,7 @@ xr_conditions = xr.Dataset.from_dataframe(df_conditions)
 
 xa_list = []
 for signal_var in signal2analyze:
-    xa = lm.time_warp_data(df_events_cond, 
+    xa, interp_results_list = lm.time_warp_data(df_events_cond, 
                            xr_photometry[signal_var], 
                            extraction_specs, 
                            trigger,
@@ -69,6 +71,11 @@ for signal_var in signal2analyze:
     
     xa_list.append(xa)
     
+#add the interp result for later plotting
+df_interp_res = pd.DataFrame(interp_results_list)
+df_interp_res['trial_nb'] = xa.trial_nb
+df_interp_res = df_interp_res.set_index('trial_nb')
+
 xr_warped = xr.merge([xr_conditions, *xa_list])
 
 #%% Save data
@@ -86,7 +93,8 @@ for var in signal2analyze:
         
     for outcome, ax in zip(outcome2plot, axes):
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
+        #TODO if not events detected, do not plot the event line
+        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, df_interp_res, ax=ax)
         
     
         
@@ -94,5 +102,3 @@ for var in signal2analyze:
 
 
 
-
-# %%

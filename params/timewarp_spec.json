@@ -72,14 +72,14 @@
         }
     },
     "default": {
-        "US_timer": {
+        "trigger": {
             "event_window": [
                 -500,
-                100
+                500
             ],
             "order": "only",
             "padding": 100,
-            "label": "reward"
+            "label": "trigger"
 
         }
     }

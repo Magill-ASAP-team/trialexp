@@ -75,6 +75,8 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     cur_time = t_trigger+trigger_specs['event_window'][1] #the trial time corresponding to cur_idx
     padding = trigger_specs['padding']
     padding_len = int(padding/1000*sampling_rate)
+    
+    interp_result = {trigger:True} #the trigger is always found
 
     # process the other events one by one
     for evt, specs in event_specs.items():
@@ -82,8 +84,11 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         # if we can find the event, then warp from the event, if not, just start after padding
         if (event := extract_event(df_trial, evt, specs['order'], dependent_event)) is not None:
             t_event = event.time
+            interp_result[evt] = True
         else:
             t_event = cur_time+padding-specs['event_window'][0]
+            interp_result[evt] = False
+
             
         # find a way to warp between two events
         # Note: note there will be nan when the animal touch the spout too close to the start of next trial
@@ -113,7 +118,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     data_interp  = trial_data.interp(time=t)
     data_interp['time'] = np.arange(total_len)/sampling_rate*1000 + trigger_specs['event_window'][0]
 
-    return data_interp
+    return data_interp, interp_result
 
 def extract_data(dataArray, start_time, end_time):
     # extract data specified by a start and ending time in ms
@@ -136,6 +141,7 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
     - xa (xarray DataArray): DataArray containing the time-warped data.
     """
     data_list = []
+    interp_results_list = []
     
     for i in df_events_cond.trial_nb.unique():
         df_trial = df_events_cond[df_events_cond.trial_nb==i]
@@ -146,7 +152,8 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
         
         #time wrap it
         try:
-            data_p = interp_data(trial_data, df_trial, trigger, extraction_specs, Fs)
+            data_p, interp_results = interp_data(trial_data, df_trial, trigger, extraction_specs, Fs)
+            interp_results_list.append(interp_results)
             data_p = data_p.expand_dims({'trial_nb':[i]})
             data_list.append(data_p)
         except NotImplementedError as e:
@@ -158,9 +165,12 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
         
     xa = xr.concat(data_list,dim='trial_nb')
 
-    return xa
+    return xa,interp_results_list
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, df_interp_res, ax=None):
+    
+    palette_colors = plt.cm.tab10.colors
+
     df = xa_cond[[signal_var,'trial_outcome']].to_dataframe().reset_index()
         
     
@@ -173,18 +183,26 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
         df_outcome_count = df_outcome.groupby('trial_outcome').count().time
         labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
         df['trial_outcome'] = df.trial_outcome.replace(labels)
+        
+        outcomes = sorted(df['trial_outcome'].unique())[::-1]
+        palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
 
         sns.lineplot(df, x='time',y=signal_var, 
-                    hue='trial_outcome', ax = ax)
+                    hue='trial_outcome', palette=palette, ax = ax)
         
         sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
 
         
         # add a bit of padding for text later
         ylim = ax.get_ylim()
-        ax.set_ylim(ylim[0], ylim[1]*1.3)
+        yrange = ylim[1] -ylim[0]
+        ax.set_ylim(ylim[0], ylim[1]+yrange*0.3)
         
         # plot the time point in the extraction_specs
+        
+        # only plot the time line if there are at least some trials that contain that event
+        idx  = df_interp_res.index.intersection(xa_cond.trial_nb)
+        event2plot = df_interp_res.loc[idx].any() #Find if there is any trial having that event
         
         trigger_window = extraction_specs[trigger]['event_window']
         cur_time = trigger_window[0]
@@ -195,11 +213,13 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
             padding = specs['padding']
             
             color = next(colors)
-            ax.axvline(cur_time-pre_time,color= color, ls='--')
-            ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
-            label = specs.get('label', evt.replace('_', ' '))
-            ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
             
+            if event2plot[evt]:
+                ax.axvline(cur_time-pre_time,color= color, ls='--')
+                ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
+                label = specs.get('label', evt.replace('_', ' '))
+                ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
+                
             cur_time += (post_time-pre_time)+padding
         
         
