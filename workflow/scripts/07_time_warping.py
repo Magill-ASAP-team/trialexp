@@ -37,7 +37,6 @@ task_name = df_events_cond.attrs['Task name']
 trigger = df_events_cond.attrs['triggers'][0]
 
 if task_name in ['pavlovian_spontanous_reaching_oct23',
-                 'reaching_go_spout_incr_break2_nov22'
                  'pavlovian_reaching_Oct26',
                  'pavlovian_spontanous_reaching_march23',
                  'pavlovian_spontanous_reaching_oct23']:
@@ -45,10 +44,17 @@ if task_name in ['pavlovian_spontanous_reaching_oct23',
     extraction_specs = specs['spontanous_reaching']
     outcome2plot = df_conditions.trial_outcome.unique()
     
-elif task_name in ['reaching_go_spout_bar_VR_Dec23',
-                   'reaching_go_spout_bar_june05']:
+elif task_name in ['reaching_go_spout_bar_VR_Dec23']:
+    extraction_specs = specs['reaching_go_spout_bar_lick']
+    outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+    
+elif task_name in ['reaching_go_spout_bar_mar23',
+                   'reaching_go_spout_bar_june05',
+                   'reaching_go_spout_bar_nov22',
+                   'reaching_go_spout_bar_apr23']:
     extraction_specs = specs['reaching_go_spout_bar']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+    
 elif task_name in ['reaching_go_spout_incr_break2_nov22']:
     extraction_specs = specs['break2']
     outcome2plot = df_conditions.trial_outcome.unique()
@@ -69,7 +75,8 @@ for signal_var in signal2analyze:
                            xr_photometry[signal_var], 
                            extraction_specs, 
                            trigger,
-                           xr_photometry.attrs['sampling_rate'])
+                           xr_photometry.attrs['sampling_rate'],
+                           verbose=True)
     
     xa_list.append(xa)
     
@@ -103,4 +110,4 @@ for var in signal2analyze:
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
 
-
+# %%

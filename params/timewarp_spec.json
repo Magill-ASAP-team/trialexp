@@ -1,5 +1,5 @@
 {
-    "reaching_go_spout_bar": {
+    "reaching_go_spout_bar_lick": {
         "hold_for_water": {
             "event_window": [
                 -500,
@@ -12,16 +12,16 @@
         "bar_off": {
             "event_window": [
                 -200,
-                200
+                50
             ],
             "order": "last_before_first",
             "dependent_event": "spout",
-            "padding": 200,
+            "padding": 100,
             "label": "last bar off"
         },
         "spout": {
             "event_window": [
-                -500,
+                -50,
                 300
             ],
             "order": "first",
@@ -38,31 +38,61 @@
             "padding": 0
         }
     },
+    "reaching_go_spout_bar": {
+        "hold_for_water": {
+            "event_window": [
+                -500,
+                500
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue"
+        },
+        "bar_off": {
+            "event_window": [
+                -200,
+                50
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 100,
+            "label": "last bar off"
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                1500
+            ],
+            "order": "first",
+            "padding": 100,
+            "label": "first spout"
+        }
+    },
     "spontanous_reaching": {
         "US_timer": {
             "event_window": [
                 -500,
-                200
+                0
             ],
             "order": "only",
-            "padding": 20,
+            "padding": 300,
             "label": "reward"
 
         },
         "bar_off": {
             "event_window": [
-                -100,
-                100
+                0,
+                0
             ],
             "order": "last_before_first",
             "dependent_event": "spout",
-            "padding": 50,
+            "padding": 300,
             "label": "last bar off"
 
         },
         "spout": {
             "event_window": [
-                -50,
+                0,
                 300
             ],
             "order": "first",

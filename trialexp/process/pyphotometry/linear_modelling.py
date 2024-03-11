@@ -77,8 +77,10 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     padding_len = int(padding/1000*sampling_rate)
     
     interp_result = {trigger:True} #the trigger is always found
+    
 
     # process the other events one by one
+    # TODO  Figure out what to do if one event is missing but not the next
     for evt, specs in event_specs.items():
         dependent_event = specs.get('dependent_event', None)
         # if we can find the event, then warp from the event, if not, just start after padding
@@ -188,7 +190,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, df_interp_r
         palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
 
         sns.lineplot(df, x='time',y=signal_var, 
-                    hue='trial_outcome', palette=palette, ax = ax)
+                    hue='trial_outcome', palette=palette, ax = ax, n_boot=100)
         
         sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
 
