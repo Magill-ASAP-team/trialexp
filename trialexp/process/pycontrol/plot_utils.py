@@ -86,3 +86,16 @@ def style_event_distribution(g, xlabel, ylabel, trigger_name):
     g.ax_joint.text(0, np.mean(ylim), trigger_name, ha='right',  rotation='vertical')
     
     return g
+
+
+def reach_time(df_trial):
+    if len(spouts := df_trial[df_trial['name']=='spout'])>0:
+        first_spout_time = spouts.iloc[0].time
+        df_win = df_trial[df_trial.time<first_spout_time]
+        if len(bar_off := df_win[df_win['name']=='bar_off'])>0:
+            last_bar_time = bar_off.iloc[-1].time
+            return first_spout_time - last_bar_time
+
+        else:
+            return None
+    return None

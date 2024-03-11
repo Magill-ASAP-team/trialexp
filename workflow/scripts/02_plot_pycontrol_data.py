@@ -25,4 +25,10 @@ style_event_distribution(g, 'Time (s)', 'Trial number', trigger_text)
 # %% save
 g.savefig(soutput.event_histogram, dpi=300)
 
-# %%
+# %% Plot the reach time
+
+reach_time = df_events_cond.groupby('trial_nb').apply(reach_time)
+reach_time = reach_time.dropna()
+ax = sns.histplot(reach_time,bins = 50, binrange=[0,500])
+ax.set(xlabel='Reach time (ms)')
+plt.savefig(soutput.reach_histogram, dpi=300)
