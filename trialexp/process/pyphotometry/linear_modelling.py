@@ -76,7 +76,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     padding = trigger_specs['padding']
     padding_len = int(padding/1000*sampling_rate)
     
-    interp_result = {trigger:True} #the trigger is always found
+    interp_result = {'interp_'+trigger:True} #the trigger is always found
     
 
     # process the other events one by one
@@ -86,10 +86,10 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         # if we can find the event, then warp from the event, if not, just start after padding
         if (event := extract_event(df_trial, evt, specs['order'], dependent_event)) is not None:
             t_event = event.time
-            interp_result[evt] = True
+            interp_result['interp_'+evt] = True
         else:
             t_event = cur_time+padding-specs['event_window'][0]
-            interp_result[evt] = False
+            interp_result['interp_'+evt] = False
 
             
         # find a way to warp between two events
@@ -169,7 +169,7 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
 
     return xa,interp_results_list
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, df_interp_res, ax=None):
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
     
     palette_colors = plt.cm.tab10.colors
 
@@ -203,8 +203,8 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, df_interp_r
         # plot the time point in the extraction_specs
         
         # only plot the time line if there are at least some trials that contain that event
-        idx  = df_interp_res.index.intersection(xa_cond.trial_nb)
-        event2plot = df_interp_res.loc[idx].any() #Find if there is any trial having that event
+        # idx  = df_interp_res.index.intersection(xa_cond.trial_nb)
+        # event2plot = df_interp_res.loc[idx].any() #Find if there is any trial having that event
         
         trigger_window = extraction_specs[trigger]['event_window']
         cur_time = trigger_window[0]
@@ -216,7 +216,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, df_interp_r
             
             color = next(colors)
             
-            if event2plot[evt]:
+            if xa_cond['interp_'+evt].dropna('trial_nb').any():
                 ax.axvline(cur_time-pre_time,color= color, ls='--')
                 ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
                 label = specs.get('label', evt.replace('_', ' '))
@@ -298,3 +298,36 @@ def highlight_pvalues(df_reg_res, ax, threshold=0.05):
     for _, row in df_reg_res.iterrows():
         if row.pvalue < threshold:
             ax.axvline(row.time, alpha=0.1, color='y')
+            
+            
+def load_extraction_spec(task_name, df_conditions, specs):
+    
+    if task_name in ['pavlovian_spontanous_reaching_oct23',
+                    'pavlovian_reaching_Oct26',
+                    'pavlovian_spontanous_reaching_march23',
+                    'pavlovian_spontanous_reaching_oct23']:
+        
+        extraction_specs = specs['spontanous_reaching']
+        outcome2plot = df_conditions.trial_outcome.unique()
+        
+    elif task_name in ['reaching_go_spout_bar_VR_Dec23']:
+        extraction_specs = specs['reaching_go_spout_bar_lick']
+        outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+        
+    elif task_name in ['reaching_go_spout_bar_mar23',
+                    'reaching_go_spout_bar_june05',
+                    'reaching_go_spout_bar_nov22',
+                    'reaching_go_spout_bar_apr23']:
+        extraction_specs = specs['reaching_go_spout_bar']
+        outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+        
+    elif task_name in ['reaching_go_spout_incr_break2_nov22']:
+        extraction_specs = specs['break2']
+        outcome2plot = df_conditions.trial_outcome.unique()
+    else:
+        extraction_specs = specs['default']
+        #update the trigger
+        extraction_specs[trigger] = extraction_specs.pop('trigger')
+        outcome2plot = df_conditions.trial_outcome.unique()
+        
+    return extraction_specs, outcome2plot

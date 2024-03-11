@@ -76,7 +76,7 @@ for signal_var in signal2analyze:
                            extraction_specs, 
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
-                           verbose=True)
+                           verbose=False)
     
     xa_list.append(xa)
     
@@ -84,15 +84,16 @@ for signal_var in signal2analyze:
 df_interp_res = pd.DataFrame(interp_results_list)
 df_interp_res['trial_nb'] = xa.trial_nb
 df_interp_res = df_interp_res.set_index('trial_nb')
+xr_interp_res = df_interp_res.to_xarray()
 
-xr_warped = xr.merge([xr_conditions, *xa_list])
+xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
 
 #%% Save data
 
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
 
-#%% Plot figures
+#%% Plot the time wrapped data
 for var in signal2analyze:
     unique_outcome = np.unique(xr_warped.trial_outcome)
     fig, axes = plt.subplots(len(outcome2plot),1,figsize=(10,4*len(outcome2plot)))
@@ -102,12 +103,13 @@ for var in signal2analyze:
         
     for outcome, ax in zip(outcome2plot, axes):
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-        #TODO if not events detected, do not plot the event line
-        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, df_interp_res, ax=ax)
+        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
         
-    
         
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
+
+# %%
+xr2plot = xr_warped.sel(trial_nb = (xr_warped.trial_outcome=='no_reach'))
 
 # %%
