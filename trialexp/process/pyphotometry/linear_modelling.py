@@ -173,10 +173,16 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
     
     palette_colors = plt.cm.tab10.colors
 
-    df = xa_cond[[signal_var,'trial_outcome']].to_dataframe().reset_index()
-        
+    df = xa_cond[[signal_var,'trial_outcome']].to_dataframe()
+    if 'session_id' in df.columns:
+            # It is a multi-session xarray Dataset, we need to clean up for later reset_index
+            # df['trial_id'] = df.session_id.astype(str)+'_'+df.trial_nb.astype(str)
+            df = df.drop(columns=['trial_nb','session_id'])
+
+    df = df.reset_index()    
+    df = df.dropna()
     
-    if len(df.dropna())>0:
+    if len(df)>0:
         # sometime when the event time doesn't matter the extraction_specs
         # no trial can be extracted
         
@@ -216,7 +222,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
             
             color = next(colors)
             
-            if xa_cond['interp_'+evt].dropna('trial_nb').any():
+            if xa_cond['interp_'+evt].any():
                 ax.axvline(cur_time-pre_time,color= color, ls='--')
                 ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
                 label = specs.get('label', evt.replace('_', ' '))
@@ -293,11 +299,11 @@ def perform_linear_regression(xa_cond, data, **predictor_vars):
     return regress_res
 
 
-def highlight_pvalues(df_reg_res, ax, threshold=0.05):
+def highlight_pvalues(df_reg_res, ax, threshold=0.05,alpha=0.1):
     # highlight the significant time
     for _, row in df_reg_res.iterrows():
         if row.pvalue < threshold:
-            ax.axvline(row.time, alpha=0.1, color='y')
+            ax.axvline(row.time, alpha=alpha, color='y')
             
             
 def load_extraction_spec(task_name, df_conditions, specs):

@@ -26,7 +26,7 @@
             ],
             "order": "first",
             "padding": 100,
-            "label": "first spout"
+            "label": "first touch"
         },
         "lick": {
             "event_window": [
