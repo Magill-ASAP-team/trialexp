@@ -16,30 +16,25 @@ def rec_properties_input(wildcards):
     else:
         return []
 
-# def gather_metrics_to_aggregate(wildcards):
-#     # determine if there is processed cell metrics in that folder
-#     # cell_metrics_df_clustering = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl')
-#     # if len(recording_csv) > 0:
-#     #     return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/kilosort3/{wildcards.probe_folder}/sorter_output/cell_metrics_df_clustering.pkl'
-#     # else:
-#     #     return []
-#     ...
-
-def task2analyze(tasks:list=None):
+def session2analyze(tasks:list=None, cohort:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []
 
     if tasks is None:
         tasks=['*']
 
-    for t in tasks:
-        total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{t}/*'))        
+    if cohort is None:
+        cohort = ['*']
+
+    for c in cohort:
+        for t in tasks:
+            total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
 
     return total_sessions
 
 rule spike_all:
      # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    input: task2analyze(['reaching_go_spout_bar_nov22'])
+    input: session2analyze(cohort=['2024_Jan_cohort'], tasks=['reaching_go_spout_bar_VR_Dec23'])
 
 rule spike_sorting:
     input:
