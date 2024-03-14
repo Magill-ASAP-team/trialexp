@@ -26,7 +26,12 @@ from tslearn.barycenters import softdtw_barycenter
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pingouin as pg
 from trialexp.process.ephys.spikes_preprocessing import get_spike_trains
-
+from tslearn.backend import instantiate_backend
+from tslearn.utils import to_time_series
+from tslearn.metrics import dtw_variants
+from tslearn.metrics.dtw_variants import *
+from tslearn.barycenters import softdtw_barycenter
+import scipy
 
 def denest_string_cell(cell):
         if len(cell) == 0: 
@@ -515,13 +520,72 @@ def get_cell_mean_cv(x, coarsen_factor = 5):
 def std_score(w,axis):
     return np.max(np.std(w,axis=1),axis=1)
 
+
+def dtw_path_unilateral(
+    s1,
+    s2,
+    be=None,
+):
+    #only allow  s2 to expand
+    be = instantiate_backend(be, s1, s2)
+    s1 = to_time_series(s1, remove_nans=True, be=be)
+    s2 = to_time_series(s2, remove_nans=True, be=be)
+
+    if len(s1) == 0 or len(s2) == 0:
+        raise ValueError(
+            "One of the input time series contains only nans or has zero length."
+        )
+
+    if be.shape(s1)[1] != be.shape(s2)[1]:
+        raise ValueError("All input time series must have the same feature size.")
+
+    # use a mask to force only s2 to strech
+    mask = np.zeros((len(s1), len(s2)))
+    indx = np.triu_indices(n=len(s1), m=len(s2),k=1) #the diagnoal must not be inf
+
+    mask[indx] = np.inf
+                    
+    acc_cost_mat = njit_accumulated_matrix(s1, s2, mask=mask)
+    path = dtw_variants._njit_return_path(acc_cost_mat)
+
+    return path, be.sqrt(acc_cost_mat[-1, -1])
+
+
+def expand_curve(s, factor):
+    idx = np.arange(len(s))
+    idx = np.repeat(idx, factor)
+    return s[idx]
+
+def match2center(s_center, s, k=10):
+    '''
+    Perform a unilateral match of the curve in s to the center s_center using DTW
+    the s_center will be expanded by k times first, then a special mask
+    will be used in DTW to constrain only s to expand, but not the reference s_center curve
+    Finally, the curves will be downsampled back to the original size
+    s should be in the form of time x n
+    '''
+    s_center_s = expand_curve(s_center, k)
+    s_matched = np.zeros_like(s)    
+    for i in range(s.shape[1]):
+        d1 = s[:,i]
+        path, sim = dtw_path_unilateral(s_center_s, d1)
+        p1,p2 = list(zip(*path))
+    
+        #downsample back to the original shape
+        s_d = signal.decimate(d1[list(p2)],k)
+        s_matched[:,i] = s_d[:s.shape[0]] # discard extra data
+        
+    return s_matched    
+
 def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4, 
-                  use_dtw_average=False, smooth_average=True):
+                  use_dtw_average=False, align_to_average=False, 
+                  alpha=0.7, aspect=1, error_band=None):
+    # align_to_average: whether to align the individual curves to the average by DTW first
 
     labels_unique = np.unique(labels)
     labels_unique = [x for x in labels_unique if x!=-1] #remove the outliner cluster
     nrow = (len(labels_unique)-1)//ncol+1
-    fig = plt.figure(figsize=(ncol*3,nrow*3))
+    fig = plt.figure(figsize=(ncol*3,nrow*3*aspect))
     colors = plt.cm.tab20.colors
     
     if use_dtw_average:
@@ -534,16 +598,45 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4,
         
     for idx,lbl in enumerate(labels_unique):
         ax = fig.add_subplot(nrow, ncol, idx+1)
-        ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)})')
+        ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)} units)')
         curves = data_norm[labels==lbl,:].T
         x_coord = spk_event_time
-        ax.plot(x_coord, curves, color=colors[idx%len(colors)]);
         if not use_dtw_average:
-            ax.plot(x_coord, curves.mean(axis=1), color='k');
+            mean_curve = curves.mean(axis=1)
         else:
+            mean_curve = mean_curves[idx].ravel()
             # use soft-DTW Barycenter for the average, it is smoother than original Barycenter
-            ax.plot(x_coord, mean_curves[idx], color='k');
+        
+        if align_to_average:
+            # align individual curves with DTW to the average first
+            curves = match2center(mean_curve, curves)
+        
+        if error_band=='ci':
+            df2plot = pd.DataFrame({
+                'time': np.tile(x_coord, (1,curves.shape[1])).ravel(),
+                'fr': curves.T.ravel()
+            })
+            sns.lineplot(df2plot, x='time', y='fr',n_boot=1000, color=colors[idx%len(colors)])
+        elif error_band == 'sem':
+            sem = scipy.stats.sem(curves,axis=1)
+            ax.fill_between(x_coord, mean_curve+sem, mean_curve-sem,
+                            alpha=alpha,
+                            color=colors[idx%len(colors)])
+            ax.plot(x_coord, mean_curve, color='k');
+        elif error_band == 'std':
+            std = np.std(curves,axis=1)
+            ax.fill_between(x_coord, mean_curve+std, mean_curve-std,
+                            alpha=alpha,
+                            color=colors[idx%len(colors)])
+            ax.plot(x_coord, mean_curve, color='k');
+
+
+        else:
+            ax.plot(x_coord, curves, color=colors[idx%len(colors)],alpha=alpha);
+            ax.plot(x_coord, mean_curve, color='k');
+
             
+        
         ax.axvline(x=0,ls='--', color='gray')
     
     
