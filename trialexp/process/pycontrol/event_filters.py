@@ -46,6 +46,13 @@ def get_first_event_from_name(df_trial, evt_name):
     if len(event) >0:    
         return event.iloc[0]
     
+def get_first_after(df_trial, event1, event2):
+    # get the first event1 after event2
+    if len(event := df_trial[df_trial['name']==event2]) >0:
+        df_window = df_trial[df_trial.time>=event.iloc[0].time]
+        return get_first_event_from_name(df_window, event1)
+        
+
 def get_events_from_name(df_event, evt_name):
     # return all events with the name
     event =  df_event[df_event['name']==evt_name]

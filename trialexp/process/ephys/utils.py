@@ -585,7 +585,7 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4,
     labels_unique = np.unique(labels)
     labels_unique = [x for x in labels_unique if x!=-1] #remove the outliner cluster
     nrow = (len(labels_unique)-1)//ncol+1
-    fig = plt.figure(figsize=(ncol*3,nrow*3*aspect))
+    fig = plt.figure(figsize=(ncol*3,nrow*3*aspect), dpi=100)
     colors = plt.cm.tab20.colors
     
     if use_dtw_average:

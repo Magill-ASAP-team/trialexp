@@ -8,6 +8,7 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from collections import Counter
+from matplotlib.patches import Polygon
 
 def extract_event(df_events, event, order, dependent_event=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
@@ -169,17 +170,98 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
 
     return xa,interp_results_list
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
+def add_break_mark(ax, x, y, d, w, h):
+    # add break mark to the x axis
+    xy = np.array([[x - w/2+d, y+h/2],
+                   [x + w/2+d, y+h/2],
+                   [x + w/2-d, y-h/2],
+                   [x - w/2-d, y-h/2]])
+
+    
+
+    ax.add_patch(Polygon(xy, color='white', closed=True, zorder=3, clip_on=False))
+    ax.plot([x - w/2+d, x - w/2-d], [y+h/2,  y-h/2], clip_on=False, color='k',ls='-', zorder=3)
+    ax.plot([x + w/2+d, x + w/2-d], [y+h/2,  y-h/2], clip_on=False, color='k',ls='-', zorder=3)
+
+
+def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected_region=True):
+    # draw the event line and shaded region for warping info
+    # add a bit of padding for text later
+    ylim = ax.get_ylim()
+    yrange = ylim[1] -ylim[0]
+    if adjust_ylim:
+        ax.set_ylim(ylim[0], ylim[1]+yrange*0.2)
+    
+    # plot the time point in the extraction_specs
+
+    trigger_window = extraction_specs[trigger]['event_window']
+    cur_time = trigger_window[0]
+    colors = (c for c in plt.cm.tab10.colors)
+    
+    for i, (evt, specs) in enumerate(extraction_specs.items()):
+        pre_time, post_time = specs['event_window']
+        padding = specs['padding']
+        
+        color = next(colors)
+        
+        ax.axvline(cur_time-pre_time,color= color, ls='--')
+        if draw_protected_region:
+            ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
+        label = specs.get('label', evt.replace('_', ' '))
+        ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
+            
+        cur_time += (post_time-pre_time)+padding
+
+        ylim = ax.get_ylim()
+        marker_size = (ylim[1]-ylim[0])*0.05
+        if i != len(extraction_specs.keys())-1:
+            add_break_mark(ax, cur_time-padding/2, ax.get_ylim()[0], 5, 20, marker_size)
+
+    return ax
+
+def compute_ticks(extraction_specs):
+    # Calculate the tick location and labels from the specs
+
+    ticks = []
+    ticks_labels = []
+    cur_time = None
+    for k,v in extraction_specs.items():
+        if cur_time is None:
+            cur_time = v['event_window'][0]
+        win_len = v['event_window'][1] - v['event_window'][0]
+        
+        t = [cur_time, cur_time + win_len]
+        ticks += t
+
+        
+        tlab = v['event_window'][0], v['event_window'][1]
+        ticks_labels += tlab
+    
+        cur_time =  cur_time + win_len+ v['padding']
+    
+    return ticks, ticks_labels
+
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None, draw_protected_region=True):
     
     palette_colors = plt.cm.tab10.colors
 
     df = xa_cond[[signal_var,'trial_outcome']].to_dataframe()
-    if 'session_id' in df.columns:
-            # It is a multi-session xarray Dataset, we need to clean up for later reset_index
-            # df['trial_id'] = df.session_id.astype(str)+'_'+df.trial_nb.astype(str)
-            df = df.drop(columns=['trial_nb','session_id'])
+    
+    # work with multiindex from multisession dataset
+    if 'trial_id' in xa_cond.coords:
+        df = df.droplevel([1,2])
+        df['trial_id'] = df['session_id'].astype(str) + '_' + df['trial_nb'].astype(str)
+        df = df.reset_index()    
 
-    df = df.reset_index()    
+    else:
+        df = df.reset_index()
+        df['trial_id'] = df['trial_nb']
+    
+    # if 'session_id' in df.columns:
+    #         # It is a multi-session xarray Dataset, we need to clean up for later reset_index
+    #         # df['trial_id'] = df.session_id.astype(str)+'_'+df.trial_nb.astype(str)
+    #         df = df.drop(columns=['trial_nb','session_id'])
+
     df = df.dropna()
     
     if len(df)>0:
@@ -187,7 +269,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
         # no trial can be extracted
         
          #add in the trial number information
-        df_outcome = df.groupby('trial_nb').first().dropna()
+        df_outcome = df.groupby('trial_id').first().dropna()
         df_outcome_count = df_outcome.groupby('trial_outcome').count().time
         labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
         df['trial_outcome'] = df.trial_outcome.replace(labels)
@@ -224,7 +306,8 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None):
             
             if xa_cond['interp_'+evt].any():
                 ax.axvline(cur_time-pre_time,color= color, ls='--')
-                ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
+                if draw_protected_region:
+                    ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
                 label = specs.get('label', evt.replace('_', ' '))
                 ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
                 
@@ -242,7 +325,11 @@ def prepare_regression_data(xa_cond, signal_var):
     Returns:
     tuple: A tuple containing the data array and a dictionary of predictor variables.
     """
-    xr_data = xa_cond.dropna(dim='trial_nb')
+    if 'trial_id' in xa_cond.coords:
+        xr_data = xa_cond.dropna(dim='trial_id')
+    else:
+        xr_data = xa_cond.dropna(dim='trial_nb')
+
     data = np.squeeze(xr_data[signal_var].data)
 
     # construct the predictor index
@@ -270,8 +357,8 @@ def perform_linear_regression(xa_cond, data, **predictor_vars):
     """
     regress_res = []
     
-    for t in range(data.shape[1]):
-        y = data[:, t]
+    for t in range(data.shape[0]):
+        y = data[t, :]
     
         # construct the dataframe for linear regression
         df2fit = pd.DataFrame({
@@ -279,7 +366,7 @@ def perform_linear_regression(xa_cond, data, **predictor_vars):
         })
         
         for k, v in predictor_vars.items():
-            df2fit[k] = v[:, t]
+            df2fit[k] = v[t, :]
                     
         mod = smf.ols(formula='signal ~ trial_outcome + trial_nb', data=df2fit)
         res = mod.fit()
@@ -291,7 +378,8 @@ def perform_linear_regression(xa_cond, data, **predictor_vars):
                 'pvalue': res.pvalues[factor],
                 'factor': factor,
                 'CI': res.conf_int().loc[factor].tolist(),
-                'time': xa_cond.time.data[t]
+                'time': xa_cond.time.data[t],
+                'residual': res.resid 
             })
 
     regress_res = pd.DataFrame(regress_res)

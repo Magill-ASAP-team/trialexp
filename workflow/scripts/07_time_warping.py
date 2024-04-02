@@ -28,7 +28,7 @@ xr_photometry = xr.open_dataset(sinput.xr_photometry, engine = 'h5netcdf')
 
 
 # %% Parameters
-signal2analyze = ['analog_1_df_over_f', 'analog_2_df_over_f']
+signal2analyze = ['zscored_df_over_f', 'zscored_df_over_f_analog_2','zscored_df_over_f_analog_3']
 
 with open('params/timewarp_spec.json') as f:
     specs = json.load(f)
@@ -45,7 +45,7 @@ if task_name in ['pavlovian_spontanous_reaching_oct23',
     outcome2plot = df_conditions.trial_outcome.unique()
     
 elif task_name in ['reaching_go_spout_bar_VR_Dec23']:
-    extraction_specs = specs['reaching_go_spout_bar_lick']
+    extraction_specs = specs['reaching_go_spout_bar_reward']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
 elif task_name in ['reaching_go_spout_bar_mar23',
@@ -112,4 +112,3 @@ for var in signal2analyze:
 # %%
 xr2plot = xr_warped.sel(trial_nb = (xr_warped.trial_outcome=='no_reach'))
 
-# %%
