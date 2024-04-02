@@ -67,3 +67,18 @@ def prepare_pred_matrix(P, r):
     P_flat= Pm.reshape(-1, Pm.shape[2]) # flatten to 2D for easier convolution
 
     return P_flat
+
+def collect_events(evt, data, kernel_size=41):
+    # collect the event waveform around data
+    # evt should be a binary matrix with 1 indicating the occurance of an event
+
+    assert len(evt)==len(data)
+    
+    evt_idx = np.nonzero(evt)[0]
+    evt_idx = evt_idx[(evt_idx>kernel_size//2) & (evt_idx<(len(data)-kernel_size//2))]
+    mean_signal = np.zeros((len(evt_idx), kernel_size))
+    
+    for i,idx in enumerate(evt_idx): #discard the last event
+        mean_signal[i,:] = data[(idx-kernel_size//2):(idx+kernel_size//2+1)].ravel()
+    
+    return mean_signal

@@ -36,7 +36,9 @@ def train(model, target, *args, epochs=1000, print_iter=200):
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
     
-    for epoch in tqdm(range(epochs)):
+    pbar = tqdm(range(epochs), unit='Epoch')
+    
+    for epoch in pbar:
         optimizer.zero_grad()
         output = model(*args)
         l1_penality = torch.norm(model.conv_beta.weight,2)
@@ -45,4 +47,4 @@ def train(model, target, *args, epochs=1000, print_iter=200):
         optimizer.step()
         scheduler.step(loss)
         if epoch%print_iter == 0:
-            print(f'Epoch {epoch+1}, Loss: {loss.item()} lr={optimizer.param_groups[0]["lr"]}')
+            pbar.set_description(f'Loss: {loss.item():.4f} lr={optimizer.param_groups[0]["lr"]:.4e}')
