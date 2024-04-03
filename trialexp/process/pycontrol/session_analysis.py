@@ -163,8 +163,11 @@ def get_task_specs(tasks_trig_and_events, task_name):
     
     extra_trigger_info = tasks_trig_and_events['extra_trigger_events'][task_idx].iloc[0]
     extra_event_trigger = extra_trigger_info.split(';') if type(extra_trigger_info) is str else []
+    
+    trial_parameters = tasks_trig_and_events['trial_parameters'][task_idx].iloc[0]
+    trial_parameters = trial_parameters.split(';') if type(trial_parameters) is str else []
          
-    return conditions, triggers, events_to_process, trial_window, extra_event_trigger
+    return conditions, triggers, events_to_process, trial_window, extra_event_trigger, trial_parameters
 
 def get_rel_time(df, trigger_name):
     # get the relative time to the trigger within a trial
@@ -234,8 +237,28 @@ def compute_conditions_by_trial(df_events_trials, conditions):
             df_conditions[con] = df_events_trials[colname].notna()
         else:
             df_conditions[con] = False
-        
+                    
     return df_conditions
+
+#%%
+def add_trial_params(df_conditions, trial_parameters, df_events):
+    # Add trial parameters to df_conditions
+    
+    df = df_conditions.copy()
+    
+    # extract the parameters from df_events
+    df_parameters = df_events[df_events.type=='trial_param']
+    df_parameters = df_parameters.groupby(['trial_nb','name']).last()
+    # add trial parameters information to df_condition
+    for param in trial_parameters:
+        df[param] = None
+        for trial_nb in df_conditions.index:
+            try:
+                df.loc[trial_nb, param] = df_parameters.loc[(trial_nb, param)].value
+            except KeyError:
+                df.loc[trial_nb, param] = None
+    
+    return df
 
 #%% Add in trial outcome definition
 def compute_trial_outcome(row, task_name):

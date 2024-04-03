@@ -6,6 +6,7 @@ from datetime import datetime
 from os import walk
 from os.path import isfile, join
 from re import search, match, DOTALL
+import re
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -38,20 +39,46 @@ def parse_session_dataframe(df_session):
 
     return df_events
 
-def print2event(df_events, conditions):
+def parse_trial_param(s):
+    pattern = r'([a-zA-Z_ ]+):\s*([\d.]+|\w+)'
+    d={}
+    for m in re.finditer(pattern, s):
+        d.update({m.group(1):m.group(2)})
+    return d
+
+def print2event(df_events, conditions, trial_parameters):
     
     df = df_events.copy()
+    extra_row_count = 0
     
     #Extract print event matched by conditions and turn them into events for later analysis
     for idx, row in df.iterrows():
         if row.type == 'print':
+            # check if the value column match with condition
+            # if so then assign the condition to the event column
             matched_con = [c for c in conditions if c == row.value]
             if len(matched_con)>0:
                 if len(matched_con)>1:
                     warnings.warn(f'Warning: more than one conditionas found {matched_con}')  
                 df.loc[idx,'name'] = matched_con[0]
                 
-    return df   
+            # Note: row and index are fixed during iterrows(), they will only be updated outside the
+            # loop
+            param_dict = parse_trial_param(row.value)
+            param_dict = {k:v for k,v in param_dict.items() if k in trial_parameters}
+            for k,v in param_dict.items():
+                # add extract row to the dataframe per paramter
+                df.loc[df.index[-1]+extra_row_count] = {
+                    'type': 'trial_param',
+                    'name': k,
+                    'time':row.time,
+                    'value': v
+                }
+                extra_row_count += 1
+                
+    
+    df = df.sort_values('time').reset_index(drop=True) #make sure the order is correct
+    return df
 
 def parse_events(session, conditions):
     #parse the event and state information and return it as a dataframe
