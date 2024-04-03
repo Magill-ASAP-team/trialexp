@@ -343,7 +343,7 @@ def prepare_regression_data(xa_cond, signal_var):
     
     return (data, {'trial_outcome': x_event, 'trial_nb':x_trial_nb})
 
-def perform_linear_regression(xa_cond, data, **predictor_vars):
+def perform_linear_regression(xa_cond, data,formula, **predictor_vars):
     """
     Perform linear regression on the given data.
 
@@ -368,10 +368,10 @@ def perform_linear_regression(xa_cond, data, **predictor_vars):
         for k, v in predictor_vars.items():
             df2fit[k] = v[t, :]
                     
-        mod = smf.ols(formula='signal ~ trial_outcome + trial_nb', data=df2fit)
+        mod = smf.ols(formula=formula, data=df2fit)
         res = mod.fit()
 
-        for factor in ['trial_outcome', 'trial_nb']:
+        for factor in predictor_vars.keys():
             regress_res.append({
                 'beta': res.params[factor],
                 'intercept': res.params['Intercept'],  # the intercept represent the mean value
