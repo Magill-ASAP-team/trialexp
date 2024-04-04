@@ -312,7 +312,31 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None, dr
                 ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
                 
             cur_time += (post_time-pre_time)+padding
+
+
+def draw_event_line(extraction_specs,trigger, ax=None, show_label=True, draw_protected_region=False):
+    
+    palette_colors = plt.cm.tab10.colors
+
+
+    trigger_window = extraction_specs[trigger]['event_window']
+    cur_time = trigger_window[0]
+    colors = (c for c in palette_colors)
+    
+    for evt, specs in extraction_specs.items():
+        pre_time, post_time = specs['event_window']
+        padding = specs['padding']
         
+        color = next(colors)
+        
+        ax.axvline(cur_time-pre_time,color= color, ls='--')
+        if draw_protected_region:
+            ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
+        
+        if show_label:
+            label = specs.get('label', evt.replace('_', ' '))
+            ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
+        cur_time += (post_time-pre_time)+padding
         
 def prepare_regression_data(xa_cond, signal_var):
     """
