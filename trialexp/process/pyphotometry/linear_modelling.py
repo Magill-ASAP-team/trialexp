@@ -367,7 +367,7 @@ def prepare_regression_data(xa_cond, signal_var):
     
     return (data, {'trial_outcome': x_event, 'trial_nb':x_trial_nb})
 
-def perform_linear_regression(xa_cond, data,formula, **predictor_vars):
+def perform_linear_regression(xa_cond, data, formula, data2=None, **predictor_vars):
     """
     Perform linear regression on the given data.
 
@@ -382,6 +382,7 @@ def perform_linear_regression(xa_cond, data,formula, **predictor_vars):
     regress_res = []
     
     for t in range(data.shape[0]):
+        
         y = data[t, :]
     
         # construct the dataframe for linear regression
@@ -389,13 +390,18 @@ def perform_linear_regression(xa_cond, data,formula, **predictor_vars):
             'signal': y,
         })
         
+        if data2 is not None:
+            df2fit['signal2'] = data2[t,:]
+            
+        
         for k, v in predictor_vars.items():
             df2fit[k] = v[t, :]
-                    
+        
+        # display(df2fit)
         mod = smf.ols(formula=formula, data=df2fit)
         res = mod.fit()
 
-        for factor in predictor_vars.keys():
+        for factor in res.params.index:
             regress_res.append({
                 'beta': res.params[factor],
                 'intercept': res.params['Intercept'],  # the intercept represent the mean value
@@ -408,7 +414,7 @@ def perform_linear_regression(xa_cond, data,formula, **predictor_vars):
 
     regress_res = pd.DataFrame(regress_res)
 
-    return regress_res
+    return regress_res, res
 
 
 def highlight_pvalues(df_reg_res, ax, threshold=0.05,alpha=0.1):
