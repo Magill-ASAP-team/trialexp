@@ -45,7 +45,7 @@ else:
     animal_id = df_pycontrol.attrs['Subject ID'] #use pycontrol instead, because pyphotometry data is difficult to change manually
     if animal_id in animal_info.index:
         injection = animal_info.loc[animal_id].injection.split(';')
-        if 'RdLight' in injection:
+        if 'RdLight' in injection or 'rDA' in injection:
             if not 'analog_3' in data_photometry:
                 baseline_correction_multicolor(data_photometry)
                 data_photometry['motion_corrected'] = 1
