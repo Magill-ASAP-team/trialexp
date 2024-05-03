@@ -1,12 +1,14 @@
-#%%
+#%% 
 import deeplabcut
 import os
 import dotenv
+
 #%% create training dataset
 dotenv.load_dotenv()
 
 path_config_file = os.environ['ETTIN_MOUNT_PATH']+'/Teris/ASAP/deeplabcut/side_2_hands_newobj-julien-2022-08-26/config.yaml'
 
+#%%
 # deeplabcut.create_training_dataset(path_config_file)
 
 #%%
