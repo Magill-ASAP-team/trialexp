@@ -241,11 +241,12 @@ def compute_ticks(extraction_specs):
     
     return ticks, ticks_labels
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None, draw_protected_region=True):
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, 
+                      ax=None, draw_protected_region=True, hue='trial_outcome'):
     
     palette_colors = plt.cm.tab10.colors
 
-    df = xa_cond[[signal_var,'trial_outcome']].to_dataframe()
+    df = xa_cond[[signal_var,hue]].to_dataframe()
     
     # work with multiindex from multisession dataset
     if 'trial_id' in xa_cond.coords:
@@ -270,15 +271,15 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None, dr
         
          #add in the trial number information
         df_outcome = df.groupby('trial_id').first().dropna()
-        df_outcome_count = df_outcome.groupby('trial_outcome').count().time
+        df_outcome_count = df_outcome.groupby(hue).count().time
         labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
-        df['trial_outcome'] = df.trial_outcome.replace(labels)
+        df[hue] = df[hue].replace(labels)
         
-        outcomes = sorted(df['trial_outcome'].unique())[::-1]
+        outcomes = sorted(df[hue].unique())[::-1]
         palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
 
         sns.lineplot(df, x='time',y=signal_var, 
-                    hue='trial_outcome', palette=palette, ax = ax, n_boot=100)
+                    hue=hue, palette=palette, ax = ax, n_boot=100)
         
         sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
 
@@ -308,9 +309,9 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ax=None, dr
                 ax.axvline(cur_time-pre_time,color= color, ls='--')
                 if draw_protected_region:
                     ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
-                label = specs.get('label', evt.replace('_', ' '))
-                ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
-                
+                    label = specs.get('label', evt.replace('_', ' '))
+                    ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
+                    
             cur_time += (post_time-pre_time)+padding
 
 
