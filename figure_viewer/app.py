@@ -93,10 +93,12 @@ def update_figures_list():
         
     # search for images in each of the session
     for _, row in df.iterrows():
-        img_info.append({'animal_id': row.animal_id,
-                        'task_name': row.task_name,
-                        'src': row.path/'processed'/'figures'/'photometry'/fig_name})
-        
+        src = row.path/'processed'/'figures'/'photometry'/fig_name
+        if src.exists():
+            img_info.append({'animal_id': row.animal_id,
+                            'task_name': row.task_name,
+                            'src': row.path/'processed'/'figures'/'photometry'/fig_name})
+            
     df_img2plot.set(pd.DataFrame(img_info)) # need to assign a new object so that shiny know it has been changed
 
     
@@ -105,18 +107,16 @@ def update_figures_list():
 @render.express
 def show_figures():
     df = df_img2plot()
+    print(df)
     for animal_id in df.animal_id.unique():
         with ui.card():
             ui.card_header(animal_id)
             with ui.layout_column_wrap(width=1/5):
                 
                 for src in df[df.animal_id==animal_id].src:
-                    @render.image
-                    def _():
-                        img:ImgData = {'src':src, 'width': '100px'}                        
-                        return img
+                    ui.img(src=str(src)) # create html tag directly, TODO: change the src address
                 
-    
+            
     
 # @render.plot
 # def hist():
