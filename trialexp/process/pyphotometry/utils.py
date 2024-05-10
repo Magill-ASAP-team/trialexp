@@ -234,8 +234,15 @@ def window_subtraction(analog1, analog2, sampling_rate, win_size_s=30) -> dict:
     for start_ind, chunk1, chunk2 in overlapping_chunks(
             analog1, analog2, 
             n_win_size, n_overlap):
-        slope, intercept, r_value, p_value, std_err = linregress(chunk2, chunk1)
-
+        try:
+            slope, intercept, r_value, p_value, std_err = linregress(chunk2, chunk1)
+        except ValueError as e:
+            print(f'Warning: regression error. I will skip wndow subtraction for {start_ind}')
+            r_value = 0
+            p_value = 0
+            r_value = 0
+            slope = 0
+            
         start_index_chunks.append(start_ind)
 
         analog_1_est_motion_chunks.append(slope * chunk2 + intercept)
@@ -1317,7 +1324,8 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         
         return photometry_dict
     
-    except ValueError:
+    except ValueError as e:
+        print(e)
         print('Motion correction failed. Skipping motion correction')
         # probably due to saturation , do not do motion correction
         photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt']
