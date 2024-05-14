@@ -84,7 +84,6 @@ event_period = (trial_window[1] - trial_window[0])/1000
 if has_photometry:
     sampling_freq = dataset.attrs['sampling_rate']
     event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
-
     
     photo_rsync = dataset.attrs['pulse_times_2']
 

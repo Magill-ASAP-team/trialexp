@@ -23,10 +23,10 @@ video_paths = [config['project_path']+'/videos/'+v for v in video2analyze]
 dest_folder = config['project_path']+'/videos/processed'
 
 deeplabcut.create_labeled_video(path_config_file, 
-                                video_paths[1], 
+                                video_paths[0], 
                                 draw_skeleton=True,                                                               
                                 destfolder=dest_folder,
-                                save_frames=True,
+                                # save_frames=True,
                                 outputframerate=30,
                                 )
 

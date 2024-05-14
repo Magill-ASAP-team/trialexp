@@ -403,15 +403,16 @@ def perform_linear_regression(xa_cond, data, formula, data2=None, **predictor_va
         res = mod.fit()
 
         for factor in res.params.index:
-            regress_res.append({
-                'beta': res.params[factor],
-                'intercept': res.params['Intercept'],  # the intercept represent the mean value
-                'pvalue': res.pvalues[factor],
-                'factor': factor,
-                'CI': res.conf_int().loc[factor].tolist(),
-                'time': xa_cond.time.data[t],
-                'residual': res.resid 
-            })
+            if factor!='Intercept':
+                regress_res.append({
+                    'beta': res.params[factor],
+                    'intercept': res.params['Intercept'],  # the intercept represent the mean value
+                    'pvalue': res.pvalues[factor],
+                    'factor': factor,
+                    'CI': res.conf_int().loc[factor].tolist(),
+                    'time': xa_cond.time.data[t],
+                    'residual': res.resid 
+                })
 
     regress_res = pd.DataFrame(regress_res)
 
