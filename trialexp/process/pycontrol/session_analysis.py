@@ -171,7 +171,7 @@ def get_task_specs(tasks_trig_and_events, task_name):
 
 def get_rel_time(df, trigger_name):
     # get the relative time to the trigger within a trial
-    t0 = df[df['name']==trigger_name].time.values
+    t0 = df[df['value']==trigger_name].time.values
     if len(t0)>1:
         logging.warn(f'Warning: not exactly 1 trigger found. I will only take the first trigger')
         t0 = t0[0]
@@ -182,7 +182,7 @@ def extract_trial_by_trigger(df_pycontrol, trigger, event2analysis, trial_window
     
     df_events = df_pycontrol.copy()
     # add trial number and calculate the time from trigger
-    trigger_time = df_events[(df_events.name==trigger)].time.values
+    trigger_time = df_events[(df_events.value==trigger)].time.values
     df_events, trigger_time = add_trial_nb(df_events, trigger_time,trial_window) #add trial number according to the trigger
     
     if len(trigger_time) == 0:
@@ -193,12 +193,12 @@ def extract_trial_by_trigger(df_pycontrol, trigger, event2analysis, trial_window
     
     
     # Filter out events we don't want
-    df_events = df_events[df_events.name.isin(event2analysis)]
+    df_events = df_events[df_events.value.isin(event2analysis)]
     
     # # group events according to trial number and event name
-    df_events_trials = df_events.groupby(['trial_nb', 'name']).agg(list)
+    df_events_trials = df_events.groupby(['trial_nb', 'value']).agg(list)
     df_events_trials = df_events_trials.loc[:, ['trial_time']]
-    df_events_trials = df_events_trials.unstack('name') #convert the event names to columns
+    df_events_trials = df_events_trials.unstack('value') #convert the event names to columns
     df_events_trials.columns = df_events_trials.columns.droplevel() # dropping the multiindex of the columns
     df_events_trials = df_events_trials.reindex(np.arange(1,len(trigger_time)+1)) # make sure we include every trial
     assert len(df_events_trials) == len(trigger_time), f'Error: trigger time does not match {df_events_trials.index} {len(trigger_time)}'

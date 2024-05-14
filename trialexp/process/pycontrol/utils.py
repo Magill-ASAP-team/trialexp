@@ -31,9 +31,9 @@ def parse_session_dataframe(df_session):
     info = dict(zip(info.name, info.value))
     
     #correct for naming error in info
-    if 'Task name' in info and 'pycontrol_share' in info['Task name']:
-        task_name = info['Task name'].split('\\')[-1]
-        info['Task name'] = task_name
+    if 'task_name' in info and 'pycontrol_share' in info['task_name']:
+        task_name = info['task_name'].split('\\')[-1]
+        info['task_name'] = task_name
                                             
     df_events.attrs.update(info)
 
