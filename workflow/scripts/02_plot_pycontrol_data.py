@@ -27,8 +27,8 @@ g.savefig(soutput.event_histogram, dpi=300)
 
 # %% Plot the reach time
 fig,ax = plt.subplots(1,1,dpi=200)
-reach_time = df_events_cond.groupby('trial_nb').apply(reach_time)
-reach_time = reach_time.dropna()
-sns.histplot(reach_time,bins = 50, binrange=[0,500], ax=ax)
+reach_t = df_events_cond.groupby('trial_nb').apply(reach_time)
+reach_t = reach_t.dropna()
+sns.histplot(reach_t,bins = 50, binrange=[0,500], ax=ax)
 ax.set(xlabel='Reach time (ms)')
 fig.savefig(soutput.reach_histogram, dpi=300)

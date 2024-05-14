@@ -41,7 +41,7 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     g = sns.JointGrid()
     
     #plot spout touch
-    df_spout = df2plot[df2plot.name=='spout']
+    df_spout = df2plot[df2plot.value=='spout']
     ax = sns.scatterplot(y=y, x=x, marker='|' , hue='trial_outcome', palette=trial_outcome_palette,
                        data= df_spout, ax = g.ax_joint, **kwargs)
     
@@ -89,10 +89,10 @@ def style_event_distribution(g, xlabel, ylabel, trigger_name):
 
 
 def reach_time(df_trial):
-    if len(spouts := df_trial[df_trial['name']=='spout'])>0:
+    if len(spouts := df_trial[df_trial['value']=='spout'])>0:
         first_spout_time = spouts.iloc[0].time
         df_win = df_trial[df_trial.time<first_spout_time]
-        if len(bar_off := df_win[df_win['name']=='bar_off'])>0:
+        if len(bar_off := df_win[df_win['value']=='bar_off'])>0:
             last_bar_time = bar_off.iloc[-1].time
             return first_spout_time - last_bar_time
 
