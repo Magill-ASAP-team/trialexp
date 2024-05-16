@@ -61,7 +61,7 @@ for k in var2plot:
         df2plot = df2plot[~df2plot.trial_outcome.isin(skip_outcome)]
         
         g = sns.FacetGrid(df2plot, col='trial_outcome', col_wrap=3, hue='trial_outcome')
-        g.map_dataframe(plot_and_handler_error, sns.lineplot, x='event_time', y=k)
+        g.map_dataframe(plot_and_handler_error, sns.lineplot, x='event_time', y=k, n_boot=100)
         g.map_dataframe(annotate_trial_number)
                 
         g.set_titles(col_template='{col_name}')
@@ -72,7 +72,7 @@ for k in var2plot:
     else:
         df2plot = xr_session[k].to_dataframe().reset_index()
         fig,ax = plt.subplots(1,1,figsize=(4,4), dpi=300)
-        sns.lineplot(df2plot, x='event_time', y = k, ax=ax)
+        sns.lineplot(df2plot, x='event_time', y = k, ax=ax, n_boot=100)
         ax.set_ylabel(k)
         ax.set_xlabel('Time (ms)')
         ax.set_title(xr_session.attrs['mode'])
@@ -81,6 +81,8 @@ for k in var2plot:
         ax.text(0.8,0.9,f'n={n}', transform=ax.transAxes)
         
         fig.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=300, bbox_inches='tight')
+        
+    plt.close()
         
     #plot heatmap
     fig = plot_pyphoto_heatmap(xr_session[k])
