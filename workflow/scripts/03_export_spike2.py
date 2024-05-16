@@ -3,7 +3,7 @@ Export event data to spike2
 '''
 #%%
 import pandas as pd 
-from trialexp.process.pycontrol.utils import extract_v_line_v2, export_session_v2
+from trialexp.process.pycontrol.utils import extract_v_line_v2, export_session_v2, get_sync_time
 from snakehelper.SnakeIOHelper import getSnake
 from workflow.scripts import settings
 from re import match
@@ -38,7 +38,7 @@ if fn == []:
     photometry_times_pyc = None
     photometry_keys= None
 else:
-    pycontrol_time = df_pycontrol[df_pycontrol.subtype=='sync'].time
+    pycontrol_time = get_sync_time(df_pycontrol)
     photometry_aligner = Rsync_aligner(pycontrol_time, data_photometry['pulse_times_2'])
     photometry_times_pyc = photometry_aligner.B_to_A(data_photometry['time'])
     photometry_keys =  [k for k in data_photometry.keys() if 'analog' in k]
@@ -60,7 +60,9 @@ the exception ourselves here
 '''
 
 spike2_path = Path(soutput.spike2_export_done).parent/'spike2.smrx'
+import tempfile
 
+# tempfile = tempfile.NamedTemporaryFile()
 try:
     if spike2_path.exists():
         os.remove(spike2_path)
@@ -76,6 +78,4 @@ else:
         df_variable = df_variable,
         smrx_filename=str(spike2_path))
     
-
-
 # %%

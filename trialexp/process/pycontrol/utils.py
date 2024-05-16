@@ -349,7 +349,8 @@ def extract_v_line_v2(df_pycontrol, print_char_limit=20):
                 }
             )
     df_v = pd.DataFrame(v_list)
-    df_v = df_v[~df_v.key.str.endswith('__')]
+    if len(df_v)>0:
+        df_v = df_v[~df_v.key.str.endswith('__')]
 
     # extract print lines
     df = df_pycontrol[df_pycontrol.type=='print']
@@ -711,7 +712,7 @@ def export_session_v2(df:pd.DataFrame, keys: list = None, export_state=True, pri
                 y_index += 1
                 spike2exporter.write_textmark(ts_ms, 'print lines', y_index, txt) 
             
-        if df_variable is not None:
+        if df_variable is not None and len(df_variable)>0:
             ts_ms = df_variable.time.values
             txt = [f'{r.key}:{r.value}' for _,r in df_variable.iterrows()]
             # df_print = pd.DataFrame(list(zip(ts_ms, txt)), columns=['ms', 'text'])
@@ -1071,3 +1072,11 @@ def load_analog_data(file_path):
     whose first column is timestamps (ms) and second data values.'''
     with open(file_path, 'rb') as f:
         return np.fromfile(f, dtype='<i').reshape(-1,2)
+
+
+def get_sync_time(df_pycontrol):
+    # return the rsync time
+    if df_pycontrol.attrs['framework_version'] == '1.8.1':
+        return df_pycontrol[df_pycontrol.content=='rsync'].time
+    else:
+        return df_pycontrol[df_pycontrol.subtype=='sync'].time

@@ -54,7 +54,6 @@ except IndexError:
 
 
 # %% synchornize pyphotometry with pycontrol
-rsync_time = df_pycontrol[df_pycontrol.subtype=='sync'].time
 
 # Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000

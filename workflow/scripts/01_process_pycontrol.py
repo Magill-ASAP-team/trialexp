@@ -27,7 +27,12 @@ if len(filename)>1:
 
 df_session = session_dataframe(filename[0])
 df_pycontrol = parse_session_dataframe(df_session)
-session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
+if df_pycontrol.attrs['framework_version'] == '1.8.1':
+    session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S')
+else:
+    session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
+
+
 subjectID = df_pycontrol.attrs['subject_id']
 task_name = df_pycontrol.attrs['task_name']
 session_id = Path(sinput.session_path).name
