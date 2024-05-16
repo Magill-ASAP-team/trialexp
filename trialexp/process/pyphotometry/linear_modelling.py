@@ -14,7 +14,7 @@ def extract_event(df_events, event, order, dependent_event=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
     # if order is 'last_before', you need to specify the depedent_event as well, it will always be
     # result is a pandas series
-    events = df_events[(df_events.name==event) & (df_events.trial_time>0)]
+    events = df_events[(df_events.content==event) & (df_events.trial_time>0)]
 
     if len(events) == 0:
         return None
@@ -27,7 +27,7 @@ def extract_event(df_events, event, order, dependent_event=None):
         assert dependent_event is not None, 'You must supply the dependent_event'
         if (dep_event := extract_event(df_events, dependent_event, 'first')) is not None:
             df_filter = df_events[df_events.time<=dep_event.time]
-            if len(events := df_filter[df_filter.name == event])>0:
+            if len(events := df_filter[df_filter.content == event])>0:
                 return events.iloc[-1]
         return None
     elif order == 'first_after_last':
@@ -63,7 +63,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     cur_idx = 0
 
     # find the trigger
-    t_trigger_event = df_trial[df_trial.name == trigger]
+    t_trigger_event = df_trial[df_trial.content == trigger]
     if len(t_trigger_event) == 0:
         raise ValueError(f"Error: the trigger {trigger} is not found")
 
@@ -453,7 +453,7 @@ def load_extraction_spec(task_name, df_conditions, specs):
     else:
         extraction_specs = specs['default']
         #update the trigger
-        extraction_specs[trigger] = extraction_specs.pop('trigger')
+        extraction_specs['trigger'] = extraction_specs.pop('trigger')
         outcome2plot = df_conditions.trial_outcome.unique()
         
     return extraction_specs, outcome2plot

@@ -13,7 +13,7 @@ from tqdm import tqdm
 from trialexp.process.pycontrol.data_import import session_dataframe
 from trialexp.process.pyphotometry.utils import import_ppd
 
-from trialexp.utils.pycontrol_utilities import parse_pycontrol_fn, rename_compat
+from trialexp.utils.pycontrol_utilities import parse_pycontrol_fn
 from trialexp.utils.pyphotometry_utilities import parse_pyhoto_fn, create_photo_sync, parse_video_fn
 from trialexp.utils.ephys_utilities import parse_openephys_folder, get_recordings_properties, create_ephys_rsync
 
@@ -86,7 +86,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     df_pycontrol = df_pycontrol[(df_pycontrol.subject_id!='00') & (df_pycontrol.subject_id!='01')] # do not copy the test data
 
     try:
-        df_pycontrol = df_pycontrol[df_pycontrol.session_length>60*3] #remove sessions that are too short, v2 uses second as unit
+        df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short, v2 uses second as unit
     except AttributeError:
         print(f'no session length, skipping folder')
         continue
@@ -284,6 +284,3 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
             recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
 
 
-# %%
-create_photo_sync(data_pycontrol, data_pyphotmetry) 
-# %%

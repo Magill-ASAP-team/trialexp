@@ -53,7 +53,6 @@ skip_outcome = ['button_press'] #outcome variable to skip plotting (e.g. due to 
 #%%
 var2plot = [k for k in xr_session.data_vars.keys() if 'event_time' in xr_session[k].coords]
 
-#%%
 
 for k in var2plot:    
     # print(k)

@@ -44,7 +44,7 @@ timelim = [1000, 4000] # in ms
     trial_window, extra_trigger_events, trial_parameters) = get_task_specs(tasks,  task_name)
 
 #%% Extract trial-related information from events
-df_pycontrol = df_pycontrol[~(df_pycontrol.name=='sync')] #remove the sync pulse
+df_pycontrol = df_pycontrol[~(df_pycontrol.subtype=='sync')] #remove the sync pulse
 df_pycontrol  = print2event(df_pycontrol, conditions, trial_parameters)
 
 df_events_trials, df_events = extract_trial_by_trigger(df_pycontrol, triggers[0], 
@@ -84,5 +84,3 @@ df_events_cond.to_pickle(soutput.event_dataframe)
 df_conditions.to_pickle(soutput.condition_dataframe)
 df_events_trials.to_pickle(soutput.trial_dataframe)
 
-
-# %%

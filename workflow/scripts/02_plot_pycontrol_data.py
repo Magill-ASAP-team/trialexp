@@ -32,3 +32,5 @@ reach_t = reach_t.dropna()
 sns.histplot(reach_t,bins = 50, binrange=[0,500], ax=ax)
 ax.set(xlabel='Reach time (ms)')
 fig.savefig(soutput.reach_histogram, dpi=300)
+
+# %%

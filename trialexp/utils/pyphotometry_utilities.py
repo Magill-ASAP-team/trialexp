@@ -27,7 +27,7 @@ def create_photo_sync(data_pycontrol, photometry_dict):
 
         photo_rsync = photometry_dict['pulse_times_2']
         # pycontrol v2 uses second as the time
-        pycontrol_rsync = data_pycontrol[data_pycontrol.name=='sync'].time
+        pycontrol_rsync = data_pycontrol[data_pycontrol.subtype=='sync'].time
         
         try:
             return Rsync_aligner(pulse_times_A= photo_rsync, 

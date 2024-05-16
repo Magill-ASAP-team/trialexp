@@ -454,7 +454,6 @@ def session_dataframe(file_path, paired_events={}, pair_end_suffix=None, time_un
     # Reset index and set column order.
     df.reset_index(drop=True)
     df = df.reindex(columns=["time", "type", "subtype", "content", "duration"])
-    df = rename_compat(df)
     return df
 
 
