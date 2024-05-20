@@ -42,6 +42,9 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     
     #plot spout touch
     df_spout = df2plot[df2plot.content=='spout']
+    if len(df_spout) == 0:
+        return g
+    
     ax = sns.scatterplot(y=y, x=x, marker='|' , hue='trial_outcome', palette=trial_outcome_palette,
                        data= df_spout, ax = g.ax_joint, **kwargs)
     

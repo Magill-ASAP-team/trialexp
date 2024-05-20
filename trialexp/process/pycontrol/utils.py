@@ -339,15 +339,16 @@ def extract_v_line_v2(df_pycontrol, print_char_limit=20):
 
     v_list = []
     for _, row in df.iterrows():
-        for k,v in row.content.items():
-            v_list.append(
-                {
-                    'time':row.time,
-                    'key': k,
-                    'value': v,
-                    'type': 'variable'
-                }
-            )
+        if type(row.content) is dict:
+            for k,v in row.content.items():
+                v_list.append(
+                    {
+                        'time':row.time,
+                        'key': k,
+                        'value': v,
+                        'type': 'variable'
+                    }
+                )
     df_v = pd.DataFrame(v_list)
     if len(df_v)>0:
         df_v = df_v[~df_v.key.str.endswith('__')]

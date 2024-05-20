@@ -48,6 +48,9 @@ def parse_pycontrol_fn(fn):
                     'timestamp': expt_datetime,
                     'session_length': 0,
                     'task_name': 'unknown'}
+        except Exception as e:
+            print(e)
+            print(fn)
     else:
         print('Error for ', fn)
 '''
