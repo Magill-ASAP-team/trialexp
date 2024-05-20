@@ -82,10 +82,12 @@ for k in var2plot:
         
         fig.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=300, bbox_inches='tight')
         
-    plt.close()
         
     #plot heatmap
     fig = plot_pyphoto_heatmap(xr_session[k])
     fig.savefig(os.path.join(figure_dir, f'{k}_heatmap.png'), dpi=300, bbox_inches='tight')
+    
+    plt.close()
+
     
 xr_session.close()
