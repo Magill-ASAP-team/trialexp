@@ -107,7 +107,7 @@ def add_trial_nb(df_events, trigger_time, trial_window):
             logging.warn(f'Error: trial shorter than trial_window for Trial {i}')
             trial_nb += 1
             continue
-        elif end<trigger_time[i]:
+        elif end<=trigger_time[i]:
             logging.warn(f'Error: trial end earlier than trigger end:{end} trigger_time{trigger_time[i]} for Trial {i}')
             trial_nb += 1
             continue
