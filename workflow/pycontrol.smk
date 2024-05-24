@@ -22,7 +22,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2024_April_cohort','2024_May cohort 5-HT'])
+    input: session2analyze(cohort=['2024_May_cohort_5HT'], tasks=['reaching_go_spout_incr_break2_nov22', 'reaching_go_spout_incr_break2_April24'])
 
 rule process_pycontrol:
     input:
@@ -88,6 +88,7 @@ rule task_specifc_analysis:
 rule photometry_figure:
     input:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
+        task_specific = '{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done'
     output:
         trigger_photo_dir= directory('{session_path}/{task}/{session_id}/processed/figures/photometry'),
         done = touch('{session_path}/{task}/{session_id}/processed/log/photometry_figure.done'),

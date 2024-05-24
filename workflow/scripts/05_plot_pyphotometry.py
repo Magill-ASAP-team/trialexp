@@ -18,7 +18,7 @@ import os
 from workflow.scripts import settings
 from joblib import Parallel, delayed
 import time
-
+from pathlib import Path
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
@@ -27,7 +27,11 @@ import time
 
 
 #%%
-xr_session = xr.load_dataset(sinput.xr_session)
+task_specific_file = Path(sinput.xr_session).parent/'xr_session_task_specific.nc'
+if task_specific_file.exists():
+    xr_session = xr.load_dataset(task_specific_file)
+else:
+    xr_session = xr.load_dataset(sinput.xr_session)
 
 figure_dir = soutput.trigger_photo_dir
 
@@ -91,3 +95,6 @@ for k in var2plot:
 
     
 xr_session.close()
+
+
+# %%
