@@ -235,7 +235,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
         copy_if_not_exist(pycontrol_file, target_pycontrol_folder)
         
         #copy all the analog data
-        analog_files = pycontrol_file.parent.glob(f'{session_id}*.pca') + pycontrol_file.parent.glob(f'{session_id}*.npy')
+        analog_files = list(pycontrol_file.parent.glob(f'{session_id}*.pca')) + list(pycontrol_file.parent.glob(f'{session_id}*.npy'))
         for f in analog_files:
             copy_if_not_exist(f, target_pycontrol_folder) 
             
