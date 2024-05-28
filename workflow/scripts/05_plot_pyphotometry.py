@@ -18,7 +18,7 @@ import os
 from workflow.scripts import settings
 from joblib import Parallel, delayed
 import time
-
+from pathlib import Path
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
@@ -27,7 +27,11 @@ import time
 
 
 #%%
-xr_session = xr.load_dataset(sinput.xr_session)
+task_specific_file = Path(sinput.xr_session).parent/'xr_session_task_specific.nc'
+if task_specific_file.exists():
+    xr_session = xr.load_dataset(task_specific_file)
+else:
+    xr_session = xr.load_dataset(sinput.xr_session)
 
 figure_dir = soutput.trigger_photo_dir
 
@@ -53,7 +57,6 @@ skip_outcome = ['button_press'] #outcome variable to skip plotting (e.g. due to 
 #%%
 var2plot = [k for k in xr_session.data_vars.keys() if 'event_time' in xr_session[k].coords]
 
-#%%
 
 for k in var2plot:    
     # print(k)
@@ -62,7 +65,7 @@ for k in var2plot:
         df2plot = df2plot[~df2plot.trial_outcome.isin(skip_outcome)]
         
         g = sns.FacetGrid(df2plot, col='trial_outcome', col_wrap=3, hue='trial_outcome')
-        g.map_dataframe(plot_and_handler_error, sns.lineplot, x='event_time', y=k)
+        g.map_dataframe(plot_and_handler_error, sns.lineplot, x='event_time', y=k, n_boot=100)
         g.map_dataframe(annotate_trial_number)
                 
         g.set_titles(col_template='{col_name}')
@@ -73,7 +76,7 @@ for k in var2plot:
     else:
         df2plot = xr_session[k].to_dataframe().reset_index()
         fig,ax = plt.subplots(1,1,figsize=(4,4), dpi=300)
-        sns.lineplot(df2plot, x='event_time', y = k, ax=ax)
+        sns.lineplot(df2plot, x='event_time', y = k, ax=ax, n_boot=100)
         ax.set_ylabel(k)
         ax.set_xlabel('Time (ms)')
         ax.set_title(xr_session.attrs['mode'])
@@ -83,8 +86,15 @@ for k in var2plot:
         
         fig.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=300, bbox_inches='tight')
         
+        
     #plot heatmap
     fig = plot_pyphoto_heatmap(xr_session[k])
     fig.savefig(os.path.join(figure_dir, f'{k}_heatmap.png'), dpi=300, bbox_inches='tight')
     
+    plt.close()
+
+    
 xr_session.close()
+
+
+# %%

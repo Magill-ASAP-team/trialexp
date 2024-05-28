@@ -26,7 +26,18 @@ def create_photo_sync(data_pycontrol, photometry_dict):
         warnings.simplefilter('ignore')
 
         photo_rsync = photometry_dict['pulse_times_2']
-        pycontrol_rsync = data_pycontrol[data_pycontrol.name=='rsync'].time
+        
+        if 'framework_version' in data_pycontrol.attrs:
+            framework_ver = data_pycontrol.attrs['framework_version']
+        else:
+            # search it in the raw dataframe
+            framework_ver = data_pycontrol[data_pycontrol.subtype=='framework_version'].content.iloc[0]
+            
+        if framework_ver == '1.8.1':
+            pycontrol_rsync = data_pycontrol[data_pycontrol.content=='rsync'].time
+        else:
+            pycontrol_rsync = data_pycontrol[data_pycontrol.subtype=='sync'].time
+
         
         try:
             return Rsync_aligner(pulse_times_A= photo_rsync, 

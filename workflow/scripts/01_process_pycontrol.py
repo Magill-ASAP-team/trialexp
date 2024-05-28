@@ -20,16 +20,21 @@ from workflow.scripts import settings
   'process_pycontrol')
 
 #%% Read pycontrol file
-
-filename = list(Path(sinput.session_path, 'pycontrol').glob('*.txt'))
+path = Path(sinput.session_path, 'pycontrol')
+filename = list(path.glob('*.txt')) + list(path.glob('*.tsv'))
 if len(filename)>1:
     raise ValueError('There are more than one pycontrol file there', filename)
 
 df_session = session_dataframe(filename[0])
 df_pycontrol = parse_session_dataframe(df_session)
-session_time = datetime.strptime(df_pycontrol.attrs['Start date'], '%Y/%m/%d %H:%M:%S')
-subjectID = df_pycontrol.attrs['Subject ID']
-task_name = df_pycontrol.attrs['Task name']
+if df_pycontrol.attrs['framework_version'] == '1.8.1':
+    session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S')
+else:
+    session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
+
+
+subjectID = df_pycontrol.attrs['subject_id']
+task_name = df_pycontrol.attrs['task_name']
 session_id = Path(sinput.session_path).name
 
 df_pycontrol.attrs['session_id'] = session_id
@@ -44,7 +49,7 @@ timelim = [1000, 4000] # in ms
     trial_window, extra_trigger_events, trial_parameters) = get_task_specs(tasks,  task_name)
 
 #%% Extract trial-related information from events
-df_pycontrol = df_pycontrol[~(df_pycontrol.name=='rsync')] #remove the sync pulse
+df_pycontrol = df_pycontrol[~(df_pycontrol.subtype=='sync')] #remove the sync pulse
 df_pycontrol  = print2event(df_pycontrol, conditions, trial_parameters)
 
 df_events_trials, df_events = extract_trial_by_trigger(df_pycontrol, triggers[0], 
@@ -60,7 +65,7 @@ df_conditions = compute_success(df_events_trials, df_conditions,
 #%%
 
 df_conditions['trial_outcome'] = df_conditions.apply(compute_trial_outcome, 
-                                                   task_name = df_pycontrol.attrs['Task name'],
+                                                   task_name = df_pycontrol.attrs['task_name'],
                                                    axis=1)
 
 

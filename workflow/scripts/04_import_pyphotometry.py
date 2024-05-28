@@ -38,29 +38,8 @@ try:
     has_photometry = True
     data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
     data_photometry = import_ppd(pyphotometry_file, data_format)
-    data_photometry = denoise_filter(data_photometry, 20)
-    
-    # determine how to do motion correction
-    animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
-    animal_id = df_pycontrol.attrs['Subject ID'] 
-    if animal_id in animal_info.index:
-        injection = animal_info.loc[animal_id].injection.split(';')
-        if 'Rdlight' in injection or 'rDA' in injection:
-            if not 'analog_3' in data_photometry:
-                baseline_correction_multicolor(data_photometry)
-                data_photometry['motion_corrected'] = 1
 
-            else:
-                # Do multicolor correction
-                data_photometry = motion_correction_multicolor(data_photometry)
-        else:    
-            data_photometry = motion_correction_win(data_photometry)
-    else:
-        data_photometry = motion_correction_win(data_photometry)
-    
-    
-    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01)
-    data_photometry = compute_zscore(data_photometry)
+    data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
     
     # Convert to xarray
     skip_var = ['analog_1_est_motion','time',
@@ -75,7 +54,6 @@ except IndexError:
 
 
 # %% synchornize pyphotometry with pycontrol
-rsync_time = df_pycontrol[df_pycontrol.name=='rsync'].time
 
 # Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000
@@ -84,7 +62,6 @@ event_period = (trial_window[1] - trial_window[0])/1000
 if has_photometry:
     sampling_freq = dataset.attrs['sampling_rate']
     event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
-
     
     photo_rsync = dataset.attrs['pulse_times_2']
 

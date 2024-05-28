@@ -37,7 +37,10 @@ tasks = tasks_params_df.task.values.tolist()
 skip_existing = True #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2023_Oct_cohort','2024_Jan_cohort','2024_April_cohort'] 
+cohort_to_copy = ['2023_Oct_cohort',
+                  '2024_Jan_cohort',
+                  '2024_April_cohort',
+                  '2024_May_cohort_5HT'] 
 
 #%%
 
@@ -74,7 +77,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     video_folder = ETTIN_DATA_FOLDER/'head-fixed'/'videos'
 
     # Gather all pycontrol, photometry, and ephys files/folders 
-    pycontrol_files = list(pycontrol_folder.glob('*.txt'))
+    pycontrol_files = list(pycontrol_folder.glob('*.txt')) + list(pycontrol_folder.glob('*.tsv'))
     pyphoto_files = list(pyphoto_folder.glob('*.ppd'))
     
     
@@ -86,7 +89,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     df_pycontrol = df_pycontrol[(df_pycontrol.subject_id!='00') & (df_pycontrol.subject_id!='01')] # do not copy the test data
 
     try:
-        df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short
+        df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short, v2 uses second as unit
     except AttributeError:
         print(f'no session length, skipping folder')
         continue
@@ -232,7 +235,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
         copy_if_not_exist(pycontrol_file, target_pycontrol_folder)
         
         #copy all the analog data
-        analog_files = pycontrol_file.parent.glob(f'{session_id}*.pca')
+        analog_files = list(pycontrol_file.parent.glob(f'{session_id}*.pca')) + list(pycontrol_file.parent.glob(f'{session_id}*.npy'))
         for f in analog_files:
             copy_if_not_exist(f, target_pycontrol_folder) 
             
@@ -283,5 +286,3 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
 
             recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
 
-
-# %%

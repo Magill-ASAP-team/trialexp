@@ -22,7 +22,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2024_April_cohort'])
+    input: session2analyze(cohort=['2024_April_cohort', '2024_May_cohort_5HT'])
 
 rule process_pycontrol:
     input:
@@ -87,13 +87,22 @@ rule task_specifc_analysis:
 
 rule photometry_figure:
     input:
-        task_specific = '{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done',
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
+        task_specific = '{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done'
     output:
         trigger_photo_dir= directory('{session_path}/{task}/{session_id}/processed/figures/photometry'),
-        rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/photometry.done')
+        done = touch('{session_path}/{task}/{session_id}/processed/log/photometry_figure.done'),
     script:
         'scripts/05_plot_pyphotometry.py'
+
+rule photometry_pipline:
+    input:
+        xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
+        trigger_photo_dir= '{session_path}/{task}/{session_id}/processed/log/photometry_figure.done',
+    output:
+        rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/photometry.done')
+
+
 
 rule behavorial_analysis:
     input:
@@ -131,6 +140,5 @@ rule pycontrol_final:
         pycontrol_done = '{session_path}/{task}/{session_id}/processed/log/pycontrol.done',
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
         spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
-        xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
     output:
         done = touch('{session_path}/{task}/{session_id}/processed/pycontrol_workflow.done')

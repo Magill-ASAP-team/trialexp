@@ -29,11 +29,12 @@ xr_photometry = xr.open_dataset(sinput.xr_photometry, engine = 'h5netcdf')
 
 # %% Parameters
 signal2analyze = ['zscored_df_over_f', 'zscored_df_over_f_analog_2','zscored_df_over_f_analog_3']
+signal2analyze = [s for s in signal2analyze if s in xr_photometry.data_vars]
 
 with open('params/timewarp_spec.json') as f:
     specs = json.load(f)
 
-task_name = df_events_cond.attrs['Task name']
+task_name = df_events_cond.attrs['task_name']
 trigger = df_events_cond.attrs['triggers'][0]
 
 if task_name in ['pavlovian_spontanous_reaching_oct23',
@@ -107,8 +108,3 @@ for var in signal2analyze:
         
         
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
-
-
-# %%
-xr2plot = xr_warped.sel(trial_nb = (xr_warped.trial_outcome=='no_reach'))
-

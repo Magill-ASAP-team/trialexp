@@ -1352,3 +1352,31 @@ def baseline_correction_multicolor(photometry_dict,baseline_method='lowpass'):
     
     return photometry_dict
 
+    
+def preprocess_photometry(data_photometry, df_pycontrol):
+    # Perform preprocessing on the photometry data e.g. bleach and motion correcction etc.
+    data_photometry = denoise_filter(data_photometry, 20)
+    
+    # determine how to do motion correction
+    animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
+    animal_id = df_pycontrol.attrs['subject_id'] 
+    if animal_id in animal_info.index:
+        injection = animal_info.loc[animal_id].injection.split(';')
+        if 'Rdlight' in injection or 'rDA' in injection:
+            if not 'analog_3' in data_photometry:
+                baseline_correction_multicolor(data_photometry)
+                data_photometry['motion_corrected'] = 1
+
+            else:
+                # Do multicolor correction
+                data_photometry = motion_correction_multicolor(data_photometry)
+        else:    
+            data_photometry = motion_correction_win(data_photometry)
+    else:
+        data_photometry = motion_correction_win(data_photometry)
+    
+    
+    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01)
+    data_photometry = compute_zscore(data_photometry)
+    return data_photometry
+    

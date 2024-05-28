@@ -11,12 +11,14 @@ import numpy as np
 import warnings
 from datetime import datetime
 from re import search
-
+import pandas as pd
 from trialexp.process.pycontrol.data_import import session_dataframe
 from trialexp.process.pycontrol.utils import parse_session_dataframe
 
+
+
 def parse_pycontrol_fn(fn):
-    pattern = r'(\w+)-(.*)\.txt'
+    pattern = r'(\w+)-(.*)\.[txt|tsv]'
     m = search(pattern, fn.name)
     
     if m:
@@ -29,7 +31,7 @@ def parse_pycontrol_fn(fn):
             df = parse_session_dataframe(df)
 
             session_length = df.time.iloc[-1]
-            task_name = df.attrs['Task name']
+            task_name = df.attrs['task_name']
             
             return { 'subject_id': subject_id,
                     'path': fn,                 
@@ -46,6 +48,9 @@ def parse_pycontrol_fn(fn):
                     'timestamp': expt_datetime,
                     'session_length': 0,
                     'task_name': 'unknown'}
+        except Exception as e:
+            print(e)
+            print(fn)
     else:
         print('Error for ', fn)
 '''
