@@ -41,11 +41,11 @@ for var in var2add:
 
     add_event_data(df_event, extract_clean_trigger_event, trial_window, xr_photometry, xr_photometry.event_time, 
                 var, 'clean_busy_win', xr_photometry.attrs['sampling_rate'], 
-                filter_func_kwargs = dict(clean_window = [-1000,1000], target_event_name='busy_win'))
+                filter_func_kwargs = dict(clean_window = [-500,500], target_event_name='busy_win'))
 
     add_event_data(df_event, extract_clean_trigger_event, trial_window, xr_photometry, xr_photometry.event_time, 
                 var, 'clean_spout', xr_photometry.attrs['sampling_rate'], 
-                filter_func_kwargs = dict(clean_window = [-1000,1000], target_event_name='spout', ignore_events=['spout_off','bar_off']))
+                filter_func_kwargs = dict(clean_window = [-500,500], target_event_name='spout', ignore_events=['spout_off','bar_off']))
 
     # down_sample_ratio = int(xr_photometry.attrs['sampling_rate']/100)
     # if down_sample_ratio>0:
