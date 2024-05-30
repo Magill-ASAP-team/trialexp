@@ -64,7 +64,6 @@ def update_task():
 @reactive.effect
 @reactive.event(input.task_name)
 def update_figure_list():
-    print('test')
     # df = get_sessions(input.cohort(), input.animal_id(), input.task_name())
     df = session_info()
     figure_names=[]
@@ -72,7 +71,7 @@ def update_figure_list():
         figure_names += list((p/'processed'/'figures'/'photometry').glob('*.png'))
     
     figure_names = [f.name for f in figure_names]
-    figure_names = list(set(figure_names))
+    figure_names = sorted(list(set(figure_names)))
     ui.update_radio_buttons('figure_list', choices=figure_names)
 
 @reactive.calc
@@ -82,8 +81,8 @@ def session_info():
         idx = idx & df_session_info.animal_id.isin(input.animal_id())
     if len(input.task_name())>0:
         idx = idx & df_session_info.task_name.isin(input.task_name())
-        
-    return df_session_info[idx]
+    # print(df_session_info.columns)
+    return df_session_info[idx].sort_values('expt_datetime')
 
 
 @reactive.effect
