@@ -9,6 +9,8 @@ from loguru import logger
 from uuid import uuid4
 from shiny.types import ImgData
 import pandas as pd
+import base64
+from pathlib import Path
 ## read the cohort information
 
 logger.debug('Reading sessions data from ettin...')
@@ -107,15 +109,18 @@ def update_figures_list():
 @render.express
 def show_figures():
     df = df_img2plot()
-    print(df)
     for animal_id in df.animal_id.unique():
         with ui.card():
             ui.card_header(animal_id)
             with ui.layout_column_wrap(width=1/5):
-                
                 for src in df[df.animal_id==animal_id].src:
-                    ui.img(src=str(src)) # create html tag directly, TODO: change the src address
-                
+                    p = Path(src)
+                    if p.exists():
+                        with open(p, 'rb') as f:
+                            mime_type = p.suffix
+                            b64_str = base64.b64encode(f.read()).decode("utf-8")
+                            ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly, TODO: change the src address
+                        
             
     
 # @render.plot

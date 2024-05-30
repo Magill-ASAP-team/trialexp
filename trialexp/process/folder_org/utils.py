@@ -17,24 +17,25 @@ def load_pycontrol_variables(session_path, parameters, param_extract_method='tai
 
     try:
         df_pycontrol = pd.read_pickle(session_path/'processed'/'df_pycontrol.pkl')
-        # extract the parameter change, reshape them, and get the first/last value
-        df_parameters = df_pycontrol[df_pycontrol.type=='parameters']
-        df_parameters= df_parameters[df_parameters['name'].isin(parameters)]
-        df_parameters = df_parameters.pivot(columns=['name'], values='value')
-        df_parameters = df_parameters.fillna(method='ffill')
-        df_parameters = df_parameters.dropna()
-        
-        if df_parameters.empty:
-            # if no parameter is found, return a dataframe filled with NaN
-            df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
-        
-        df_parameters['session_id'] = session_id
+        if 'Micropython version' in df_pycontrol.attrs:
+            # extract the parameter change, reshape them, and get the first/last value
+            df_parameters = df_pycontrol[df_pycontrol.type=='parameters']
+            df_parameters= df_parameters[df_parameters['name'].isin(parameters)]
+            df_parameters = df_parameters.pivot(columns=['name'], values='value')
+            df_parameters = df_parameters.ffill()
+            df_parameters = df_parameters.dropna()
+            
+            if df_parameters.empty:
+                # if no parameter is found, return a dataframe filled with NaN
+                df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
+            
+            df_parameters['session_id'] = session_id
 
-        if not df_parameters.empty:
-            if param_extract_method=='tail':
-                return df_parameters.tail(1)
-            else:
-                return df_parameters.head(1)
+            if not df_parameters.empty:
+                if param_extract_method=='tail':
+                    return df_parameters.tail(1)
+                else:
+                    return df_parameters.head(1)
     except FileNotFoundError:
         pass
     
