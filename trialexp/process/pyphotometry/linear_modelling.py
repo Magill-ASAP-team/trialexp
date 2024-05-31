@@ -110,7 +110,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         # copy the data around event
         event_window_time = specs['event_window'][1] - specs['event_window'][0]
         event_window_len = int(event_window_time/1000*sampling_rate)
-        t[cur_idx:(cur_idx+event_window_len)] = np.arange(t_event+specs['event_window'][0], t_event+specs['event_window'][1], 1/sampling_rate*1000)
+        t[cur_idx:(cur_idx+event_window_len)] = np.linspace(t_event+specs['event_window'][0], t_event+specs['event_window'][1], event_window_len)
 
         cur_idx += event_window_len
         cur_time = cur_time + event_window_time
