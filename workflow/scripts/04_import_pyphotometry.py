@@ -37,7 +37,7 @@ try:
     pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
     data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
-    data_photometry = import_ppd(pyphotometry_file, data_format)
+    data_photometry = import_ppd_auto(pyphotometry_file)
 
     data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
     
@@ -172,4 +172,3 @@ if has_photometry:
 else:
     Path(soutput.pycontrol_aligner).touch()
 
-# %%
