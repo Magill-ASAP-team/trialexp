@@ -30,7 +30,7 @@ if fn == []:
 else:
     fn = fn[0]
     data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
-    data_photometry = import_ppd(fn, data_format)
+    data_photometry = import_ppd_auto(fn, data_format)
     data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
     
 #%%
@@ -41,7 +41,7 @@ else:
     pycontrol_time = get_sync_time(df_pycontrol)
     photometry_aligner = Rsync_aligner(pycontrol_time, data_photometry['pulse_times_2'])
     photometry_times_pyc = photometry_aligner.B_to_A(data_photometry['time'])
-    photometry_keys =  [k for k in data_photometry.keys() if 'analog' in k]
+    photometry_keys =  [k for k in data_photometry.keys() if k.startswith('analog')]
 
 #%%
 #remove all state change event
@@ -78,4 +78,5 @@ else:
         df_variable = df_variable,
         smrx_filename=str(spike2_path))
     
+
 # %%
