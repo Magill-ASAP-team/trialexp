@@ -45,7 +45,8 @@ if task_name in ['pavlovian_spontanous_reaching_oct23',
     extraction_specs = specs['spontanous_reaching']
     outcome2plot = df_conditions.trial_outcome.unique()
     
-elif task_name in ['reaching_go_spout_bar_VR_Dec23']:
+elif task_name in ['reaching_go_spout_bar_VR_Dec23',
+                   'reaching_go_spout_bar_VR_April24']:
     extraction_specs = specs['reaching_go_spout_bar_reward']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
@@ -108,3 +109,5 @@ for var in signal2analyze:
         
         
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
+
+# %%

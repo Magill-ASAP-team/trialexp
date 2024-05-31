@@ -450,7 +450,8 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
                         'reaching_go_spout_bar_nov22',
                         'reaching_go_spout_bar_mar23',
                         'reaching_go_spout_bar_june05',
-                        'reaching_go_spout_bar_VR_Dec23']:
+                        'reaching_go_spout_bar_VR_Dec23',
+                        'reaching_go_spout_bar_VR_April24']:
 
         if 'spout_trial_time' in df_events.columns and 'US_end_timer_trial_time' in df_events.columns:
 

@@ -36,7 +36,24 @@ def load_pycontrol_variables(session_path, parameters, param_extract_method='tai
                     return df_parameters.tail(1)
                 else:
                     return df_parameters.head(1)
-    except FileNotFoundError:
+                
+        else:
+            # process new format
+            # only load the run start parameter
+            
+            # create an empty dataframe filled with NA
+            df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
+            df_parameters['session_id'] = session_id
+            start_params = df_pycontrol[df_pycontrol.subtype=='run_start'].iloc[0].content
+            
+            # fill the parameter if found
+            for p in parameters:
+                if p in start_params:
+                    df_parameters[p] = start_params[p]
+                                         
+            return df_parameters
+            
+    except (FileNotFoundError, IndexError):
         pass
     
 
@@ -58,7 +75,7 @@ def build_session_info_cohort(root_path, load_pycontrol=False,
     Returns:
     - df_session_info: A Pandas dataframe containing the session information.
     """
-    paths = Path(root_path).glob('*_cohort/by_sessions/*/*')
+    paths = Path(root_path).glob('*_cohort*/by_sessions/*/*')
     paths = [Path(p) for p in paths]
 
     # parse the folder name
