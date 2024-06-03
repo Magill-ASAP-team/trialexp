@@ -37,7 +37,7 @@ try:
     pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
     data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
-    data_photometry = import_ppd_auto(pyphotometry_file)
+    data_photometry = import_ppd_auto(pyphotometry_file, data_format)
 
     data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
     
@@ -51,6 +51,8 @@ try:
     dataset = photometry2xarray(data_photometry, skip_var = skip_var)
 except IndexError:
     has_photometry = False
+
+#%%
 
 
 # %% synchornize pyphotometry with pycontrol
