@@ -17,12 +17,12 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
     for c in cohort:
         for t in tasks:
-            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
+            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*05-31*'))        
 
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2024_April_cohort', '2024_May_cohort_5HT'])
+    input: session2analyze(cohort=['2024_April_cohort', '2024_May_cohort_5HT'],tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule process_pycontrol:
     input:

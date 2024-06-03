@@ -37,10 +37,7 @@ tasks = tasks_params_df.task.values.tolist()
 skip_existing = True #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2023_Oct_cohort',
-                  '2024_Jan_cohort',
-                  '2024_April_cohort',
-                  '2024_May_cohort_5HT'] 
+cohort_to_copy = ['2024_April_cohort','2024_May_cohort_5HT'] 
 
 #%%
 
@@ -123,6 +120,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
+    # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-05-30-152835']
     
     for _, row in df_pycontrol.iterrows():
         
@@ -286,3 +284,5 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
 
             recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
 
+
+# %%

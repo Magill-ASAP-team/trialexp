@@ -15,27 +15,37 @@ from pathlib import Path
 
 logger.debug('Reading sessions data from ettin...')
 root_path = '/home/MRC.OX.AC.UK/ndcn1330/ettin/Julien/ASAP/Data/'
-df_session_info = build_session_info_cohort(root_path, load_pycontrol=True, pycontrol_parameters=['hold_time_required_ms'])
-cohorts = df_session_info.cohort.unique().tolist()
 logger.debug('done')
 
 ui.page_opts(title="Hello sidebar!")
 
 df_img2plot = reactive.value() # used to store the dataframe of images to plot
 
-def get_sessions(cohort, animal_id=None, task_name=None):
-    idx = df_session_info.cohort==cohort
-    if animal_id is not None:
-        idx = idx & df_session_info.animal_id.isin(animal_id)
-    if task_name is not None:
-        print(task_name)
-        idx = idx & df_session_info.task_name.isin(task_name)
-        
-    return df_session_info[idx]
-    
-    
 
+
+@reactive.calc
+def session_info():
+    
+    session_file = Path('df_session_info.pkl')
+    if session_file.exists():
+        df_session_info = pd.read_pickle(session_file)
+        print('Loaded existing df_session_info dataframe')
+    else:
+        df_session_info = build_session_info_cohort(root_path, load_pycontrol=True, pycontrol_parameters=['hold_time_required_ms'])
+        df_session_info.to_pickle('df_session_info.pkl') #TODO: update the session dataframe incrementally
+
+    idx = df_session_info.cohort==input.cohort()
+    if len(input.animal_id())>0:
+        idx = idx & df_session_info.animal_id.isin(input.animal_id())
+    if len(input.task_name())>0:
+        idx = idx & df_session_info.task_name.isin(input.task_name())
+    # print(df_session_info.columns)
+    return df_session_info[idx].sort_values('expt_datetime')
+
+    
 with ui.sidebar(width=500):
+    df = session_info()
+    cohorts = df.cohort.unique().tolist()
     ui.input_select("cohort", "Select cohort", choices=cohorts, selected=cohorts[0])
     ui.input_checkbox_group('animal_id', 'Animals', choices=[])
     ui.input_checkbox_group('task_name', 'Task', choices=[])
@@ -50,21 +60,18 @@ with ui.sidebar(width=500):
 @reactive.effect
 @reactive.event(input.cohort)
 def update_animal_id():
-    # df = get_sessions(input.cohort())
     df = session_info()
     ui.update_checkbox_group('animal_id', choices=df.animal_id.unique().tolist())
 
 @reactive.effect
 @reactive.event(input.animal_id)
 def update_task():
-    # df = get_sessions(input.cohort(), input.animal_id())
     df = session_info()
     ui.update_checkbox_group('task_name', choices=df.task_name.unique().tolist())
     
 @reactive.effect
 @reactive.event(input.task_name)
 def update_figure_list():
-    # df = get_sessions(input.cohort(), input.animal_id(), input.task_name())
     df = session_info()
     figure_names=[]
     for p in df.path:
@@ -73,16 +80,6 @@ def update_figure_list():
     figure_names = [f.name for f in figure_names]
     figure_names = sorted(list(set(figure_names)))
     ui.update_radio_buttons('figure_list', choices=figure_names)
-
-@reactive.calc
-def session_info():
-    idx = df_session_info.cohort==input.cohort()
-    if len(input.animal_id())>0:
-        idx = idx & df_session_info.animal_id.isin(input.animal_id())
-    if len(input.task_name())>0:
-        idx = idx & df_session_info.task_name.isin(input.task_name())
-    # print(df_session_info.columns)
-    return df_session_info[idx].sort_values('expt_datetime')
 
 
 @reactive.effect
