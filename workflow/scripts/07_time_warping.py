@@ -34,7 +34,11 @@ signal2analyze = [s for s in signal2analyze if s in xr_photometry.data_vars]
 with open('params/timewarp_spec.json') as f:
     specs = json.load(f)
 
-task_name = df_events_cond.attrs['task_name']
+if 'task_name' in df_events_cond.attrs:
+    task_name = df_events_cond.attrs['task_name']
+else:
+    task_name = df_events_cond.attrs['Task name']
+    
 trigger = df_events_cond.attrs['triggers'][0]
 
 if task_name in ['pavlovian_spontanous_reaching_oct23',
@@ -46,16 +50,20 @@ if task_name in ['pavlovian_spontanous_reaching_oct23',
     outcome2plot = df_conditions.trial_outcome.unique()
     
 elif task_name in ['reaching_go_spout_bar_VR_Dec23',
-                   'reaching_go_spout_bar_VR_April24']:
+                   'reaching_go_spout_bar_VR_April24',
+                   'reaching_go_spout_bar_apr23',
+                   'reaching_go_spout_bar_mar23',
+                   'reaching_go_spout_bar_june05',
+                   'reaching_go_spout_bar_nov22']:
     extraction_specs = specs['reaching_go_spout_bar_reward']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
-elif task_name in ['reaching_go_spout_bar_mar23',
-                   'reaching_go_spout_bar_june05',
-                   'reaching_go_spout_bar_nov22',
-                   'reaching_go_spout_bar_apr23']:
-    extraction_specs = specs['reaching_go_spout_bar']
-    outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+# elif task_name in ['reaching_go_spout_bar_mar23',
+#                    'reaching_go_spout_bar_june05',
+#                    'reaching_go_spout_bar_nov22',
+#                    ]:
+#     extraction_specs = specs['reaching_go_spout_bar']
+#     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
 elif task_name in ['reaching_go_spout_incr_break2_nov22']:
     extraction_specs = specs['break2']
@@ -110,4 +118,3 @@ for var in signal2analyze:
         
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
-# %%

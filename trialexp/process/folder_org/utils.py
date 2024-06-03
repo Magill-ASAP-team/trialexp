@@ -44,7 +44,15 @@ def load_pycontrol_variables(session_path, parameters, param_extract_method='tai
             # create an empty dataframe filled with NA
             df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
             df_parameters['session_id'] = session_id
-            start_params = df_pycontrol[df_pycontrol.subtype=='run_start'].iloc[0].content
+            
+            if len(run_start := df_pycontrol[df_pycontrol.subtype=='run_start'])>0:
+                start_params = run_start.iloc[0].content
+            else:
+                # old data imported into new format, build the parameters list
+                start_params = {}
+                for d in df_pycontrol[df_pycontrol.type=='variable'].content:
+                    if type(d) is dict:
+                        start_params.update(d)
             
             # fill the parameter if found
             for p in parameters:
@@ -53,8 +61,11 @@ def load_pycontrol_variables(session_path, parameters, param_extract_method='tai
                                          
             return df_parameters
             
-    except (FileNotFoundError, IndexError):
+    except FileNotFoundError as e:
         pass
+    except IndexError as e:
+        print(session_path)
+        print(e)
     
 
 def build_session_info_cohort(root_path, load_pycontrol=False, 

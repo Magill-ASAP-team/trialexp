@@ -1465,7 +1465,11 @@ def preprocess_photometry(data_photometry, df_pycontrol):
     
     # determine how to do motion correction
     animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
-    animal_id = df_pycontrol.attrs['subject_id'] 
+    if 'subject_id' in df_pycontrol.attrs:
+        animal_id = df_pycontrol.attrs['subject_id'] 
+    else:
+        animal_id = df_pycontrol.attrs['Subject ID'] 
+        
     if animal_id in animal_info.index:
         injection = animal_info.loc[animal_id].injection.split(';')
         if 'Rdlight' in injection or 'rDA' in injection:

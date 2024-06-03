@@ -210,7 +210,7 @@ def zigzag_path(x0,y0,segment_length=1, height=1):
 def add_compressed_mark(ax,x, y, h, w):
 
     # Mask the axis
-    mw = w*4 #half total width
+    mw = w*3.5 #half total width
     mh = h*2
     xy = np.array([[x - mw/2, y+h/2],
                [x + mw/2, y+h/2],

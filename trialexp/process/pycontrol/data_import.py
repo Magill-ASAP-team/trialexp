@@ -404,6 +404,27 @@ def session_dataframe(file_path, paired_events={}, pair_end_suffix=None, time_un
                             "content": print_str,
                         }
                     )
+            elif line[0] == 'V': #Variable line
+                vars = line.split(' ')[1:]
+                
+                # variables may contains list, that will complicate its parsing
+                # trying to work around that now
+                if len(vars) == 3:
+                    # no list
+                    timestamp = int(vars[0])
+                    var_name = vars[1]
+                    var_value = vars[2]
+                else:
+                    # possible list in the last item
+                    timestamp = int(vars[0])
+                    var_name = vars[1]
+                    var_value = ' '.join(vars[2:])
+                
+                line_dicts.append({
+                    'type': 'variable',
+                    'time': timestamp,
+                    'content': {var_name:var_value}
+                })
 
         df = pd.DataFrame(line_dicts)
 
