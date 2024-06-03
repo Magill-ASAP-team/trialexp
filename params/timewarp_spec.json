@@ -36,7 +36,7 @@
             "order": "first_after_last",
             "dependent_event": "US_end_timer",
             "padding": 0,
-            "label": "reward \ndelivery"
+            "label": "reward\ndelivery"
         }
     },
     "reaching_go_spout_bar_reward": {
@@ -75,7 +75,7 @@
             ],
             "order": "first",
             "padding": 0,
-            "label": "reward \ndelivery"
+            "label": "reward\ndelivery"
         }
     },
     "reaching_go_spout_bar": {

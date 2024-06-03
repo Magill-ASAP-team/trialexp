@@ -9,6 +9,8 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from collections import Counter
 from matplotlib.patches import Polygon
+from matplotlib.path import Path
+import matplotlib.patches as patches
 
 def extract_event(df_events, event, order, dependent_event=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
@@ -182,6 +184,44 @@ def add_break_mark(ax, x, y, d, w, h):
     ax.add_patch(Polygon(xy, color='white', closed=True, zorder=3, clip_on=False))
     ax.plot([x - w/2+d, x - w/2-d], [y+h/2,  y-h/2], clip_on=False, color='k',ls='-', zorder=3)
     ax.plot([x + w/2+d, x + w/2-d], [y+h/2,  y-h/2], clip_on=False, color='k',ls='-', zorder=3)
+    
+def zigzag_path(x0,y0,segment_length=1, height=1):
+    
+    # Generate vertices and codes for Path
+    vertices = [(x0, y0)]
+    codes = [Path.MOVETO]
+    
+    points = [0,1,0,-1,0]
+    
+    for i in range(1,len(points)):
+        x = i * segment_length + x0
+        y = points[i]*height +y0
+        vertices.append((x, y))
+        codes.append(Path.LINETO)
+    
+    # Create Path object
+    zigzag_path = Path(vertices, codes)
+    
+    # Create a PathPatch object
+    patch = patches.PathPatch(zigzag_path, facecolor='none', edgecolor='k', lw=1,zorder=3, clip_on=False)
+    
+    return patch
+    
+def add_compressed_mark(ax,x, y, h, w):
+
+    # Mask the axis
+    mw = w*4 #half total width
+    mh = h*2
+    xy = np.array([[x - mw/2, y+h/2],
+               [x + mw/2, y+h/2],
+               [x + mw/2, y-h/2],
+               [x - mw/2, y-h/2]])
+    
+    ax.add_patch(Polygon(xy, color='white', closed=True, zorder=3, clip_on=False))
+
+    # draw the zigzag mark
+    zigzag = zigzag_path(x-w*2,y, segment_length=w, height=h)
+    ax.add_patch(zigzag)
 
 
 def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected_region=True):
@@ -215,7 +255,9 @@ def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected
         ylim = ax.get_ylim()
         marker_size = (ylim[1]-ylim[0])*0.05
         if i != len(extraction_specs.keys())-1:
-            add_break_mark(ax, cur_time-padding/2, ax.get_ylim()[0], 5, 20, marker_size)
+            # add_break_mark(ax, cur_time-padding/2, ax.get_ylim()[0], 5, 20, marker_size)
+            add_compressed_mark(ax, cur_time-padding/2, ax.get_ylim()[0],0.05,10)
+
 
     return ax
 
