@@ -117,7 +117,7 @@ notebooks/noncanonical/nb20221018_130600_workflow_pyPhot_heatmap.ipynb
 .snakemake/
 reports
 
-output
+
 .env
 *.mp4
 *.gif
