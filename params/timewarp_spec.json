@@ -1,0 +1,190 @@
+{
+    "reaching_go_spout_bar_lick": {
+        "hold_for_water": {
+            "event_window": [
+                -500,
+                500
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue on"
+        },
+        "bar_off": {
+            "event_window": [
+                -200,
+                50
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 100,
+            "label": "Reach start"
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                300
+            ],
+            "order": "first",
+            "padding": 100,
+            "label": "Reach finish"
+        },
+        "lick": {
+            "event_window": [
+                -100,
+                500
+            ],
+            "order": "first_after_last",
+            "dependent_event": "US_end_timer",
+            "padding": 0,
+            "label": "reward \ndelivery"
+        }
+    },
+    "reaching_go_spout_bar_reward": {
+        "hold_for_water": {
+            "event_window": [
+                -500,
+                500
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue on"
+        },
+        "bar_off": {
+            "event_window": [
+                -200,
+                50
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 100,
+            "label": "reach start"
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                300
+            ],
+            "order": "first",
+            "padding": 100,
+            "label": "reach finish"
+        },
+        "US_end_timer": {
+            "event_window": [
+                -100,
+                1000
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "reward \ndelivery"
+        }
+    },
+    "reaching_go_spout_bar": {
+        "hold_for_water": {
+            "event_window": [
+                -500,
+                500
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue"
+        },
+        "bar_off": {
+            "event_window": [
+                -200,
+                50
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 100,
+            "label": "last bar off"
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                1500
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "first spout"
+        }
+    },
+    "spontanous_reaching": {
+        "US_timer": {
+            "event_window": [
+                -500,
+                0
+            ],
+            "order": "only",
+            "padding": 300,
+            "label": "reward"
+
+        },
+        "bar_off": {
+            "event_window": [
+                0,
+                0
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 300,
+            "label": "last bar off"
+
+        },
+        "spout": {
+            "event_window": [
+                0,
+                300
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "first spout"
+
+        }
+    },
+    "break2": {
+        "busy_win": {
+            "event_window": [
+                -500,
+                200
+            ],
+            "order": "only",
+            "padding": 20,
+            "label": "cue"
+
+        },
+        "bar_off": {
+            "event_window": [
+                -100,
+                100
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 50,
+            "label": "last bar off"
+
+        },
+        "spout": {
+            "event_window": [
+                -50,
+                300
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "first spout"
+
+        }
+    },
+    "default": {
+        "trigger": {
+            "event_window": [
+                -500,
+                500
+            ],
+            "order": "only",
+            "padding": 100,
+            "label": "trigger"
+
+        }
+    }
+
+}

@@ -17,26 +17,110 @@ def load_pycontrol_variables(session_path, parameters, param_extract_method='tai
 
     try:
         df_pycontrol = pd.read_pickle(session_path/'processed'/'df_pycontrol.pkl')
-        # extract the parameter change, reshape them, and get the first/last value
-        df_parameters = df_pycontrol[df_pycontrol.type=='parameters']
-        df_parameters= df_parameters[df_parameters['name'].isin(parameters)]
-        df_parameters = df_parameters.pivot(columns=['name'], values='value')
-        df_parameters = df_parameters.fillna(method='ffill')
-        df_parameters = df_parameters.dropna()
-        
-        if df_parameters.empty:
-            # if no parameter is found, return a dataframe filled with NaN
-            df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
-        
-        df_parameters['session_id'] = session_id
+        if 'Micropython version' in df_pycontrol.attrs:
+            # extract the parameter change, reshape them, and get the first/last value
+            df_parameters = df_pycontrol[df_pycontrol.type=='parameters']
+            df_parameters= df_parameters[df_parameters['name'].isin(parameters)]
+            df_parameters = df_parameters.pivot(columns=['name'], values='value')
+            df_parameters = df_parameters.ffill()
+            df_parameters = df_parameters.dropna()
+            
+            if df_parameters.empty:
+                # if no parameter is found, return a dataframe filled with NaN
+                df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
+            
+            df_parameters['session_id'] = session_id
 
-        if not df_parameters.empty:
-            if param_extract_method=='tail':
-                return df_parameters.tail(1)
-            else:
-                return df_parameters.head(1)
-    except FileNotFoundError:
+            if not df_parameters.empty:
+                if param_extract_method=='tail':
+                    return df_parameters.tail(1)
+                else:
+                    return df_parameters.head(1)
+                
+        else:
+            # process new format
+            # only load the run start parameter
+            
+            # create an empty dataframe filled with NA
+            df_parameters = pd.DataFrame([{p:pd.NA for p in parameters}])
+            df_parameters['session_id'] = session_id
+            start_params = df_pycontrol[df_pycontrol.subtype=='run_start'].iloc[0].content
+            
+            # fill the parameter if found
+            for p in parameters:
+                if p in start_params:
+                    df_parameters[p] = start_params[p]
+                                         
+            return df_parameters
+            
+    except (FileNotFoundError, IndexError):
         pass
+    
+
+def build_session_info_cohort(root_path, load_pycontrol=False, 
+                       pycontrol_parameters=None,
+                       param_extract_method='tail'):
+    """
+    This function takes a root path as input and creates a session info from the folders at that path.
+    It parses the folder name with a regular expression to extract information about the animal id,
+    experiment date/time, and session id. It returns a Pandas dataframe containing this information,
+    as well as a calculated session number for each animal based on the experiment date/time.
+    it works with the cohort data structure from Jan 2024
+
+    Args:
+    - root_path (Path): A string representing the root path where the session folders are located.
+    - load_pycontrol (bool): whether to load the pycontrol data to extract variable parameters
+    - param_extract_method (str): how to extract the parameters from each pycontrol file, can be tail or head
+    
+    Returns:
+    - df_session_info: A Pandas dataframe containing the session information.
+    """
+    paths = Path(root_path).glob('*_cohort*/by_sessions/*/*')
+    paths = [Path(p) for p in paths]
+
+    # parse the folder name
+    # TODO: extract the task name
+    def parse_session_path(session_path):
+        session_id = session_path.name
+        task_name = session_path.parent.name
+        cohort = session_path.parents[2].name
+
+        pattern = r'(\w+)-(.*)'
+        m = re.search(pattern, session_id)
+        
+        
+        if m:
+            animal_id = m.group(1)
+            date_string = m.group(2)
+            expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
+
+            return {'animal_id':animal_id, 
+                    'expt_datetime': expt_datetime,
+                    'session_id':session_id,
+                    'task_name':task_name,
+                    'cohort': cohort,
+                    'path':session_path}
+
+    session_info = [parse_session_path(p) for p in paths]
+    df_session_info = pd.DataFrame(session_info)
+    
+
+    
+    # Calculate the session number
+    df_session_info['session_no'] = df_session_info.groupby(['animal_id','task_name'])['expt_datetime'].rank()
+
+    
+    if load_pycontrol:
+        if pycontrol_parameters is None:
+            raise ValueError('You need to set the parameters to extract')
+        
+        df_parameters = pd.concat([load_pycontrol_variables(p,pycontrol_parameters,param_extract_method) for p in paths])
+
+        
+        #merge the paramteres to df_session_info
+        df_session_info = df_session_info.merge(df_parameters, on='session_id')
+    
+    return df_session_info
 
 def build_session_info(root_path, load_pycontrol=False, 
                        pycontrol_parameters=None,
@@ -105,7 +189,7 @@ def load_datasets(session_paths, load_behaviour_dataset=False):
     for p in tqdm(session_paths):
         fn = p/'processed'/'xr_session.nc'
         try:
-            ds = xr.open_dataset(fn) 
+            ds = xr.open_dataset(fn,engine='h5netcdf') 
             # print(np.unique(np.diff(ds.event_time.data)), ds.event_time.data[-1], p)
             ds = ds.drop_dims('time') # for performance reason
             
@@ -113,7 +197,7 @@ def load_datasets(session_paths, load_behaviour_dataset=False):
             if load_behaviour_dataset:
                 fn_be = p/'processed'/'xr_behaviour.nc'
                 if fn_be.exists():
-                    ds_be = xr.open_dataset(fn_be)
+                    ds_be = xr.open_dataset(fn_be,engine='h5netcdf')
                     ds = xr.merge([ds,ds_be])
             
             ds_list.append(ds)

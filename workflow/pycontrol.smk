@@ -5,21 +5,24 @@ from dotenv import load_dotenv
 
 load_dotenv() 
 
-def task2analyze(tasks:list=None):
+def session2analyze(tasks:list=None, cohort:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []
 
     if tasks is None:
         tasks=['*']
 
-    for t in tasks:
-        total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{t}/*'))        
+    if cohort is None:
+        cohort = ['*']
+
+    for c in cohort:
+        for t in tasks:
+            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*05-31*'))        
 
     return total_sessions
 
 rule pycontrol_all:
-    input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    # input: task2analyze(['reaching_go_spout_bar_nov22'])
+    input: session2analyze(cohort=['2024_April_cohort', '2024_May_cohort_5HT'],tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule process_pycontrol:
     input:
@@ -42,6 +45,7 @@ rule pycontrol_figures:
     output:
         event_histogram = report('{session_path}/{task}/{session_id}/processed/figures/event_histogram_{session_id}.png', 
                                     caption='report/event_histogram.rst', category='Plots' ),
+        reach_histogram = '{session_path}/{task}/{session_id}/processed/figures/reach_histogram_{session_id}.png',
         rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/pycontrol.done')
     script:
         'scripts/02_plot_pycontrol_data.py'
@@ -83,13 +87,22 @@ rule task_specifc_analysis:
 
 rule photometry_figure:
     input:
-        task_specific = '{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done',
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
+        task_specific = '{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done'
     output:
         trigger_photo_dir= directory('{session_path}/{task}/{session_id}/processed/figures/photometry'),
-        rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/photometry.done')
+        done = touch('{session_path}/{task}/{session_id}/processed/log/photometry_figure.done'),
     script:
         'scripts/05_plot_pyphotometry.py'
+
+rule photometry_pipline:
+    input:
+        xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
+        trigger_photo_dir= '{session_path}/{task}/{session_id}/processed/log/photometry_figure.done',
+    output:
+        rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/photometry.done')
+
+
 
 rule behavorial_analysis:
     input:
@@ -100,6 +113,17 @@ rule behavorial_analysis:
     script:
         'scripts/06_behavorial_analysis.py'
 
+
+rule time_warping:
+    input:
+        xr_photometry = '{session_path}/{task}/{session_id}/processed/xr_photometry.nc',
+        condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
+        event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
+    output:
+        xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
+        figure_dir= directory('{session_path}/{task}/{session_id}/processed/figures/timewarp'),
+    script:
+        'scripts/07_time_warping.py'
 
 def photometry_input(wildcards):
     #determine if photometry needs to run in the current folder
@@ -115,6 +139,6 @@ rule pycontrol_final:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
         pycontrol_done = '{session_path}/{task}/{session_id}/processed/log/pycontrol.done',
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
-        spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done'
+        spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
     output:
         done = touch('{session_path}/{task}/{session_id}/processed/pycontrol_workflow.done')

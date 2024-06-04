@@ -21,20 +21,38 @@ from trialexp.process.pycontrol.data_import import session_dataframe
 from trialexp.process.pyphotometry.utils import import_ppd
 from trialexp.utils.rsync import Rsync_aligner, RsyncError
 
-def create_photo_sync(pycontrol_file, pyphotometry_file):
+def create_photo_sync(data_pycontrol, photometry_dict):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        pyphotometry_file = import_ppd(pyphotometry_file)
-        data_pycontrol = session_dataframe(pycontrol_file)
 
-        photo_rsync = pyphotometry_file['pulse_times_2']
-        pycontrol_rsync = data_pycontrol[data_pycontrol.name=='rsync'].time
+        photo_rsync = photometry_dict['pulse_times_2']
+        
+        if 'framework_version' in data_pycontrol.attrs:
+            framework_ver = data_pycontrol.attrs['framework_version']
+        else:
+            # search it in the raw dataframe
+            framework_ver = data_pycontrol[data_pycontrol.subtype=='framework_version'].content.iloc[0]
+            
+        if framework_ver == '1.8.1':
+            pycontrol_rsync = data_pycontrol[data_pycontrol.content=='rsync'].time
+        else:
+            pycontrol_rsync = data_pycontrol[data_pycontrol.subtype=='sync'].time
+
+        
         try:
             return Rsync_aligner(pulse_times_A= photo_rsync, 
                 pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
             
         except (RsyncError, ValueError) as e:
-            return None
+            # First try fail, let's try the next one
+            if 'pulse_times_3' in photometry_dict:
+                photo_rsync = photometry_dict['pulse_times_3']
+                try:
+                    return Rsync_aligner(pulse_times_A= photo_rsync, 
+                        pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
+                    
+                except (RsyncError, ValueError) as e:
+                    return None
 
 def parse_pyhoto_fn(fn):
     pattern = r'(\w+)-(.*)\.ppd'

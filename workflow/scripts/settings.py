@@ -7,7 +7,9 @@ dotenv.load_dotenv()
 # debug_folder = r'//home/MRC.OX.AC.UK/phar0732/ettin/Data/head-fixed/_Other/test_folder_ephys/kms058_2023-03-24_15-09-44_bar_final/Record Node 101/experiment1/recording1/continuous/Neuropix-PXI-100.ProbeA-AP/sorting/'
 
 debug_folder = os.path.join(os.environ['SESSION_ROOT_DIR'], 
-                            'reaching_go_spout_bar_nov22',
-                            'TT004-2023-07-31-145414')
+                            '2024_April_cohort',
+                            'by_sessions',
+                            'reaching_go_spout_bar_VR_April24',
+                            'RE015-2024-05-31-112606')
 # debug_folder = r'/home/MRC.OX.AC.UK/phar0732/ettin/Data/head-fixed/by_sessions/reaching_go_spout_bar_nov22/kms062-2023-03-06-182344'
 # %%

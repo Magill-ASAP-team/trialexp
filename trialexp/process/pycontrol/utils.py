@@ -6,6 +6,7 @@ from datetime import datetime
 from os import walk
 from os.path import isfile, join
 from re import search, match, DOTALL
+import re
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ import plotly.graph_objects as go
 from pandas import Timestamp
 from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
-
+import warnings
 from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 
 Event = namedtuple('Event', ['time','name'])
@@ -27,26 +28,57 @@ def parse_session_dataframe(df_session):
     # parse and format the session dataframe imported from pycontrol
     df_events = df_session[(df_session.type!='info')]
     info = df_session[df_session.type=='info']
-    info = dict(zip(info.name, info.value))
+    info = dict(zip(info.subtype, info.content))
     
     #correct for naming error in info
-    if 'Task name' in info and 'pycontrol_share' in info['Task name']:
-        task_name = info['Task name'].split('\\')[-1]
-        info['Task name'] = task_name
+    if 'task_name' in info and 'pycontrol_share' in info['task_name']:
+        task_name = info['task_name'].split('\\')[-1]
+        info['task_name'] = task_name
                                             
     df_events.attrs.update(info)
 
     return df_events
 
-def print2event(df_events, conditions):
+def parse_trial_param(s):
+    pattern = r'([a-zA-Z_ ]+):\s*([\d.]+|\w+)'
+    d={}
+    for m in re.finditer(pattern, s):
+        d.update({m.group(1):m.group(2)})
+    return d
+
+def print2event(df_events, conditions, trial_parameters):
     
     df = df_events.copy()
+    extra_row_count = 0
     
     #Extract print event matched by conditions and turn them into events for later analysis
-    idx = (df.type=='print') & (df.value.isin(conditions))
-    df.loc[idx, 'name'] = df.loc[idx,'value'] 
+    for idx, row in df.iterrows():
+        if row.type == 'print':
+            # check if the value column match with condition
+            # if so then assign the condition to the event column
+            matched_con = [c for c in conditions if c == row.content]
+            if len(matched_con)>0:
+                if len(matched_con)>1:
+                    warnings.warn(f'Warning: more than one conditionas found {matched_con}')  
+                df.loc[idx,'name'] = matched_con[0]
+                
+            # Note: row and index are fixed during iterrows(), they will only be updated outside the
+            # loop
+            param_dict = parse_trial_param(row.content)
+            param_dict = {k:v for k,v in param_dict.items() if k in trial_parameters}
+            for k,v in param_dict.items():
+                # add extract row to the dataframe per paramter
+                df.loc[df.index[-1]+extra_row_count] = {
+                    'type': 'trial_param',
+                    'subtype': k,
+                    'time':row.time,
+                    'content': v
+                }
+                extra_row_count += 1
+                
     
-    return df   
+    df = df.sort_values('time').reset_index(drop=True) #make sure the order is correct
+    return df
 
 def parse_events(session, conditions):
     #parse the event and state information and return it as a dataframe
@@ -299,6 +331,71 @@ def plot_session(df:pd.DataFrame, keys: list = None, state_def: list = None, pri
 
         fig.show()
 
+def extract_v_line_v2(df_pycontrol, print_char_limit=20):
+    # for pyControl > v2
+    
+    # extract variable change
+    df = df_pycontrol[df_pycontrol.type=='variable']
+
+    v_list = []
+    for _, row in df.iterrows():
+        if type(row.content) is dict:
+            for k,v in row.content.items():
+                v_list.append(
+                    {
+                        'time':row.time,
+                        'key': k,
+                        'value': v,
+                        'type': 'variable'
+                    }
+                )
+    df_v = pd.DataFrame(v_list)
+    if len(df_v)>0:
+        df_v = df_v[~df_v.key.str.endswith('__')]
+
+    # extract print lines
+    df = df_pycontrol[df_pycontrol.type=='print']
+
+    p_list = []
+    for _, row in df.iterrows():
+        if len(row.content)<print_char_limit:    
+            # skip the long print line, they are prbably just status udpate
+            p_list.append(
+                {
+                    'time':row.time,
+                    'content': row.content,
+                    'type': 'print'
+                }
+        )
+    df_p = pd.DataFrame(p_list)
+    return df_v, df_p
+
+def extract_v_line(pycontrol_path):
+
+    # # assuming just one txt file
+    # pycontrol_txt = list(Path(sinput.pycontrol_folder).glob('*.txt'))
+
+    with open(pycontrol_path, 'r') as f:
+        all_lines = [line.strip() for line in f.readlines() if line.strip()]
+
+    count = 0
+    print_lines = []
+    while count < len(all_lines):
+        # all_lines[count][0] == 'P'
+        if bool(match('P\s\d+\s', all_lines[count])):
+            print_lines.append(all_lines[count][2:])
+            count += 1
+            while (count < len(all_lines)) and not (bool(match('[PVD]\s\d+\s', all_lines[count]))):
+                print_lines[-1] = print_lines[-1] + \
+                    "\n" + all_lines[count]
+                count += 1
+        else:
+            count += 1
+
+    v_lines = [line[2:] for line in all_lines if line[0] == 'V']
+    
+    return v_lines, print_lines
+
 
 def export_session(df:pd.DataFrame, keys: list = None, export_state=True, print_expr: list = None, 
                     event_ms: list = None, smrx_filename: str = None, verbose :bool = False,
@@ -484,6 +581,181 @@ def export_session(df:pd.DataFrame, keys: list = None, export_state=True, print_
             
  
 
+def export_session_v2(df:pd.DataFrame, keys: list = None, export_state=True, print_expr: list = None, 
+                    event_ms: list = None, smrx_filename: str = None, 
+                    verbose :bool = False,
+                    df_print=None, 
+                    df_variable=None,
+                    data_photometry: dict = None, photometry_times_pyc: np.ndarray = None,
+                    photometry_keys: list = None):
+        """
+        Visualise a session using Spike2, support for pycontrol >v2
+
+        keys: list
+            subset of self.times.keys() to be plotted as events
+            Use [] to plot nothing
+
+        state_def: dict, list, or None = None
+            must be None (default)
+            or dictionary of 
+                'name' : str
+                    Channel name
+                'onset' : str 
+                    key for onset 
+                'offset' : str
+                    key for offset
+            or list of such dictionaries
+
+            eg. dict(name='trial', onset='CS_Go', offset='refrac_period')
+            eg. {'name':'trial', 'onset':'CS_Go', 'offset':'refrac_period'}
+
+            For each onset, find the first offset event before the next onset 
+
+        event_ms: list of dict
+                'name':'name of something'
+                'time_ms': X
+            allow plotting timestamps as an event
+
+        state_ms: list of dict #TODO
+
+        smrx_filename: str = None
+            The output filename (*.smrx)
+
+        print_to_text: Bool = True
+            print_lines will be converted to text (and TextMark channel in Spike2)
+
+        vchange_to_text: Bool = True
+            Variable changes during the session, eg. "V 12560 windor_dur_ms 3000", will be converted to text (and TextMark channel in Spike2)
+
+        data_photometry: dict = None
+            Holding photometry data
+            If None, the photometry channels will be skipped
+        
+        photometry_times_pyc: np.ndarray
+            Rsync-ed pyphotometry time stamps in pycontrol time in ms
+        
+        photometry_keys: list = None
+            Specify what channels to export.
+
+        verbose :bool = False
+
+
+        """
+
+        # see  \Users\phar0528\Anaconda3\envs\trialexp\Lib\site-packages\sonpy\MakeFile.py
+        #NOTE cannot put file path in the pydoc block
+
+        if keys is None:
+            keys = df.name.unique()
+        else:
+            for k in keys: 
+               assert k in df.content.unique(), f"{k} is not found in self.time.keys()"
+        
+        
+        if smrx_filename is None:
+            raise ValueError('You must specify the smrx_filename filename if you want to export file')
+        else:
+            spike2exporter = Spike2Exporter(smrx_filename, df.time.max(), verbose)
+            
+        
+        def extract_states(df_pycontrol):
+            # extract the onset and offset of state automatically
+            df_states = df_pycontrol[df_pycontrol.type=='state']
+
+            states_dict = defaultdict(list)
+
+            #extract the starting and end point of stats
+            if len(df_states)>2:
+                curState  = df_states.iloc[0]['content']
+                start_time = df_states.iloc[0]['time']
+                
+                for _, row in df_states.iloc[1:].iterrows():
+                    if not row.name == curState:
+                        states_dict[curState].extend([start_time, row.time])
+                        start_time = row['time']
+                        curState = row['content']
+                        
+            return states_dict  
+
+        y_index = 0
+        
+        for kind, k in enumerate(keys):
+            y_index += 1
+            df_evt2plot = df[df.content==k]
+            spike2exporter.write_event(df_evt2plot.time.values, k, y_index)
+
+        if event_ms is not None:
+            if isinstance(event_ms, dict):
+                event_ms = [event_ms]
+            # allow exporting time stamps into event channels
+            for dct in event_ms:
+                y_index += 1
+                spike2exporter.write_event(dct['time_ms'], dct['name'], y_index)
+
+        if export_state:
+            # Draw states as gapped lines
+            state_dict = extract_states(df)
+            
+            for state, time_ms in state_dict.items():
+                y_index += 1
+                spike2exporter.write_marker_for_state(time_ms, state, y_index)
+        
+        #TODO accept custom state defintions?
+
+        if df_print is not None:
+
+            ts_ms = df_print.time.values
+            txt = df_print.content.values
+
+            # df_print = pd.DataFrame(list(zip(ts_ms, txt)), columns=['ms', 'text'])
+
+            if len(txt)>0:
+                y_index += 1
+                spike2exporter.write_textmark(ts_ms, 'print lines', y_index, txt) 
+            
+        if df_variable is not None and len(df_variable)>0:
+            ts_ms = df_variable.time.values
+            txt = [f'{r.key}:{r.value}' for _,r in df_variable.iterrows()]
+            # df_print = pd.DataFrame(list(zip(ts_ms, txt)), columns=['ms', 'text'])
+            if len(txt)>0:
+                y_index += 1
+                spike2exporter.write_textmark(ts_ms, 'V changes', y_index, txt)
+
+        if (data_photometry is not None) and (photometry_times_pyc is not None) \
+            and (photometry_keys is not None) :
+
+            multiplier = int((1/1000) / spike2exporter.dTimeBase) #NOTE sampling_rate was originally 1000, and we assume that it is unchanged
+            T = photometry_times_pyc
+            nan_indices = np.argwhere(np.isnan(T))
+            T_no_nan = np.delete(T, nan_indices)
+
+            new_T = np.arange(0, df.time.max(), 1/1000*1000) #NOTE sampling_rate was originally 1000
+
+            def write_photometry(name):
+                Y = data_photometry[name]
+                Y_no_nan = np.delete(Y, nan_indices)  # []
+
+                if len(Y_no_nan) == len(T_no_nan):
+                    new_Y = np.interp(new_T, T_no_nan, Y_no_nan)
+
+                    spike2exporter.write_waveform(new_Y, name, y_index, multiplier)
+                else:
+                    # the length mismatch, maybe a wrong data type (not a time series?)
+                    #TODO issue a warning or raise an error? 
+                    ...
+
+            for name in photometry_keys:
+                y_index += 1
+                if name in data_photometry:
+                    write_photometry(name)
+                else:
+                    # name is not found in data_photometry
+                    #TODO issue a warning or error or nothing? 
+                    ...
+
+        elif (data_photometry is None) :
+            ...
+            # skip exporting photometry
 
 #----------------------------------------------------------------------------------
 # Plotting
@@ -801,3 +1073,11 @@ def load_analog_data(file_path):
     whose first column is timestamps (ms) and second data values.'''
     with open(file_path, 'rb') as f:
         return np.fromfile(f, dtype='<i').reshape(-1,2)
+
+
+def get_sync_time(df_pycontrol):
+    # return the rsync time
+    if df_pycontrol.attrs['framework_version'] == '1.8.1':
+        return df_pycontrol[df_pycontrol.content=='rsync'].time
+    else:
+        return df_pycontrol[df_pycontrol.subtype=='sync'].time

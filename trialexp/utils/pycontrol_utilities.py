@@ -11,34 +11,48 @@ import numpy as np
 import warnings
 from datetime import datetime
 from re import search
-
+import pandas as pd
 from trialexp.process.pycontrol.data_import import session_dataframe
+from trialexp.process.pycontrol.utils import parse_session_dataframe
+
+
 
 def parse_pycontrol_fn(fn):
-    pattern = r'(\w+)-(.*)\.txt'
+    pattern = r'(\w+)-(.*)\.[txt|tsv]'
     m = search(pattern, fn.name)
+    
     if m:
         subject_id = m.group(1)
         date_string = m.group(2)
         expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
         
         try:
-            df = session_dataframe(fn)
+            df = session_dataframe(fn) #note: this may run into error
+            df = parse_session_dataframe(df)
+
             session_length = df.time.iloc[-1]
+            task_name = df.attrs['task_name']
             
             return { 'subject_id': subject_id,
                     'path': fn,                 
                     'session_id': fn.stem,
                     'filename': fn.stem, 
                     'timestamp': expt_datetime,
-                    'session_length': session_length }
+                    'session_length': session_length,
+                    'task_name': task_name}
         except KeyError:
             return { 'subject_id': subject_id,
                     'path': fn,                 
                     'session_id': fn.stem,
                     'filename': fn.stem, 
                     'timestamp': expt_datetime,
-                    'session_length': 0 }
+                    'session_length': 0,
+                    'task_name': 'unknown'}
+        except Exception as e:
+            print(e)
+            print(fn)
+    else:
+        print('Error for ', fn)
 '''
 following is depracted until possible re-use elsewhere
 #----------------------------------------------------------------------------------

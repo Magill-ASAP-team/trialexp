@@ -41,7 +41,10 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     g = sns.JointGrid()
     
     #plot spout touch
-    df_spout = df2plot[df2plot.name=='spout']
+    df_spout = df2plot[df2plot.content=='spout']
+    if len(df_spout) == 0:
+        return g
+    
     ax = sns.scatterplot(y=y, x=x, marker='|' , hue='trial_outcome', palette=trial_outcome_palette,
                        data= df_spout, ax = g.ax_joint, **kwargs)
     
@@ -50,7 +53,7 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
         sns.histplot(y=y, binwidth=ybinwidth, ax=g.ax_marg_y, data=df_spout)
     
     #plot aborted bar off
-    df_baroff = df2plot[(df2plot.name=='bar_off') & (df2plot.trial_outcome =='aborted')]
+    df_baroff = df2plot[(df2plot.content=='bar_off') & (df2plot.trial_outcome =='aborted')]
     ax = sns.scatterplot(y=y, x=x, marker='.' , hue='trial_outcome', palette=trial_outcome_palette,
                        data= df_baroff, ax = g.ax_joint, legend=False, **kwargs)
 
@@ -65,8 +68,10 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
         ax.set(xlim=xlim)
 
 
-        
-    sns.move_legend(ax, "upper left", bbox_to_anchor=(1.2, 1))
+    try: 
+        sns.move_legend(ax, "upper left", bbox_to_anchor=(1.2, 1))
+    except ValueError:
+        pass
     
     # add another legend manually for the markers
     g.figure.text(1,0.3, '|    spout touch')
@@ -84,3 +89,16 @@ def style_event_distribution(g, xlabel, ylabel, trigger_name):
     g.ax_joint.text(0, np.mean(ylim), trigger_name, ha='right',  rotation='vertical')
     
     return g
+
+
+def reach_time(df_trial):
+    if len(spouts := df_trial[df_trial['content']=='spout'])>0:
+        first_spout_time = spouts.iloc[0].time
+        df_win = df_trial[df_trial.time<first_spout_time]
+        if len(bar_off := df_win[df_win['content']=='bar_off'])>0:
+            last_bar_time = bar_off.iloc[-1].time
+            return first_spout_time - last_bar_time
+
+        else:
+            return None
+    return None

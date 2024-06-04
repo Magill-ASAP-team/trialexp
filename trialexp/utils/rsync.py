@@ -50,7 +50,7 @@ class Rsync_aligner():
         # Refuse to match in that case
         A_len = len(pulse_times_A)
         B_len = len(pulse_times_B)
-        if (min(A_len, B_len)/max(A_len,B_len)) <0.5:
+        if (min(A_len, B_len)/max(A_len,B_len)) <0.5 and raise_exception:
             print(f'pulse_times_A len:{A_len} pulse_times_B len: {B_len}')
             raise RsyncError(f'Two pulse times differ too much. Results may not be correct')
              

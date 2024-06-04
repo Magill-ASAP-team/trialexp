@@ -18,10 +18,15 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
+import re
 
 from trialexp.process.pycontrol.event_filters import extract_event_time
 from trialexp.utils.rsync import *
-
+from scipy.optimize import curve_fit
+from scipy import signal
+import warnings
+from scipy.stats import median_abs_deviation
+from datetime import datetime
 '''
 Most of the photometry data processing functions are based on the intial design
 of the pyPhotometry package. They are stored in a dictionary containing both
@@ -50,14 +55,17 @@ Assumptions:
 # and normalization functions. The normalization functions assume that the
 # data has already been filtered.
 
-def denoise_filter(photometry_dict:dict, lowpass_freq = 20) -> dict:
+
+
+def denoise_filter(photometry_dict:dict, lowpass_freq, highpass_freq=None) -> dict:
     # apply a low-pass filter to remove high frequency noise
-    b,a = get_filt_coefs(low_pass=lowpass_freq, sampling_rate=photometry_dict['sampling_rate'])
-    analog_1_filt = filtfilt(b, a, photometry_dict['analog_1'], padtype='even')
-    analog_2_filt = filtfilt(b, a, photometry_dict['analog_2'], padtype='even')
-    
-    photometry_dict['analog_1_filt'] = analog_1_filt
-    photometry_dict['analog_2_filt'] = analog_2_filt
+    b,a = get_filt_coefs(low_pass=lowpass_freq, high_pass=highpass_freq, sampling_rate=photometry_dict['sampling_rate'])
+    pattern = re.compile('analog_[0-9]$')
+    signal_names = [ k for k in photometry_dict.keys() if pattern.match(k)]
+
+    for sig in signal_names:
+        sig_filt = filtfilt(b, a, photometry_dict[sig], padtype='even')        
+        photometry_dict[f'{sig}_filt'] = sig_filt
     
     return photometry_dict
     
@@ -150,6 +158,133 @@ def motion_correction_win(photometry_dict: dict) -> dict:
     return photometry_dict
 
 
+def overlapping_chunks(data1, data2, n_win_size: int, n_overlap: int):
+    """
+    Generate overlapping chunks of data from two arrays.
+
+    Parameters:
+    -----------
+    data1 : array-like
+        First array of data.
+    data2 : array-like
+        Second array of data.
+    n_win_size : int
+        Size of the window used to extract chunks of data.
+    n_overlap : int
+        Number of samples to overlap between consecutive chunks.
+
+    Yields:
+    -------
+    tuple
+        A tuple containing the index of the first sample of the chunk, the chunk of data from `data1`, and the chunk of data from `data2`.
+
+    Raises:
+    -------
+    ValueError
+        If `n_win_size/n_overlap` is not an integer.
+
+    Notes:
+    ------
+    The function generates chunks of size `n_win_size` from the input arrays, with an overlap of `n_overlap` samples between consecutive chunks. If the last chunk is truncated, it is still returned.
+
+    Examples:
+    ---------
+    >>> data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    >>> data2 = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    >>> for i, chunk1, chunk2 in overlapping_chunks(data1, data2, n_win_size=4, n_overlap=2):
+    ...     print(i, chunk1, chunk2)
+    0 [1, 2, 3, 4] [10, 20, 30, 40]
+    2 [3, 4, 5, 6] [30, 40, 50, 60]
+    4 [5, 6, 7, 8] [50, 60, 70, 80]
+    6 [7, 8, 9, 10] [70, 80, 90, 100]
+    """
+
+    x = n_win_size/n_overlap
+
+    if isinstance(x, float) and not x.is_integer():
+        raise ValueError("1/overlap_ratio must be an integer")
+
+    step_size = n_win_size - int(n_win_size) // int(x)
+    # for i in range(0, len(data1) - n_win_size + 1, step_size): #TODO this will skip the last iteration
+    #     yield i, data1[i:i + n_win_size], data2[i:i + n_win_size]
+    for i in range(0, len(data1), step_size):
+        if i + n_win_size <= len(data1):  # If a full-sized chunk can be taken
+            yield i, data1[i:i + n_win_size], data2[i:i + n_win_size]
+        else:  # If only a truncated chunk can be taken
+            yield i, data1[i:], data2[i:]
+    
+    
+    
+def window_subtraction(analog1, analog2, sampling_rate, win_size_s=30) -> dict:
+    '''
+    subtract analog2 from analog1 by spitting into overlapping time windows, do a linear fit, and then subtract
+    Have the advantage of only affecting a limited region with shadow artifacts, for region where there is
+    no artifacts, the slope should be close to zero. Issue a warning when large negative slope is detected
+    '''
+    
+    n_win_size = int(win_size_s * sampling_rate)
+    n_overlap = int(n_win_size/2)  # 50% overlap
+
+
+    # Splitting the data into chucks and do fitting on each chunk
+    start_index_chunks = []
+    analog_1_est_motion_chunks = []
+    p_vals = []
+    r_vals = []
+    for start_ind, chunk1, chunk2 in overlapping_chunks(
+            analog1, analog2, 
+            n_win_size, n_overlap):
+        try:
+            slope, intercept, r_value, p_value, std_err = linregress(chunk2, chunk1)
+        except ValueError as e:
+            print(f'Warning: regression error. I will skip wndow subtraction for {start_ind}')
+            r_value = 0
+            p_value = 0
+            r_value = 0
+            slope = 0
+            
+        start_index_chunks.append(start_ind)
+
+        analog_1_est_motion_chunks.append(slope * chunk2 + intercept)
+        p_vals.append(p_value)
+        r_vals.append(r_value)
+        
+    if any(np.array(r_vals)< -0.2):
+        warnings.warn('Some slope has a large negative value!')
+
+    # Joining the fitted data together
+    analog_1_est_motion_joined = np.zeros(np.size(analog1))
+
+    step_size = n_win_size - int(n_win_size) // int(n_win_size/n_overlap)
+
+    for i, _ in enumerate(start_index_chunks):
+        ch = analog_1_est_motion_chunks[i] # the motion of analog_1 is estimated from analog_2
+        
+        if i == 0:
+            analog_1_est_motion_joined[0:step_size] = ch[0:step_size]
+
+        elif i > 0 and i < len(start_index_chunks) -1:
+            ch_prev = analog_1_est_motion_chunks[i-1]
+            ind_this =  start_index_chunks[i]
+            
+            # average two chunks
+            analog_1_est_motion_joined[ind_this:ind_this + step_size] \
+                = (ch[0:step_size] + ch_prev[step_size-1:-1])/2
+
+        elif i == len(start_index_chunks) -1 :
+            ind_this =  start_index_chunks[i]
+
+            # copy one chunk
+            analog_1_est_motion_joined[ind_this:ind_this + step_size] = ch
+
+        elif i == len(start_index_chunks):
+            raise ValueError('Accidental reaching the last chunk. Should not happen')
+
+    analog_1_est_motion = analog_1_est_motion_joined
+    analog_1_corrected = analog1 - analog_1_est_motion_joined
+    
+    return analog_1_est_motion, analog_1_corrected
+        
 
 def motion_correction(photometry_dict: dict) -> dict:
     
@@ -169,6 +304,8 @@ def motion_correction(photometry_dict: dict) -> dict:
 
     return photometry_dict
 
+
+
 def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> dict:
     
     if 'analog_1_corrected' not in photometry_dict:
@@ -180,7 +317,16 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
 
     # Now calculate the dF/F by dividing the motion corrected signal by the time varying baseline fluorescence.
     photometry_dict['analog_1_df_over_f'] = photometry_dict['analog_1_corrected'] / photometry_dict['analog_1_baseline_fluo'] 
-    photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_filt'] / photometry_dict['analog_2_baseline_fluo']
+    
+    if 'analog_2_corrected' in photometry_dict.keys():
+        photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_corrected'] / photometry_dict['analog_2_baseline_fluo']
+    else:
+        photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_filt'] / photometry_dict['analog_2_baseline_fluo']
+    
+    if 'analog_3_detrended' in photometry_dict:
+        photometry_dict['analog_3_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_3_filt'], padtype='even')
+        photometry_dict['analog_3_df_over_f'] = photometry_dict['analog_3_detrended'] / photometry_dict['analog_3_baseline_fluo']
+
     
     return photometry_dict
 
@@ -190,6 +336,13 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
 
 def compute_zscore(photometry_dict):
     photometry_dict['zscored_df_over_f'] = zscore(photometry_dict['analog_1_df_over_f'])
+    
+    if 'analog_2_corrected' in photometry_dict:
+        photometry_dict['zscored_df_over_f_analog_2'] = zscore(photometry_dict['analog_2_df_over_f'])
+        
+    if 'analog_3_detrended' in photometry_dict:
+        photometry_dict['zscored_df_over_f_analog_3'] = zscore(photometry_dict['analog_3_df_over_f'])
+
     return photometry_dict
 
 def median_filtering(data, medfilt_size: int = 3) -> np.ndarray:
@@ -241,11 +394,135 @@ def fit_exp_func(data, fs: int = 100, medfilt_size: int = 3) -> np.ndarray:
     return fitted_data
 
 
+def get_dataformat(df_dataformat, session_id):
+
+    def parse_date(date_string):
+        return datetime.strptime(date_string, '%Y-%m-%d')
+
+    # use the session id to determine which dataformat to use
+    df_dataformat['date_cutoff'] = df_dataformat.date.apply(parse_date)
+    curr_date = '-'.join(session_id.split('-')[1:4])
+    curr_date = parse_date(curr_date)
+    idx = np.searchsorted(df_dataformat.date_cutoff, curr_date)
+    if idx>0:
+        data_format = df_dataformat.iloc[idx-1].photom_format
+    else:
+        data_format = 'v1'
+    
+    return data_format
+
+def import_ppd_auto(file_path,data_format='v1'):
+    # determine which function to use to import data
+    with open(file_path, 'rb') as f:
+        header_size = int.from_bytes(f.read(2), 'little')
+        data_header = f.read(header_size)
+    # Extract header information
+    header_dict = json.loads(data_header)
+    if header_dict['version'] == '1.0.2':
+        return import_ppd_v2(file_path,  low_pass=None, high_pass=None)
+    else:
+        return import_ppd(file_path, data_format)
+
+def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
+    """Function to import pyPhotometry binary data files into Python. The high_pass
+    and low_pass arguments determine the frequency in Hz of highpass and lowpass
+    filtering applied to the filtered analog signals. To disable highpass or lowpass
+    filtering set the respective argument to None.  Returns a dictionary with the
+    following items:
+        'filename'      - Data filename
+        'subject_ID'    - Subject ID
+        'date_time'     - Recording start date and time (ISO 8601 format string)
+        'end_time'      - Recording end date and time (ISO 8601 format string)
+        'mode'          - Acquisition mode
+        'sampling_rate' - Sampling rate (Hz)
+        'LED_current'   - Current for LEDs 1 and 2 (mA)
+        'version'       - Version number of pyPhotometry
+        'analog_1'      - Raw analog signal 1 (volts)
+        'analog_2'      - Raw analog signal 2 (volts)
+        'analog_3'      - Raw analog signal 3 (if present, volts)
+        'analog_1_filt' - Filtered analog signal 1 (volts)
+        'analog_2_filt' - Filtered analog signal 2 (volts)
+        'analog_3_filt' - Filtered analog signal 2 (if present, volts)
+        'digital_1'     - Digital signal 1
+        'digital_2'     - Digital signal 2 (if present)
+        'pulse_inds_1'  - Locations of rising edges on digital input 1 (samples).
+        'pulse_inds_2'  - Locations of rising edges on digital input 2 (samples).
+        'pulse_times_1' - Times of rising edges on digital input 1 (ms).
+        'pulse_times_2' - Times of rising edges on digital input 2 (ms).
+        'time'          - Time of each sample relative to start of recording (ms)
+    """
+    with open(file_path, "rb") as f:
+        header_size = int.from_bytes(f.read(2), "little")
+        data_header = f.read(header_size)
+        data = np.frombuffer(f.read(), dtype=np.dtype("<u2"))
+    # Extract header information
+    header_dict = json.loads(data_header)
+    volts_per_division = header_dict["volts_per_division"]
+    sampling_rate = header_dict["sampling_rate"]
+    # Extract signals.
+    analog = data >> 1  # Analog signal is most significant 15 bits.
+    digital = ((data & 1) == 1).astype(int)  # Digital signal is least significant bit.
+    # Alternating samples are different signals.
+    if "n_analog_signals" in header_dict.keys():
+        n_analog_signals = header_dict["n_analog_signals"]
+        n_digital_signals = header_dict["n_digital_signals"]
+    else:  # Pre version 1.0 data file.
+        n_analog_signals = 2
+        n_digital_signals = 2
+    analog_1 = analog[::n_analog_signals] * volts_per_division[0]
+    analog_2 = analog[1::n_analog_signals] * volts_per_division[1]
+    analog_3 = analog[2::n_analog_signals] * volts_per_division[0] if n_analog_signals == 3 else None
+    digital_1 = digital[::n_analog_signals]
+    digital_2 = digital[1::n_analog_signals] if n_digital_signals == 2 else None
+    time = np.arange(analog_1.shape[0]) * 1000 / sampling_rate  # Time relative to start of recording (ms).
+    # Filter signals with specified high and low pass frequencies (Hz).
+    if low_pass and high_pass:
+        b, a = butter(2, np.array([high_pass, low_pass]) / (0.5 * sampling_rate), "bandpass")
+    elif low_pass:
+        b, a = butter(2, low_pass / (0.5 * sampling_rate), "low")
+    elif high_pass:
+        b, a = butter(2, high_pass / (0.5 * sampling_rate), "high")
+    if low_pass or high_pass:
+        analog_1_filt = filtfilt(b, a, analog_1)
+        analog_2_filt = filtfilt(b, a, analog_2)
+        analog_3_filt = filtfilt(b, a, analog_3) if n_analog_signals == 3 else None
+    else:
+        analog_1_filt = analog_2_filt = analog_3_filt = None
+    # Extract rising edges for digital inputs.
+    pulse_inds_1 = 1 + np.where(np.diff(digital_1) == 1)[0]
+    pulse_inds_2 = 1 + np.where(np.diff(digital_2) == 1)[0] if n_digital_signals == 2 else None
+    pulse_times_1 = pulse_inds_1 * 1000 / sampling_rate
+    pulse_times_2 = pulse_inds_2 * 1000 / sampling_rate if n_digital_signals == 2 else None
+    # Return signals + header information as a dictionary.
+    data_dict = {
+        "filename": os.path.basename(file_path),
+        "analog_1": analog_1,
+        "analog_2": analog_2,
+        "analog_1_filt": analog_1_filt,
+        "analog_2_filt": analog_2_filt,
+        "digital_1": digital_1,
+        "digital_2": digital_2,
+        "pulse_inds_1": pulse_inds_1,
+        "pulse_inds_2": pulse_inds_2,
+        "pulse_times_1": pulse_times_1,
+        "pulse_times_2": pulse_times_2,
+        "time": time,
+    }
+    if n_analog_signals == 3:
+        data_dict.update(
+            {
+                "analog_3": analog_3,
+                "analog_3_filt": analog_3_filt,
+            }
+        )
+    data_dict.update(header_dict)
+    return data_dict
+
 #----------------------------------------------------------------------------------
 # Load analog data
 #----------------------------------------------------------------------------------
 
-def import_ppd(file_path):
+def import_ppd(file_path, data_format='v1'):
     '''Function to import pyPhotometry binary data files into Python. The high_pass 
     and low_pass arguments determine the frequency in Hz of highpass and lowpass 
     filtering applied to the filtered analog signals. To disable highpass or lowpass
@@ -268,6 +545,9 @@ def import_ppd(file_path):
         'pulse_times_1' - Times of rising edges on digital input 1 (ms).
         'pulse_times_2' - Times of rising edges on digital input 2 (ms).
         'time'          - Time of each sample relative to start of recording (ms)
+        
+        data_format: v1 for hybrid recordig is GFP, isosbestic, RFP
+         v2 for hybrid recording is GFP, RFP isosbestic
     '''
     with open(file_path, 'rb') as f:
         header_size = int.from_bytes(f.read(2), 'little')
@@ -280,15 +560,33 @@ def import_ppd(file_path):
     # Extract signals.
     analog  = data >> 1                     # Analog signal is most significant 15 bits.
     digital = ((data & 1) == 1).astype(int) # Digital signal is least significant bit.
-    # Alternating samples are signals 1 and 2.
-    analog_1 = analog[ ::2] * volts_per_division[0]
-    analog_2 = analog[1::2] * volts_per_division[1]
-    digital_1 = digital[ ::2]
-    digital_2 = digital[1::2]
+    analog_3 = None
+
+    
+    if header_dict['mode'] == '1 colour continuous + 2 colour time div.' or header_dict['mode'] == '3 colour time div.':
+        # there are 3 analog signals, try to make the name compatible with exisiting recordings
+        if data_format == 'v1':
+            analog_1 = analog[::3] * volts_per_division[0]  # GFP
+            analog_3 = analog[1::3] * volts_per_division[0] # isosbestic
+            analog_2 = analog[2::3] * volts_per_division[1] # RFP
+        else:
+            analog_1 = analog[::3] * volts_per_division[0]  # GFP
+            analog_2 = analog[1::3] * volts_per_division[1] # RFP
+            analog_3 = analog[2::3] * volts_per_division[0] # isosbestic
+            
+        digital_1 = digital[::3]
+        digital_2 = digital[1::3]
+        digital_3 = digital[2::3] #workaround for wrong data format in some recording
+    else:
+        # Alternating samples are signals 1 and 2.
+        analog_1 = analog[::2] * volts_per_division[0]
+        analog_2 = analog[1::2] * volts_per_division[1]
+        digital_1 = digital[::2]
+        digital_2 = digital[1::2]
+        
     # Time relative to start of recording (ms).
     time = np.arange(analog_1.shape[0]).astype(np.int64)*1000/sampling_rate #warning: default data type np.int32 will lead to overflow
     # time = np.arange(analog_1.shape[0])*1000/sampling_rate #warning: default data type np.int32 will lead to overflow
-
    
     # Extract rising edges for digital inputs.
     pulse_inds_1 = 1+np.where(np.diff(digital_1) == 1)[0]
@@ -304,7 +602,17 @@ def import_ppd(file_path):
                  'pulse_inds_2'  : pulse_inds_2,
                  'pulse_times_1' : pulse_times_1,
                  'pulse_times_2' : pulse_times_2,
-                 'time'          : time}
+                 'time'          : time,
+                 'data_format' : data_format}
+    
+    if analog_3 is not None:
+        pulse_inds_3 = 1 + np.where(np.diff(digital_3)==1)[0]
+        pulse_times_3  = pulse_inds_3*1000/sampling_rate
+        data_dict.update({
+            'analog_3': analog_3,
+            'digital_3': digital_3,
+            'pulse_times_3': pulse_times_3})
+    
     
     # Add metadata to dictionary.
     data_dict.update(header_dict)
@@ -693,6 +1001,7 @@ def photometry2xarray(data_photometry, skip_var=None):
 
     for k, data in data_photometry.items():
         if not k in skip_var:
+            
             if isinstance(data, (list,np.ndarray)) and len(data) == len(time):
                     array = xr.DataArray(data, coords={'time':time}, dims=['time'])
                     data_list[k] = array
@@ -817,14 +1126,17 @@ def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate,
             event_found.append(False)
         
     # align to the longest element
-    data  = np.vstack(data)
+    if len(data)>0:
+        data  = np.vstack(data).astype(float)
+    else:
+        data = np.empty((0,int((window[1]-window[0])/1000*sampling_rate)))
     
     # if data_len is provide, perform additional check or correct the data length
     if data_len is not None:
         if not data.shape[0]==data_len:
             data = data[:data_len,:]
     
-    return data.astype(float),event_found #only float support NA
+    return data,event_found #only float support NA
 
 #%% Calulate the relative time
 def get_rel_time(trigger_timestamp, window, aligner, ref_time):
@@ -924,7 +1236,7 @@ def make_rel_time_xr(event_time, windows, pyphoto_aligner, ref_time):
     return rel_time
 
 def make_event_xr(event_time, trial_window,
-                  event_time_coordinate,  dataArray, sampling_rate):
+                  event_time_coordinate,  dataArray, sampling_rate, group='trial_nb', dim_name=None):
     '''
     Create xarray.DataArray object for the continuous data around provided timestamp. 
 
@@ -947,21 +1259,29 @@ def make_event_xr(event_time, trial_window,
     Note:
         It returns only data from extract_event_data() function ignoring the event_found.
     '''
-    
-   
-    assert event_time.index.name =='trial_nb', 'event_time should have a trial_nb index'
     data, _ = extract_event_data(event_time, trial_window, dataArray, sampling_rate)
+    if group =='trial_nb':
+        assert event_time.index.name =='trial_nb', 'event_time should have a trial_nb index'
+        da = xr.DataArray(
+            data, coords={'event_time':event_time_coordinate, 
+                        'trial_nb':event_time.index.values},
+                            dims=('trial_nb','event_time'))
+    else:
+        # do not care about the trial structure, just extract everything
 
-    da = xr.DataArray(
-        data, coords={'event_time':event_time_coordinate, 
-                      'trial_nb':event_time.index.values},
-                        dims=('trial_nb','event_time'))
-        
+        if dim_name is None:
+            raise ValueError('If not using trial_nb as group, you need to specify the group name for the datarray coordiante')
+        da = xr.DataArray(
+            data, 
+            coords={'event_time':event_time_coordinate, 
+                        f'{dim_name}_idx':np.arange(len(event_time))},
+            dims=(f'{dim_name}_idx','event_time')
+        )
     return da
 
 def add_event_data(df_event, filter_func, trial_window,
                    dataset, event_time_coordinate, data_var_name, 
-                   event_name, sampling_rate, filter_func_kwargs={}):
+                   event_name, sampling_rate, groupby_col='trial_nb',filter_func_kwargs={}):
     '''
     Add continuous data around provided timestamp to a dataset.
 
@@ -995,9 +1315,174 @@ def add_event_data(df_event, filter_func, trial_window,
         each timestamp.  It requires two supporting functions make_event_xr() & extract_event_time().
     '''
 
-    event_time = extract_event_time(df_event, filter_func, filter_func_kwargs)
+    event_time = extract_event_time(df_event, filter_func, filter_func_kwargs, groupby_col=groupby_col)
     xr_event_data = make_event_xr(event_time, trial_window,
                                             event_time_coordinate,
-                                            dataset[data_var_name], sampling_rate)
+                                            dataset[data_var_name], sampling_rate,
+                                            group=groupby_col,
+                                            dim_name=event_name)
     dataset[f'{event_name}_{data_var_name}'] = xr_event_data
 # %%
+def fit_exp_baseline(curve, sampling_rate, smooth_window=4001):
+
+    def fitFn(x,a,b,c):
+        return a+(b*np.exp(-(1/c)*x))
+    
+    p0 = [1,5,5]
+    t = np.arange(len(curve))/sampling_rate
+    smooth_curve = signal.savgol_filter(curve,smooth_window,3)
+    popt,pcov = curve_fit(fitFn, t, smooth_curve,p0)
+    baseline = fitFn(t,*popt)
+
+    return baseline
+
+def fit_a2b(a,b):
+    # fit array a to b with linear regression
+    slope, intercept, r_value, p_value, std_err = linregress(x=a, y=b)
+    output = intercept + slope * a
+    return output
+
+def remove_outliner_mad(x,thres_factor):
+    '''
+    Remove the shadow artifact from the signal when the signal is above median+ median_abs_deviation*thres_factor
+    replace the signal with the median value 
+    For best result, the signal needs to be first high-pass filtered e.g. by 0.1Hz
+    '''
+    x = x.copy()
+    median_org = np.median(x)
+    
+    absx = np.abs(x)
+    median = np.median(absx)
+    mda = median_abs_deviation(absx)
+    
+    idx2remove = (absx>(median+mda*thres_factor))
+    
+    x[idx2remove] = median_org
+    
+    return x, idx2remove
+    
+def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseline_method='lowpass'):
+    # analog1:  GFP
+    # analog2: isosbestic
+    # analog3: RFP
+    '''
+    Analysis notes:
+    When the isosbestic channel is very noisy, and shadow artifact appears in the signal, it is be very difficult to cancel it.
+    When we stretch the isosbestic signal to match the shadow artifact in the RFP channel, the noise from the isosbestic channel will be 
+    stretched too. Substracting this amplified noise from the RFP will totally mask the original signal.
+    We can probably smooth the signal to avoid the noise but that it will affect the results when there are real motion-artifact
+    TODO: develop some specified way to remove the shadow artifact, probably by setting a threshold and just remove that data
+    '''
+    sampling_rate = photometry_dict['sampling_rate']
+    
+    if any(['analog_1_filt' not in photometry_dict, 'analog_2_filt' not in photometry_dict]):
+        raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
+
+    try:
+        # method 1
+        # slope, intercept, r_value, p_value, std_err = linregress(x=photometry_dict['analog_3_filt'], y=photometry_dict['analog_1_filt'])
+        # photometry_dict['analog_1_est_motion'] = intercept + slope * photometry_dict['analog_3_filt']
+        # photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt'] - photometry_dict['analog_1_est_motion']
+        
+        # method 2: correct motion after baseline removed from both analog1 and isosbestic
+        isos_bleach_baseline = lowpass_baseline(photometry_dict['analog_3_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+        analog_1_bleach_baseline = lowpass_baseline(photometry_dict['analog_1_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+        analog_1_detrend = photometry_dict['analog_1_filt'] - analog_1_bleach_baseline
+        isos_detrend = photometry_dict['analog_3_filt'] - isos_bleach_baseline
+        
+        photometry_dict['isos_bleach_baseline'] = isos_bleach_baseline
+        photometry_dict['analog_1_bleach_baseline'] = analog_1_bleach_baseline
+        photometry_dict['analog_1_detrend'] = analog_1_detrend
+        photometry_dict['isos_detrend'] = isos_detrend
+        
+        # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
+        photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion']
+        
+        # method 3
+        # GFP_baseline = lowpass_baseline(photometry_dict['analog_1_filt'],sampling_rate)
+        # photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
+        
+        # For RFP, remove baseline
+        if baseline_method == 'lowpass':
+            RFP_baseline =  lowpass_baseline(photometry_dict['analog_2_filt'],sampling_rate)
+            isos_baseline = lowpass_baseline(photometry_dict['analog_3_filt'],sampling_rate)
+        else:
+            RFP_baseline = fit_exp_baseline(photometry_dict['analog_2_filt'], sampling_rate)
+            isos_baseline = fit_exp_baseline(photometry_dict['analog_3_filt'],sampling_rate)
+            
+        photometry_dict['analog_2_detrended']  = photometry_dict['analog_2_filt'] - RFP_baseline
+        photometry_dict['analog_3_detrended'] = photometry_dict['analog_3_filt'] - isos_baseline
+        
+        # we need to remove the shadow artifact first
+        photometry_dict['analog_2_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_2_detrended'],8)
+        photometry_dict['analog_3_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_3_detrended'],8)
+
+        
+        analog_2_est_motion, analog_2_corrected = window_subtraction(photometry_dict['analog_2_deshadow'],
+                                                                     photometry_dict['analog_3_deshadow'],
+                                                                     sampling_rate)
+        
+        photometry_dict['analog_2_est_motion'] = analog_2_est_motion
+        photometry_dict['analog_2_corrected'] = analog_2_corrected
+
+        photometry_dict['motion_corrected'] = 1
+        
+        return photometry_dict
+    
+    except ValueError as e:
+        print(e)
+        print('Motion correction failed. Skipping motion correction')
+        # probably due to saturation , do not do motion correction
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt']
+        photometry_dict['motion_corrected'] = 0
+
+    return photometry_dict
+
+def lowpass_baseline(curve, sampling_rate, corner_freq = 0.02):
+    # use an aggressive lowpass filter to find the baseline
+    b,a = get_filt_coefs(low_pass=corner_freq, sampling_rate=sampling_rate)
+    return signal.filtfilt(b,a,curve)
+
+def baseline_correction_multicolor(photometry_dict,baseline_method='lowpass'):
+    sampling_rate = photometry_dict['sampling_rate']
+    if baseline_method =='lowpass':
+        RFP_baseline = lowpass_baseline(photometry_dict['analog_2_filt'],sampling_rate)
+        GFP_baseline = lowpass_baseline(photometry_dict['analog_1_filt'],sampling_rate)
+    else:
+        RFP_baseline =  fit_exp_baseline(photometry_dict['analog_2_filt'],sampling_rate, sampling_rate*2)
+        GFP_baseline =  fit_exp_baseline(photometry_dict['analog_1_filt'],sampling_rate, sampling_rate*2)
+
+    photometry_dict['analog_2_corrected']  = photometry_dict['analog_2_filt'] - RFP_baseline
+    photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
+    
+    return photometry_dict
+
+    
+def preprocess_photometry(data_photometry, df_pycontrol):
+    # Perform preprocessing on the photometry data e.g. bleach and motion correcction etc.
+    data_photometry = denoise_filter(data_photometry, 20)
+    
+    # determine how to do motion correction
+    animal_info = pd.read_csv('params/animal_info.csv',index_col='animal_id')
+    animal_id = df_pycontrol.attrs['subject_id'] 
+    if animal_id in animal_info.index:
+        injection = animal_info.loc[animal_id].injection.split(';')
+        if 'Rdlight' in injection or 'rDA' in injection:
+            if not 'analog_3' in data_photometry:
+                baseline_correction_multicolor(data_photometry)
+                data_photometry['motion_corrected'] = 1
+
+            else:
+                # Do multicolor correction
+                data_photometry = motion_correction_multicolor(data_photometry)
+        else:    
+            data_photometry = motion_correction_win(data_photometry)
+    else:
+        data_photometry = motion_correction_win(data_photometry)
+    
+    
+    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01)
+    data_photometry = compute_zscore(data_photometry)
+    return data_photometry
+    

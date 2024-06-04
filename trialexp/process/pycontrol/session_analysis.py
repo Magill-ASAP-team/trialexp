@@ -107,7 +107,7 @@ def add_trial_nb(df_events, trigger_time, trial_window):
             logging.warn(f'Error: trial shorter than trial_window for Trial {i}')
             trial_nb += 1
             continue
-        elif end<trigger_time[i]:
+        elif end<=trigger_time[i]:
             logging.warn(f'Error: trial end earlier than trigger end:{end} trigger_time{trigger_time[i]} for Trial {i}')
             trial_nb += 1
             continue
@@ -139,14 +139,6 @@ def get_task_specs(tasks_trig_and_events, task_name):
     """
     All the df columns named in this function, events and opto_categories must 
     follow columns of the indicated tasksfile
-    
-    This function sets the values of 
-        self.triggers
-        self.events_to_process
-        self.conditions
-        self.trial_window
-        self.timelim
-
     """
 
     # match triggers (events/state used for t0)
@@ -158,22 +150,28 @@ def get_task_specs(tasks_trig_and_events, task_name):
     
            
     # events to extract
-    events_to_process = np.array2string(tasks_trig_and_events['events'][task_idx].values).strip("'[]").split('; ')
+    events_to_process = np.array2string(tasks_trig_and_events['events'][task_idx].values).strip("'[]").split(';')
+    events_to_process = list(map(str.strip, events_to_process))
     # printed line in task file indicating
     # the type of optogenetic stimulation
     # used to group_by trials with same stim/sham
-    conditions = np.array2string(tasks_trig_and_events['conditions'][task_idx].values).strip("'[]").split('; ')
+    conditions = np.array2string(tasks_trig_and_events['conditions'][task_idx].values).strip("'[]").split(';')
+    conditions = list(map(str.strip, conditions))
     
     trial_window = tasks_trig_and_events['trial_window'][task_idx].iloc[0].split(';')
     trial_window = list(map(float, trial_window))
-    # REMOVED, now only at Experiment level to avoid inconsistencies
-    # define trial_window parameter for extraction around triggers
-    # self.trial_window = trial_window        
-    return conditions, triggers, events_to_process, trial_window
+    
+    extra_trigger_info = tasks_trig_and_events['extra_trigger_events'][task_idx].iloc[0]
+    extra_event_trigger = extra_trigger_info.split(';') if type(extra_trigger_info) is str else []
+    
+    trial_parameters = tasks_trig_and_events['trial_parameters'][task_idx].iloc[0]
+    trial_parameters = trial_parameters.split(';') if type(trial_parameters) is str else []
+         
+    return conditions, triggers, events_to_process, trial_window, extra_event_trigger, trial_parameters
 
 def get_rel_time(df, trigger_name):
     # get the relative time to the trigger within a trial
-    t0 = df[df['name']==trigger_name].time.values
+    t0 = df[df['content']==trigger_name].time.values
     if len(t0)>1:
         logging.warn(f'Warning: not exactly 1 trigger found. I will only take the first trigger')
         t0 = t0[0]
@@ -184,7 +182,7 @@ def extract_trial_by_trigger(df_pycontrol, trigger, event2analysis, trial_window
     
     df_events = df_pycontrol.copy()
     # add trial number and calculate the time from trigger
-    trigger_time = df_events[(df_events.name==trigger)].time.values
+    trigger_time = df_events[(df_events.content==trigger)].time.values
     df_events, trigger_time = add_trial_nb(df_events, trigger_time,trial_window) #add trial number according to the trigger
     
     if len(trigger_time) == 0:
@@ -195,12 +193,12 @@ def extract_trial_by_trigger(df_pycontrol, trigger, event2analysis, trial_window
     
     
     # Filter out events we don't want
-    df_events = df_events[df_events.name.isin(event2analysis)]
+    df_events = df_events[df_events.content.isin(event2analysis)]
     
     # # group events according to trial number and event name
-    df_events_trials = df_events.groupby(['trial_nb', 'name']).agg(list)
+    df_events_trials = df_events.groupby(['trial_nb', 'content']).agg(list)
     df_events_trials = df_events_trials.loc[:, ['trial_time']]
-    df_events_trials = df_events_trials.unstack('name') #convert the event names to columns
+    df_events_trials = df_events_trials.unstack('content') #convert the event names to columns
     df_events_trials.columns = df_events_trials.columns.droplevel() # dropping the multiindex of the columns
     df_events_trials = df_events_trials.reindex(np.arange(1,len(trigger_time)+1)) # make sure we include every trial
     assert len(df_events_trials) == len(trigger_time), f'Error: trigger time does not match {df_events_trials.index} {len(trigger_time)}'
@@ -239,8 +237,28 @@ def compute_conditions_by_trial(df_events_trials, conditions):
             df_conditions[con] = df_events_trials[colname].notna()
         else:
             df_conditions[con] = False
-        
+                    
     return df_conditions
+
+#%%
+def add_trial_params(df_conditions, trial_parameters, df_events):
+    # Add trial parameters to df_conditions
+    
+    df = df_conditions.copy()
+    
+    # extract the parameters from df_events
+    df_parameters = df_events[df_events.type=='trial_param']
+    df_parameters = df_parameters.groupby(['trial_nb','content']).last()
+    # add trial parameters information to df_condition
+    for param in trial_parameters:
+        df[param] = None
+        for trial_nb in df_conditions.index:
+            try:
+                df.loc[trial_nb, param] = df_parameters.loc[(trial_nb, param)].content
+            except KeyError:
+                df.loc[trial_nb, param] = None
+    
+    return df
 
 #%% Add in trial outcome definition
 def compute_trial_outcome(row, task_name):
@@ -250,7 +268,9 @@ def compute_trial_outcome(row, task_name):
 
     if task_name in ['reaching_go_spout_bar_nov22', 
                      'reaching_go_spout_bar_mar23', 
-                     'reaching_go_spout_bar_apr23']:
+                     'reaching_go_spout_bar_apr23',
+                     'reaching_go_spout_bar_june05',
+                     'reaching_go_spout_bar_VR_Dec23']:
         
         if row.break_after_abort:
             return 'aborted'
@@ -313,6 +333,14 @@ def compute_trial_outcome(row, task_name):
             return 'success'
         else:
             return 'undefined'
+    elif task_name in ['pavlovian_reaching_Oct23',
+                       'pavlovian_reaching_Oct26',
+                       'pavlovian_spontanous_reaching_oct23',
+                       'pavlovian_spontanous_reaching_march23']:
+        if row.spout:
+            return 'success'
+        else:
+            return 'no_reach'
     else:
         if row.success:
             return 'success'
@@ -359,9 +387,14 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
         # df_events.loc[(nogo_success_idx),'success'] = True
 
     # To perform for simple pavlovian Go task, 
-    elif task_name in ['train_Go_CS-US_pavlovian','reaching_yp', 'reaching_test','reaching_test_CS',
-        'train_CSgo_US_coterminated','train_Go_CS-US_pavlovian', 'train_Go_CS-US_pavlovian_with_bar', 
-        'pavlovian_nobar_nodelay']:
+    elif task_name in ['train_Go_CS-US_pavlovian',
+                       'reaching_yp',
+                       'reaching_test',
+                       'reaching_test_CS',
+                        'train_CSgo_US_coterminated',
+                        'train_Go_CS-US_pavlovian',
+                        'train_Go_CS-US_pavlovian_with_bar', 
+                        'pavlovian_nobar_nodelay']:
 
         # self.triggers[0] refers to CS_Go triggering event most of the time whereas self.triggers[1] refers to CS_NoGo
         # find if spout event within timelim for go trials
@@ -413,8 +446,12 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
 
     # To perform for delayed tasks (check whether a US_end_timer was preceded by a spout)
     elif task_name in ['reaching_go_spout_bar_dual_all_reward_dec22', 
-        'reaching_go_spout_bar_dual_dec22', 'reaching_go_spout_bar_nov22',
-        'reaching_go_spout_bar_mar23']:
+                        'reaching_go_spout_bar_dual_dec22', 
+                        'reaching_go_spout_bar_nov22',
+                        'reaching_go_spout_bar_mar23',
+                        'reaching_go_spout_bar_june05',
+                        'reaching_go_spout_bar_VR_Dec23',
+                        'reaching_go_spout_bar_VR_April24']:
 
         if 'spout_trial_time' in df_events.columns and 'US_end_timer_trial_time' in df_events.columns:
 
@@ -429,17 +466,6 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
                 df_conditions.loc[(reach_success_bool), 'success'] = True
         else:
             df_conditions['success'] = False
-    
-
-
-    # Reorder columns putting trigger, valid and success first for more clarity
-    # col_list = list(df_conditions.columns.values)
-    # col_to_put_first = ['trigger', 'success','valid']
-    # for c in col_to_put_first:
-    #     col_list.remove(c)
-    # col_list = ['trigger', 'success','valid'] + col_list
-    # df_conditions = df_conditions[col_list]
-
     
 
     return df_conditions
