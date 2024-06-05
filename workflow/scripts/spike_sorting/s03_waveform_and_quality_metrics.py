@@ -18,7 +18,7 @@ from spikeinterface.postprocessing import compute_principal_components
 from snakehelper.SnakeIOHelper import getSnake
 import spikeinterface.extractors as se
 from spikeinterface import qualitymetrics
-from workflow.scripts import settings
+import settings
 from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid
 
 #%% Load inputs

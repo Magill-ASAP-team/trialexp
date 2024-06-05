@@ -5,7 +5,7 @@ Export event data to spike2
 import pandas as pd 
 from trialexp.process.pycontrol.utils import extract_v_line_v2, export_session_v2, get_sync_time
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
+import settings
 from re import match
 from pathlib import Path
 from trialexp.process.pyphotometry.utils import *

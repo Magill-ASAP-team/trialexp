@@ -11,8 +11,7 @@ from trialexp.process.pycontrol.data_import import session_dataframe
 from datetime import datetime
 from snakehelper.SnakeIOHelper import getSnake
 from pathlib import Path
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',

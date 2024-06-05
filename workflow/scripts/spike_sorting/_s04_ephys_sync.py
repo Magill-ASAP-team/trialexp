@@ -13,9 +13,8 @@ import pandas as pd
 import numpy as np
 
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
-
-from workflow.scripts import settings
+import settings
+import settings
 from trialexp.utils.ephys_utilities import create_ephys_rsync
 
 

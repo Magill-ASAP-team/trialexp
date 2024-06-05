@@ -2,9 +2,9 @@ from glob import glob
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from trialexp.process.pycontrol.utils import auto_load_dotenv
 
-load_dotenv() 
-
+auto_load_dotenv()
 def session2analyze(tasks:list=None, cohort:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []

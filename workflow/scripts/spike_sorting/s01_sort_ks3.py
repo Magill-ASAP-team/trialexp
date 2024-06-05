@@ -13,13 +13,12 @@ import numpy as np
 import pandas as pd
 
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
+import settings
 import spikeinterface.extractors as se
 import spikeinterface.sorters as ss
 from spikeinterface.core import select_segment_recording
 
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
 # print(spike_sorting_done_path)

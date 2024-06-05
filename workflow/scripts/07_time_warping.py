@@ -11,7 +11,7 @@ import pandas as pd
 import seaborn as sns 
 from matplotlib import pyplot as plt 
 import numpy as np
-from workflow.scripts import settings
+import settings
 import trialexp.process.pyphotometry.linear_modelling as lm
 from pathlib import Path
 import json

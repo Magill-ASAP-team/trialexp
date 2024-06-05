@@ -22,8 +22,7 @@ from trialexp.process.ephys.spikes_preprocessing import (
     get_spike_trains, make_evt_dataframe, merge_cell_metrics_and_spikes)
 from trialexp.process.ephys.utils import (binned_firing_rate, compare_fr_with_random)
 from trialexp.process.pyphotometry.utils import *
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 

@@ -21,8 +21,7 @@ from snakehelper.SnakeIOHelper import getSnake
 from trialexp.process.ephys.utils import crosscorr_lag_range, plot_correlated_neurons
 from trialexp.process.group_analysis.plot_utils import style_plot
 from trialexp.process.pyphotometry.utils import *
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 

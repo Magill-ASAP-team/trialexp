@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
+import settings
 from matplotlib import pyplot as plt
 import seaborn as sns
 
