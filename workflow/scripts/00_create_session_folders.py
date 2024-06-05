@@ -11,13 +11,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from trialexp.process.pycontrol.data_import import session_dataframe
-from trialexp.process.pyphotometry.utils import import_ppd
+from trialexp.process.pyphotometry.utils import import_ppd_auto, get_dataformat
 
 from trialexp.utils.pycontrol_utilities import parse_pycontrol_fn
 from trialexp.utils.pyphotometry_utilities import parse_pyhoto_fn, create_photo_sync, parse_video_fn
 from trialexp.utils.ephys_utilities import parse_openephys_folder, get_recordings_properties, create_ephys_rsync
 
 from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()
 
@@ -120,7 +121,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
-    # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-05-30-152835']
+    # df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'RE015']
     
     for _, row in df_pycontrol.iterrows():
         
@@ -199,6 +200,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     
     df_pycontrol['video_names'] = matched_video_names
 
+    ##########################
     # Move folders
     for i in tqdm(range(len(df_pycontrol))):
         row = df_pycontrol.iloc[i]
@@ -240,9 +242,12 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
         #Copy pyphotometry file if they match
         if pyphotometry_file is not None:
             data_pycontrol = session_dataframe(pycontrol_file)
-            data_pyphotmetry = import_ppd(pyphotometry_file)
+            data_pyphotmetry = import_ppd_auto(pyphotometry_file)
             if create_photo_sync(data_pycontrol, data_pyphotmetry) is not None:
                 copy_if_not_exist(pyphotometry_file, target_pyphoto_folder)
+            else:
+                logger.debug(f'Cannot sync photometry data for {pyphotometry_file.name}')
+
                 
         # write down the filename of the video file
         video_list_file = target_video_folder/'video_list.txt'
@@ -262,7 +267,8 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 # copy syncing files in 
                 if create_ephys_rsync(str(pycontrol_file), sync_path) is not None:
                     recordings_properties.loc[recordings_properties.sync_path == sync_path, 'syncable'] = True
-            
+                else:
+                    print(f'Cannot sync ephys data for {sync_path.parent.name}')
             longest_syncable = recordings_properties.loc[recordings_properties.syncable == True, 'duration'].max()
             recordings_properties.loc[(recordings_properties.duration == longest_syncable) & (recordings_properties.syncable == True), 'longest'] = True
 

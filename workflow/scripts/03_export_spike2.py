@@ -29,8 +29,7 @@ if fn == []:
     data_photometry = None    
 else:
     fn = fn[0]
-    data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
-    data_photometry = import_ppd_auto(fn, data_format)
+    data_photometry = import_ppd_auto(fn)
     data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
     
 #%%

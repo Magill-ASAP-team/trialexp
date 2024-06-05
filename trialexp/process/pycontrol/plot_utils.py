@@ -8,7 +8,7 @@ from matplotlib.axes import Axes
 import os
 
 #define the color palette for trial_come
-default_palette = sns.color_palette()
+default_palette = plt.cm.tab20.colors
 trial_outcome_palette = {
     'success': default_palette[0],
     'aborted' : default_palette[1],
@@ -20,7 +20,8 @@ trial_outcome_palette = {
     'not success': default_palette[7],
     'free_reward_reach': default_palette[8],
     'free_reward_no_reach': default_palette[9],
-    
+    'jackpot': default_palette[10],
+    'omission': default_palette[11],
 }
 
 def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=None, **kwargs):
