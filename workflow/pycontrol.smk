@@ -17,7 +17,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
     for c in cohort:
         for t in tasks:
-            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*TT010*'))        
+            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
 
     return total_sessions
 
