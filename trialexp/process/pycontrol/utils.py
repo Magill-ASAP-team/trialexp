@@ -46,7 +46,8 @@ def auto_load_dotenv(workspace_dir=''):
                     return
         except:
             pass                    
-                    
+        
+        # print('Loading linux .env')            
         load_dotenv(workspace_dir+'linux.env')
         
 
