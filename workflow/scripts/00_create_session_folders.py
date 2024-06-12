@@ -16,11 +16,9 @@ from trialexp.process.pyphotometry.utils import import_ppd_auto, get_dataformat
 from trialexp.utils.pycontrol_utilities import parse_pycontrol_fn
 from trialexp.utils.pyphotometry_utilities import parse_pyhoto_fn, create_photo_sync, parse_video_fn
 from trialexp.utils.ephys_utilities import parse_openephys_folder, get_recordings_properties, create_ephys_rsync
-
-from dotenv import load_dotenv
+from trialexp.process.pycontrol.utils import auto_load_dotenv
 from loguru import logger
-
-load_dotenv()
+import settings
 
 def copy_if_not_exist(src, dest):
     if not (dest/src.name).exists():
@@ -38,7 +36,7 @@ tasks = tasks_params_df.task.values.tolist()
 skip_existing = True #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2024_April_cohort','2024_May_cohort_5HT'] 
+cohort_to_copy = ['2024_April_cohort'] 
 
 #%%
 
@@ -121,7 +119,8 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
-    # df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'RE015']
+    # df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'TT008']
+    # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-06-10-153517']
     
     for _, row in df_pycontrol.iterrows():
         
@@ -170,27 +169,19 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 # find all potential match, choose the one that is earlier and closest
                 td = (row.timestamp - df_ephys_exp_subject.exp_datetime)
                 td = np.array([t.total_seconds() for t in td])
-                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1]
-                min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1] # pycontrol is later
                 
-                idx = np.argmin(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
-                
-                
-                
-                if min_td < timedelta(days=0.25):
-                    matched_ephys_path.append(ephys_base_path / df_ephys_exp_subject.iloc[idx].foldername)
-                    matched_ephys_fn.append(df_ephys_exp_subject.iloc[idx].foldername)
-                else:
-                    matched_ephys_path.append(None)
-                    matched_ephys_fn.append(None)
-            
-            elif not df_ephys_exp.empty and df_ephys_exp_subject.empty:
-                matched_ephys_path.append(None)
-                matched_ephys_fn.append(None)
-
-        else:
-            matched_ephys_path.append(None)
-            matched_ephys_fn.append(None)
+                if len(df_ephys_exp_subject) > 0:
+                    min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                    idx = np.argmin(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                    if min_td < timedelta(days=0.25):
+                        matched_ephys_path.append(ephys_base_path / df_ephys_exp_subject.iloc[idx].foldername)
+                        matched_ephys_fn.append(df_ephys_exp_subject.iloc[idx].foldername)
+                        continue
+        
+        # some error occur, append None
+        matched_ephys_path.append(None)
+        matched_ephys_fn.append(None)
 
     df_pycontrol['pyphoto_path'] = matched_photo_path
     df_pycontrol['pyphoto_filename'] = matched_photo_fn
