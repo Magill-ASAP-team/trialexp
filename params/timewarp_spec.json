@@ -68,11 +68,12 @@
             "padding": 100,
             "label": "reach finish"
         },
-        "US_end_timer": {
+        "US_delay_timer": {
             "event_window": [
                 -100,
                 1000
             ],
+            "alternative": ["US_jackpot","US_omission"],
             "order": "first",
             "padding": 0,
             "label": "reward\ndelivery"

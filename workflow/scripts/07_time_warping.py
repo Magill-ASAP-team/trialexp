@@ -113,7 +113,7 @@ for var in signal2analyze:
         
     for outcome, ax in zip(outcome2plot, axes):
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
+        lm.plot_warpped_data2(xr2plot, var, extraction_specs, trigger, ax=ax)
         
         
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)

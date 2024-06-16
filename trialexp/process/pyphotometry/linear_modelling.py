@@ -12,11 +12,17 @@ from matplotlib.patches import Polygon
 from matplotlib.path import Path
 import matplotlib.patches as patches
 
-def extract_event(df_events, event, order, dependent_event=None):
+def extract_event(df_events, event, order, dependent_event=None, alternative=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
     # if order is 'last_before', you need to specify the depedent_event as well, it will always be
     # result is a pandas series
-    events = df_events[(df_events.content==event) & (df_events.trial_time>0)]
+    # optionally, you can match multiple events using the alterantive argument
+    
+    if alternative is None:
+        events = df_events[(df_events.content==event) & (df_events.trial_time>0)]
+    else:
+        events = df_events[(df_events.content.isin([event, *alternative])) & (df_events.trial_time>0)]
+
 
     if len(events) == 0:
         return None
@@ -87,7 +93,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     for evt, specs in event_specs.items():
         dependent_event = specs.get('dependent_event', None)
         # if we can find the event, then warp from the event, if not, just start after padding
-        if (event := extract_event(df_trial, evt, specs['order'], dependent_event)) is not None:
+        if (event := extract_event(df_trial, evt, specs['order'], dependent_event, specs.get('alternative',None) )) is not None:
             t_event = event.time
             interp_result['interp_'+evt] = True
         else:
@@ -300,11 +306,6 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger,
         df = df.reset_index()
         df['trial_id'] = df['trial_nb']
     
-    # if 'session_id' in df.columns:
-    #         # It is a multi-session xarray Dataset, we need to clean up for later reset_index
-    #         # df['trial_id'] = df.session_id.astype(str)+'_'+df.trial_nb.astype(str)
-    #         df = df.drop(columns=['trial_nb','session_id'])
-
     df = df.dropna()
     
     if len(df)>0:
@@ -355,6 +356,85 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger,
                     ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
                     
             cur_time += (post_time-pre_time)+padding
+
+
+def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, 
+                      ax=None, draw_protected_region=True, hue='trial_outcome'):
+    
+    palette_colors = plt.cm.tab10.colors
+
+    df = xa_cond[[signal_var,hue]].to_dataframe()
+    
+    # work with multiindex from multisession dataset
+    if 'trial_id' in xa_cond.coords:
+        df = df.droplevel([1,2])
+        df['trial_id'] = df['session_id'].astype(str) + '_' + df['trial_nb'].astype(str)
+        df = df.reset_index()    
+
+    else:
+        df = df.reset_index()
+        df['trial_id'] = df['trial_nb']
+    
+    df = df.dropna()
+    
+    if len(df)>0:
+        # sometime when the event time doesn't matter the extraction_specs
+        # no trial can be extracted
+        
+         #add in the trial number information
+        df_outcome = df.groupby('trial_id').first().dropna()
+        df_outcome_count = df_outcome.groupby(hue).count().time
+        labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
+        df[hue] = df[hue].replace(labels)
+        
+        outcomes = sorted(df[hue].unique())[::-1]
+        palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
+
+        sns.lineplot(df, x='time',y=signal_var, 
+                    hue=hue, palette=palette, ax = ax, n_boot=100)
+        
+        sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
+        ax.set(xlabel='Relative time (ms)', ylabel = 'z-scored dF/F', xlim=[-500,2300])
+        
+        # add in the warp information
+        
+        add_warp_info(ax, extraction_specs, 'hold_for_water')
+        sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
+        ticks, ticks_labels = compute_ticks(extraction_specs)
+        ax.set_xticks(ticks, labels =ticks_labels, rotation=30);
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        # add a bit of padding for text later
+        # ylim = ax.get_ylim()
+        # yrange = ylim[1] -ylim[0]
+        # ax.set_ylim(ylim[0], ylim[1]+yrange*0.3)
+        
+        # # plot the time point in the extraction_specs
+        
+        # # only plot the time line if there are at least some trials that contain that event
+        # # idx  = df_interp_res.index.intersection(xa_cond.trial_nb)
+        # # event2plot = df_interp_res.loc[idx].any() #Find if there is any trial having that event
+        
+        # trigger_window = extraction_specs[trigger]['event_window']
+        # cur_time = trigger_window[0]
+        # colors = (c for c in plt.cm.tab10.colors)
+        
+        # for evt, specs in extraction_specs.items():
+        #     pre_time, post_time = specs['event_window']
+        #     padding = specs['padding']
+            
+        #     color = next(colors)
+            
+        #     if xa_cond['interp_'+evt].any():
+        #         ax.axvline(cur_time-pre_time,color= color, ls='--')
+        #         if draw_protected_region:
+        #             ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
+        #             label = specs.get('label', evt.replace('_', ' '))
+        #             ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
+                    
+        #     cur_time += (post_time-pre_time)+padding
 
 
 def draw_event_line(extraction_specs,trigger, ax=None, show_label=True, draw_protected_region=False):
