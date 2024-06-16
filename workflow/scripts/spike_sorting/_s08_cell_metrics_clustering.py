@@ -17,8 +17,7 @@ import plotly.graph_objects as go
 import seaborn as sns
 
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 

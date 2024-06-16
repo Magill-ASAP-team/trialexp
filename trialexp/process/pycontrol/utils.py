@@ -18,9 +18,38 @@ from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
 import warnings
 from trialexp.process.pycontrol.spike2_export import Spike2Exporter
+import platform
+from dotenv import load_dotenv
+import os
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
+
+
+def auto_load_dotenv(workspace_dir=''):
+    #automatically local the correct dotenv file based on the platform
+    # load_dotenv will search for the .env file incrementally higher up
+    
+    if workspace_dir != '':
+        workspace_dir += '/'
+    
+    if platform.system() == 'Windows':
+        load_dotenv(workspace_dir+'windows.env')
+    else:
+        # determine whether we are in WSL
+        try: 
+            with open('/proc/version','r') as f:
+                version_info = f.read().lower()
+                if 'microsoft' in version_info or 'wsl' in version_info:
+                    print('Loading config for wsl')
+                    load_dotenv(workspace_dir+'wsl.env')
+                    return
+        except:
+            pass                    
+        
+        # print('Loading linux .env')            
+        load_dotenv(workspace_dir+'linux.env')
+        
 
 ######## Analyzing event data
 

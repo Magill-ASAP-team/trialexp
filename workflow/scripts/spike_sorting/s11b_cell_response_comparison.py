@@ -16,7 +16,7 @@ from trialexp.process.group_analysis.plot_utils import style_plot
 import trialexp.process.figures.plot_utils as plot_utils
 from joblib import Parallel, delayed
 import warnings
-from workflow.scripts import settings
+import settings
 #%%
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',

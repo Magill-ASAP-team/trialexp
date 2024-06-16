@@ -2,9 +2,9 @@ from glob import glob
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from trialexp.process.pycontrol.utils import auto_load_dotenv
 
-load_dotenv() 
-
+auto_load_dotenv()
 def session2analyze(tasks:list=None, cohort:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []
@@ -17,12 +17,12 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
     for c in cohort:
         for t in tasks:
-            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/kms063*'))        
+            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
 
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2023_Jan_cohort'],tasks=['reaching_go_spout_bar_mar23'])
+    input: session2analyze(cohort=['2024_April_cohort','2024_May_cohort_5HT'], tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule process_pycontrol:
     input:
@@ -139,6 +139,6 @@ rule pycontrol_final:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
         pycontrol_done = '{session_path}/{task}/{session_id}/processed/log/pycontrol.done',
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
-        spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
+        # spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
     output:
         done = touch('{session_path}/{task}/{session_id}/processed/pycontrol_workflow.done')

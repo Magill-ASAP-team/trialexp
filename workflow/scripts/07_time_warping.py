@@ -11,7 +11,7 @@ import pandas as pd
 import seaborn as sns 
 from matplotlib import pyplot as plt 
 import numpy as np
-from workflow.scripts import settings
+import settings
 import trialexp.process.pyphotometry.linear_modelling as lm
 from pathlib import Path
 import json
@@ -50,7 +50,6 @@ if task_name in ['pavlovian_spontanous_reaching_oct23',
     outcome2plot = df_conditions.trial_outcome.unique()
     
 elif task_name in ['reaching_go_spout_bar_VR_Dec23',
-                   'reaching_go_spout_bar_VR_April24',
                    'reaching_go_spout_bar_apr23',
                    'reaching_go_spout_bar_mar23',
                    'reaching_go_spout_bar_june05',
@@ -58,13 +57,11 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
     extraction_specs = specs['reaching_go_spout_bar_reward']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
-# elif task_name in ['reaching_go_spout_bar_mar23',
-#                    'reaching_go_spout_bar_june05',
-#                    'reaching_go_spout_bar_nov22',
-#                    ]:
-#     extraction_specs = specs['reaching_go_spout_bar']
-#     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+elif task_name in ['reaching_go_spout_bar_VR_April24']:
+    extraction_specs = specs['reaching_go_spout_bar_reward']
+    outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     
+
 elif task_name in ['reaching_go_spout_incr_break2_nov22']:
     extraction_specs = specs['break2']
     outcome2plot = df_conditions.trial_outcome.unique()
@@ -118,3 +115,5 @@ for var in signal2analyze:
         
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
+
+# %%

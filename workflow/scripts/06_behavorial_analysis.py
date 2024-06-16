@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 import seaborn as sns 
 import numpy as np
 import os
-from workflow.scripts import settings
+import settings
 from trialexp.process.pycontrol import event_filters
 
 #%% Load inputs

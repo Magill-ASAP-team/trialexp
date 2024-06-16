@@ -411,16 +411,24 @@ def get_dataformat(df_dataformat, session_id):
     
     return data_format
 
-def import_ppd_auto(file_path,data_format='v1'):
-    # determine which function to use to import data
+def import_ppd_auto(file_path, cutoff_date = datetime(2023,10,23)):
+    # Automatically import ppd data using the correct file format
     with open(file_path, 'rb') as f:
         header_size = int.from_bytes(f.read(2), 'little')
         data_header = f.read(header_size)
     # Extract header information
     header_dict = json.loads(data_header)
+    
     if header_dict['version'] == '1.0.2':
         return import_ppd_v2(file_path,  low_pass=None, high_pass=None)
     else:
+        # parse the datetime to determine the correct file format to use
+        start_date = datetime.strptime(header_dict['date_time'], '%Y-%m-%dT%H:%M:%S.%f') 
+        if start_date > cutoff_date:
+            data_format = 'v2'
+        else:
+            data_format = 'v1'
+                    
         return import_ppd(file_path, data_format)
 
 def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
@@ -522,7 +530,7 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
 # Load analog data
 #----------------------------------------------------------------------------------
 
-def import_ppd(file_path, data_format='v1'):
+def import_ppd(file_path, data_format='v2'):
     '''Function to import pyPhotometry binary data files into Python. The high_pass 
     and low_pass arguments determine the frequency in Hz of highpass and lowpass 
     filtering applied to the filtered analog signals. To disable highpass or lowpass

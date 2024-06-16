@@ -41,7 +41,7 @@ rule spike_sorting:
         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
-        si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/si/kilosort3'),
+        si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
     threads: 32
     script:
         "scripts/spike_sorting/s01_sort_ks3.py"

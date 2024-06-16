@@ -286,6 +286,25 @@ def compute_trial_outcome(row, task_name):
             return 'success'
         else:
             return 'undefined'
+    elif task_name in ['reaching_go_spout_bar_VR_April24']:
+        if row.break_after_abort:
+            return 'aborted'
+        elif not row.spout:
+            return 'no_reach'
+        elif row.button_press:
+            return 'button_press'
+        elif row['water by bar_off']:
+            return 'water_by_bar_off'
+        elif row.US_jackpot:
+            return 'jackpot'
+        elif row.US_omission:
+            return 'omission'
+        elif row.spout and not row.water_on:
+            return 'late_reach'
+        elif row['water by spout']:
+            return 'success'
+        else:
+            return 'undefined'
     elif task_name in ['reaching_go_spout_incr_break2_nov22']:
         if not row.spout:
             return 'no_reach'

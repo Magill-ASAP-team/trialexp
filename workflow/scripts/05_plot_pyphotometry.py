@@ -15,7 +15,7 @@ import seaborn as sns
 from matplotlib import pyplot as plt 
 import numpy as np
 import os
-from workflow.scripts import settings
+import settings
 from joblib import Parallel, delayed
 import time
 from pathlib import Path

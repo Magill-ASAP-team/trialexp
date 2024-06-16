@@ -21,7 +21,7 @@ import spikeinterface.extractors as se
 from spikeinterface.core import select_segment_recording
 
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
+import settings
 from trialexp.process.ephys.utils import cellmat2xarray, denest_string_cell, session_and_probe_specific_uid, cellmat2dataframe
 
 xr.set_options(display_expand_attrs=False) # attrs is too long

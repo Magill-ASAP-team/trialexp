@@ -15,7 +15,8 @@ from trialexp.process.ephys.utils import *
 from trialexp.process.group_analysis.plot_utils import style_plot
 from joblib import Parallel, delayed
 
-from workflow.scripts import settings
+import settings 
+
 #%% Load inputs
 
 

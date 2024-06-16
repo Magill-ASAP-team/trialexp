@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_event_time
-from workflow.scripts import settings
+import settings
 from pathlib import Path
 import pickle
 from datetime import datetime
@@ -36,9 +36,8 @@ df_dataformat = pd.read_csv('params/data_format.csv')
 try:
     pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
-    data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
-    data_photometry = import_ppd_auto(pyphotometry_file, data_format)
-
+    data_photometry = import_ppd_auto(pyphotometry_file)
+    print(data_photometry['version'])
     data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
     
     # Convert to xarray
@@ -52,7 +51,6 @@ try:
 except IndexError:
     has_photometry = False
 
-#%%
 
 
 # %% synchornize pyphotometry with pycontrol

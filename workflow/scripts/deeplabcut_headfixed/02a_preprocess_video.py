@@ -1,5 +1,5 @@
 #%%
-from workflow.scripts import settings
+import settings
 from snakehelper.SnakeIOHelper import getSnake
 import deeplabcut
 import numpy as np

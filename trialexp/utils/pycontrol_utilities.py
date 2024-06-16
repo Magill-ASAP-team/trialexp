@@ -40,7 +40,7 @@ def parse_pycontrol_fn(fn):
                     'timestamp': expt_datetime,
                     'session_length': session_length,
                     'task_name': task_name}
-        except KeyError:
+        except Exception as e:
             return { 'subject_id': subject_id,
                     'path': fn,                 
                     'session_id': fn.stem,
@@ -48,9 +48,6 @@ def parse_pycontrol_fn(fn):
                     'timestamp': expt_datetime,
                     'session_length': 0,
                     'task_name': 'unknown'}
-        except Exception as e:
-            print(e)
-            print(fn)
     else:
         print('Error for ', fn)
 '''

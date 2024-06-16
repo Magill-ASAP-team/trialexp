@@ -5,7 +5,7 @@ This script analyze the photometry response for different movement types
 #%%
 import trialexp.process.deeplabcut.utils as dlc_utils
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
+import settings
 import numpy as np
 from pathlib import Path
 import pandas as pd

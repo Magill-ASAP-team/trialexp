@@ -16,8 +16,7 @@ from matplotlib import gridspec
 from snakehelper.SnakeIOHelper import getSnake
 
 
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 

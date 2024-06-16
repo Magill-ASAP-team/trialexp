@@ -43,7 +43,7 @@ def create_photo_sync(data_pycontrol, photometry_dict):
             return Rsync_aligner(pulse_times_A= photo_rsync, 
                 pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
             
-        except (RsyncError, ValueError) as e:
+        except (RsyncError, ValueError, ZeroDivisionError) as e:
             # First try fail, let's try the next one
             if 'pulse_times_3' in photometry_dict:
                 photo_rsync = photometry_dict['pulse_times_3']
@@ -51,7 +51,7 @@ def create_photo_sync(data_pycontrol, photometry_dict):
                     return Rsync_aligner(pulse_times_A= photo_rsync, 
                         pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
                     
-                except (RsyncError, ValueError) as e:
+                except (RsyncError, ValueError,ZeroDivisionError) as e:
                     return None
 
 def parse_pyhoto_fn(fn):
@@ -63,7 +63,7 @@ def parse_pyhoto_fn(fn):
         expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
         
         return {
-                'subject_id': subject_id,
+                'subject_id': subject_id, 
                 'path':fn, 
                 'filename':fn.stem, 
                 'timestamp':expt_datetime}    

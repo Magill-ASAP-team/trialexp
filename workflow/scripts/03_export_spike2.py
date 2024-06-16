@@ -5,7 +5,7 @@ Export event data to spike2
 import pandas as pd 
 from trialexp.process.pycontrol.utils import extract_v_line_v2, export_session_v2, get_sync_time
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
+import settings
 from re import match
 from pathlib import Path
 from trialexp.process.pyphotometry.utils import *
@@ -29,8 +29,7 @@ if fn == []:
     data_photometry = None    
 else:
     fn = fn[0]
-    data_format = get_dataformat(df_dataformat, df_pycontrol.attrs['session_id'])
-    data_photometry = import_ppd_auto(fn, data_format)
+    data_photometry = import_ppd_auto(fn)
     data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
     
 #%%

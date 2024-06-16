@@ -12,8 +12,7 @@ from sklearn import manifold
 from sklearn.preprocessing import StandardScaler
 
 from snakehelper.SnakeIOHelper import getSnake
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 

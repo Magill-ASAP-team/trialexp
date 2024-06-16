@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_clean_trigger_event
-from workflow.scripts import settings
+import settings
 from pathlib import Path
 import pickle 
 import seaborn as sns

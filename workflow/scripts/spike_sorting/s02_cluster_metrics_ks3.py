@@ -8,8 +8,7 @@ import shutil
 import matlab.engine
 from snakehelper.SnakeIOHelper import getSnake
 
-from workflow.scripts import settings
-
+import settings
 #%% Load inputs
 
 

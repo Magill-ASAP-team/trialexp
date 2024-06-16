@@ -11,15 +11,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from trialexp.process.pycontrol.data_import import session_dataframe
-from trialexp.process.pyphotometry.utils import import_ppd
+from trialexp.process.pyphotometry.utils import import_ppd_auto, get_dataformat
 
 from trialexp.utils.pycontrol_utilities import parse_pycontrol_fn
 from trialexp.utils.pyphotometry_utilities import parse_pyhoto_fn, create_photo_sync, parse_video_fn
 from trialexp.utils.ephys_utilities import parse_openephys_folder, get_recordings_properties, create_ephys_rsync
-
-from dotenv import load_dotenv
-
-load_dotenv()
+from trialexp.process.pycontrol.utils import auto_load_dotenv
+from loguru import logger
+import settings
 
 def copy_if_not_exist(src, dest):
     if not (dest/src.name).exists():
@@ -37,7 +36,7 @@ tasks = tasks_params_df.task.values.tolist()
 skip_existing = True #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2024_April_cohort','2024_May_cohort_5HT'] 
+cohort_to_copy = ['2024_April_cohort'] 
 
 #%%
 
@@ -120,7 +119,8 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
-    # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-05-30-152835']
+    # df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'TT008']
+    # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-06-10-153517']
     
     for _, row in df_pycontrol.iterrows():
         
@@ -169,27 +169,19 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 # find all potential match, choose the one that is earlier and closest
                 td = (row.timestamp - df_ephys_exp_subject.exp_datetime)
                 td = np.array([t.total_seconds() for t in td])
-                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1]
-                min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1] # pycontrol is later
                 
-                idx = np.argmin(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
-                
-                
-                
-                if min_td < timedelta(days=0.25):
-                    matched_ephys_path.append(ephys_base_path / df_ephys_exp_subject.iloc[idx].foldername)
-                    matched_ephys_fn.append(df_ephys_exp_subject.iloc[idx].foldername)
-                else:
-                    matched_ephys_path.append(None)
-                    matched_ephys_fn.append(None)
-            
-            elif not df_ephys_exp.empty and df_ephys_exp_subject.empty:
-                matched_ephys_path.append(None)
-                matched_ephys_fn.append(None)
-
-        else:
-            matched_ephys_path.append(None)
-            matched_ephys_fn.append(None)
+                if len(df_ephys_exp_subject) > 0:
+                    min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                    idx = np.argmin(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                    if min_td < timedelta(days=0.25):
+                        matched_ephys_path.append(ephys_base_path / df_ephys_exp_subject.iloc[idx].foldername)
+                        matched_ephys_fn.append(df_ephys_exp_subject.iloc[idx].foldername)
+                        continue
+        
+        # some error occur, append None
+        matched_ephys_path.append(None)
+        matched_ephys_fn.append(None)
 
     df_pycontrol['pyphoto_path'] = matched_photo_path
     df_pycontrol['pyphoto_filename'] = matched_photo_fn
@@ -199,6 +191,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     
     df_pycontrol['video_names'] = matched_video_names
 
+    ##########################
     # Move folders
     for i in tqdm(range(len(df_pycontrol))):
         row = df_pycontrol.iloc[i]
@@ -240,9 +233,12 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
         #Copy pyphotometry file if they match
         if pyphotometry_file is not None:
             data_pycontrol = session_dataframe(pycontrol_file)
-            data_pyphotmetry = import_ppd(pyphotometry_file)
+            data_pyphotmetry = import_ppd_auto(pyphotometry_file)
             if create_photo_sync(data_pycontrol, data_pyphotmetry) is not None:
                 copy_if_not_exist(pyphotometry_file, target_pyphoto_folder)
+            else:
+                logger.debug(f'Cannot sync photometry data for {pyphotometry_file.name}')
+
                 
         # write down the filename of the video file
         video_list_file = target_video_folder/'video_list.txt'
@@ -262,7 +258,8 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 # copy syncing files in 
                 if create_ephys_rsync(str(pycontrol_file), sync_path) is not None:
                     recordings_properties.loc[recordings_properties.sync_path == sync_path, 'syncable'] = True
-            
+                else:
+                    print(f'Cannot sync ephys data for {sync_path.parent.name}')
             longest_syncable = recordings_properties.loc[recordings_properties.syncable == True, 'duration'].max()
             recordings_properties.loc[(recordings_properties.duration == longest_syncable) & (recordings_properties.syncable == True), 'longest'] = True
 
