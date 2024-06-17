@@ -10,3 +10,5 @@ xarray
 scikit-learn
 jupyterlab
 kilosort[gui]
+ipywidgets
+h5netcdf
