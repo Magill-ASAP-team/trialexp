@@ -8,3 +8,5 @@ seaborn
 plotly
 xarray
 scikit-learn
+jupyterlab
+kilosort[gui]
