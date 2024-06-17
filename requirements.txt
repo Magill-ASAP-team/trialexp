@@ -1,0 +1,10 @@
+snakemake
+scipy
+sonpy
+git+https://github.com/teristam/snakehelper.git
+statsmodels
+python-dotenv
+seaborn
+plotly
+xarray
+scikit-learn
