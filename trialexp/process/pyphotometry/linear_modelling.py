@@ -541,6 +541,57 @@ def perform_linear_regression(xa_cond, data, formula, data2=None, **predictor_va
     return regress_res, res
 
 
+def perform_mixed_effect_analysis(xa_cond, data, formula, data2=None, **predictor_vars):
+    """
+    Perform linear regression on the given data.
+
+    Args:
+        xa_cond (Xarray): Xarray object containing time data.
+        data (ndarray): 2D array of shape (n_samples, n_timepoints) containing the dependent variable.
+        **predictor_vars: Keyword arguments containing predictor variables as 2D arrays of shape (n_samples, n_timepoints).
+
+    Returns:
+        regress_res (DataFrame): DataFrame containing the regression results for each timepoint.
+    """
+    regress_res = []
+    
+    for t in range(data.shape[0]):
+        
+        y = data[t, :]
+    
+        # construct the dataframe for linear regression
+        df2fit = pd.DataFrame({
+            'signal': y,
+        })
+        
+        if data2 is not None:
+            df2fit['signal2'] = data2[t,:]
+            
+        
+        for k, v in predictor_vars.items():
+            df2fit[k] = v[t, :]
+        
+        # display(df2fit)
+        mod = smf.ols(formula=formula, data=df2fit)
+        res = mod.fit()
+
+        for factor in res.params.index:
+            if factor!='Intercept':
+                regress_res.append({
+                    'beta': res.params[factor],
+                    'intercept': res.params['Intercept'],  # the intercept represent the mean value
+                    'pvalue': res.pvalues[factor],
+                    'factor': factor,
+                    'CI': res.conf_int().loc[factor].tolist(),
+                    'time': xa_cond.time.data[t],
+                    'residual': res.resid 
+                })
+
+    regress_res = pd.DataFrame(regress_res)
+
+    return regress_res, res
+
+
 def highlight_pvalues(df_reg_res, ax, threshold=0.05,alpha=0.1):
     # highlight the significant time
     for _, row in df_reg_res.iterrows():
