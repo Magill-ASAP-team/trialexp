@@ -27,6 +27,8 @@ from scipy import signal
 import warnings
 from scipy.stats import median_abs_deviation
 from datetime import datetime
+from loguru import logger
+
 '''
 Most of the photometry data processing functions are based on the intial design
 of the pyPhotometry package. They are stored in a dictionary containing both
@@ -1074,7 +1076,7 @@ def resample_event(aligner, ref_time, event_time, event_value, fill_value=-1):
 
 
 def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate, 
-                       data_len =None, time_tolerance=5):
+                       data_len =None, time_tolerance=10):
     '''
     Extract continous data around a timestamp. The original timestamp will be
     aligned to the coordinate of the dataArray with aligner
@@ -1121,10 +1123,10 @@ def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate,
                     data.append(dataArray.data[start_idx:end_idx])
                 else:
                     #TODO: work on the case for multi-dimensional data
-                    data.append(dataArray.data[:,start_idx:end_idx])
-                    
+                    data.append(dataArray.data[:,start_idx:end_idx])   
                 event_found.append(True)
             else:
+                logger.debug(f'Warning: not enough data found {start_idx}:{end_idx}')
                 x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.NaN
                 data.append([x])
                 event_found.append(False)
