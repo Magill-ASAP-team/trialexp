@@ -105,9 +105,9 @@ for probe_name in probe_names:
 
     # If no corresponding anatomy
     if probe_anat.empty:
-        xr_spikes_trials_phases['anat_depth'][probe_mask] = np.NaN
-        xr_spikes_trials_phases['brain_region_short'][probe_mask] = np.NaN
-        xr_spikes_trials_phases['brain_region_long'][probe_mask] = np.NaN
+        xr_spikes_trials_phases['anat_depth'][probe_mask] = np.nan
+        xr_spikes_trials_phases['brain_region_short'][probe_mask] = np.nan
+        xr_spikes_trials_phases['brain_region_long'][probe_mask] = np.nan
 
     # If anatomy found
     else:

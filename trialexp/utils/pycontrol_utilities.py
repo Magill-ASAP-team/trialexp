@@ -164,18 +164,18 @@ def find_last_time_before_list(list_ev, list_lim):
     list_lim is the list of events to use as limit
     '''
     if len(list_ev) >= 1 and len(list_lim) >= 1:
-        last_time = max([i for i in list_ev if i < find_min_time_list(list_lim)], default=np.NaN)
+        last_time = max([i for i in list_ev if i < find_min_time_list(list_lim)], default=np.nan)
     
     # TODO check implementation for limit cases (when no lim events found)
-    elif isinstance(list_ev, int) and find_min_time_list(list_lim) is not np.NaN:
+    elif isinstance(list_ev, int) and find_min_time_list(list_lim) is not np.nan:
         
         if find_min_time_list(list_lim) > list_ev:
             last_time = list_ev
         else:
-            last_time = np.NaN
+            last_time = np.nan
 
     elif len(list_ev) == 0 or len(list_lim) == 0:
-        last_time = np.NaN
+        last_time = np.nan
     else:
         print(list_ev,type(list_ev))
     return last_time
@@ -183,11 +183,11 @@ def find_last_time_before_list(list_ev, list_lim):
 
 def find_min_time_list(x):
     if len(x) >= 1:
-        min_time = min([i for i in x if i>0], default=np.NaN)
+        min_time = min([i for i in x if i>0], default=np.nan)
     elif isinstance(x, int) and x > 0:
         min_time = x
     elif len(x) == 0:
-        min_time = np.NaN
+        min_time = np.nan
     else:
         print(x,type(x))
 
@@ -195,11 +195,11 @@ def find_min_time_list(x):
 
 def find_max_time_list(x):
     if len(x) >= 1:
-        max_time = max([i for i in x if i>0], default=np.NaN)
+        max_time = max([i for i in x if i>0], default=np.nan)
     elif isinstance(x, int) and x > 0:
         max_time = x
     elif len(x) == 0:
-        max_time = np.NaN
+        max_time = np.nan
     else:
         print(x,type(x))
 
@@ -217,15 +217,15 @@ def find_if_event_within_timelim(df_item, timelim):
 
 def time_delta_by_row(df_events_row, col_idx_start, col_idx_end):
     #print(df_events_row)
-    start_time = min([i for i in df_events_row[col_idx_start] if i > 0], default=np.NaN)
+    start_time = min([i for i in df_events_row[col_idx_start] if i > 0], default=np.nan)
     if isinstance(start_time, float):
-        return np.NaN
+        return np.nan
     else:
-        end_time = min([i for i in df_events_row[col_idx_end] if i > start_time], default=np.NaN)
+        end_time = min([i for i in df_events_row[col_idx_end] if i > start_time], default=np.nan)
         if isinstance(end_time, int):
             return end_time - start_time
         else:
-            return np.NaN
+            return np.nan
 
 '''
 # Kouichi's helper, appears not to be used

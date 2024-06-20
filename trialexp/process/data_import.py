@@ -1353,7 +1353,7 @@ class Session():
                                 success_rate = len(self.df_conditions[(self.df_conditions['valid'] == True) & (self.df_conditions['success'] == True)].index) \
                         / len(self.df_conditions[(self.df_conditions['valid'] == True)].index)
             except (ZeroDivisionError):
-                success_rate = np.NaN
+                success_rate = np.nan
 
             # append value to behav dict
             self.behav['success_rate'] = success_rate
@@ -1364,9 +1364,9 @@ class Session():
 
                     # compute the mean and std of the event times AFTER (>0) trial initiation
                     mean_min_time = self.df_events[ev + '_trial_time'].loc[idx_cond].apply(
-                        lambda x: min([i for i in x if i>0], default=np.NaN)).mean()
+                        lambda x: min([i for i in x if i>0], default=np.nan)).mean()
                     std_min_time = self.df_events[ev + '_trial_time'].loc[idx_cond].apply(
-                        lambda x: min([i for i in x if i>0], default=np.NaN)).std()
+                        lambda x: min([i for i in x if i>0], default=np.nan)).std()
                     # for EACH trial, count how many events occurs after t0
                     num_min_time = self.df_events[ev + '_trial_time'].loc[idx_cond].apply(
                         lambda x: np.count_nonzero(~isnan([i for i in x if i>0])))
@@ -1766,8 +1766,8 @@ class Session():
             else:
                 raise Exception("offset is in a wrong type") 
 
-            onsets_ms = [np.NaN] * len(all_on_ms)
-            offsets_ms = [np.NaN] * len(all_on_ms)
+            onsets_ms = [np.nan] * len(all_on_ms)
+            offsets_ms = [np.nan] * len(all_on_ms)
 
             for i, this_onset in enumerate(all_on_ms):  # slow
                 good_offset_list_ms = []
@@ -1789,7 +1789,7 @@ class Session():
             offsets_ms = [x for x in offsets_ms if not np.isnan(x)]
 
             state_ms = map(list, zip(onsets_ms, offsets_ms,
-                           [np.NaN] * len(onsets_ms)))
+                           [np.nan] * len(onsets_ms)))
             # [onset1, offset1, NaN, onset2, offset2, NaN, ....]
             state_ms = [item for sublist in state_ms for item in sublist]
             return state_ms

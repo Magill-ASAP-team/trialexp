@@ -359,9 +359,10 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger,
 
 
 def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, 
-                      ax=None, draw_protected_region=True, hue='trial_outcome'):
+                      ax=None, draw_protected_region=True, hue='trial_outcome', palette_colors=None):
     
-    palette_colors = plt.cm.tab10.colors
+    if palette_colors is None:
+        palette_colors = plt.cm.tab10.colors
 
     df = xa_cond[[signal_var,hue]].to_dataframe()
     
@@ -388,13 +389,15 @@ def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger,
         df[hue] = df[hue].replace(labels)
         
         outcomes = sorted(df[hue].unique())[::-1]
+        
         palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
+        
 
         sns.lineplot(df, x='time',y=signal_var, 
                     hue=hue, palette=palette, ax = ax, n_boot=100)
         
         sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
-        ax.set(xlabel='Relative time (ms)', ylabel = 'z-scored dF/F', xlim=[-500,2300])
+        ax.set(xlabel='Time around events (ms)', ylabel = 'z-scored dF/F', xlim=[-500,2300])
         
         # add in the warp information
         
@@ -521,14 +524,13 @@ def perform_linear_regression(xa_cond, data, formula, data2=None, **predictor_va
             df2fit[k] = v[t, :]
         
         # display(df2fit)
-        mod = smf.ols(formula=formula, data=df2fit)
+        mod = smf.ols(formula=formula, data=df2fit.dropna())
         res = mod.fit()
-
         for factor in res.params.index:
             if factor!='Intercept':
                 regress_res.append({
                     'beta': res.params[factor],
-                    'intercept': res.params['Intercept'],  # the intercept represent the mean value
+                    'intercept': res.params['Intercept'] if 'Intercept' in res.params else None,  # the intercept represent the mean value
                     'pvalue': res.pvalues[factor],
                     'factor': factor,
                     'CI': res.conf_int().loc[factor].tolist(),
@@ -598,6 +600,19 @@ def highlight_pvalues(df_reg_res, ax, threshold=0.05,alpha=0.1):
         if row.pvalue < threshold:
             ax.axvline(row.time, alpha=alpha, color='y')
             
+
+def highlight_pvalues_consec_win(pvalues, time, ax, alpha=0.2, threshold=0.05, consec_win=4, consec_win_threshold=1):
+    # Calculate the consecutive windows of significant and hightlight them in figure
+    sig = (pvalues <threshold).astype(float)
+    
+    win = np.ones((consec_win,))
+    consec_sig_idx = (np.convolve(sig,win,'same')>=consec_win*consec_win_threshold)
+    
+    sig_t = time[consec_sig_idx]
+    
+    for t in sig_t:
+        ax.axvline(t, alpha=alpha, color='y')
+            
             
 def load_extraction_spec(task_name, df_conditions, specs):
     
@@ -630,3 +645,35 @@ def load_extraction_spec(task_name, df_conditions, specs):
         outcome2plot = df_conditions.trial_outcome.unique()
         
     return extraction_specs, outcome2plot
+
+def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False):
+
+    ax.set_title(factor)
+    df2plot = reg_res[reg_res.factor==factor]
+    
+    #plot the CI
+    ci = np.array(df2plot.CI.to_list())
+    ax.fill_between(df2plot.time, ci[:,0], ci[:,1], alpha=0.2)
+    
+    #plot beta
+    # TODO: make it easier to know whether it is strengthing the original signal or weaking
+    # strengthen: making +ve signal more +ve and -ve signal more negative
+    ax.axhline(0,ls='--',color='gray',alpha=0.5)
+    
+    ylim = ax.get_ylim()
+    if ylim[1] < 0.1:
+        ax.set_ylim([-1,1]) # don't give the wrong impression of a very small beta
+    draw_event_line(extraction_specs, 'hold_for_water', ax, show_label=False)
+    
+    # add a bit of padding for text later
+    ylim = ax.get_ylim()
+    yrange = ylim[1] -ylim[0]
+    ax.set_ylim(ylim[0], ylim[1]+yrange*0.3)
+        
+    add_warp_info(ax, extraction_specs, 'hold_for_water')
+    
+    sns.lineplot(df2plot, x='time',y='beta', ax=ax)
+    ax.set_xlabel('Time around events (ms)')
+
+    if display_pvalue:
+        highlight_pvalues_consec_win(df2plot, ax, threshold=0.01, consec_win=3)
