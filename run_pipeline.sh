@@ -6,4 +6,4 @@ conda activate trialexp
 # Run the Python file
 python workflow/scripts/00_create_session_folders.py
 
-snakemake --snakefile workflow/pycontrol.smk -k -c20
+snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime
