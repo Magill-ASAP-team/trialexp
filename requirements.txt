@@ -15,3 +15,4 @@ ipywidgets
 h5netcdf
 neo
 loguru
+shiny
