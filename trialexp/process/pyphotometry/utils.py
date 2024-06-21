@@ -1127,11 +1127,11 @@ def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate,
                 event_found.append(True)
             else:
                 logger.debug(f'Warning: not enough data found {start_idx}:{end_idx}')
-                x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.NaN
+                x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.nan
                 data.append([x])
                 event_found.append(False)
         else:
-            x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.NaN
+            x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.nan
             data.append([x])
             event_found.append(False)
         
@@ -1152,7 +1152,7 @@ def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate,
 def get_rel_time(trigger_timestamp, window, aligner, ref_time):
     # Calculate the time relative to a trigger timestamp)
     ts = aligner.A_to_B(trigger_timestamp)
-    time_relative = np.ones_like(ref_time)*np.NaN
+    time_relative = np.ones_like(ref_time)*np.nan
     
     for t in ts: 
         d = ref_time-t

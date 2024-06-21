@@ -962,7 +962,7 @@ class Session():
                                 success_rate = len(self.df_conditions[(self.df_conditions['valid'] == True) & (self.df_conditions['success'] == True)].index) \
                         / len(self.df_conditions[(self.df_conditions['valid'] == True)].index)
             except (ZeroDivisionError):
-                success_rate = np.NaN
+                success_rate = np.nan
 
             # append value to behav dict
             self.behav['success_rate'] = success_rate
@@ -973,9 +973,9 @@ class Session():
 
                     # compute the mean and std of the event times AFTER (>0) trial initiation
                     mean_min_time = self.df_events[ev + '_trial_time'].loc[idx_cond].apply(
-                        lambda x: min([i for i in x if i>0], default=np.NaN)).mean()
+                        lambda x: min([i for i in x if i>0], default=np.nan)).mean()
                     std_min_time = self.df_events[ev + '_trial_time'].loc[idx_cond].apply(
-                        lambda x: min([i for i in x if i>0], default=np.NaN)).std()
+                        lambda x: min([i for i in x if i>0], default=np.nan)).std()
                     # for EACH trial, count how many events occurs after t0
                     num_min_time = self.df_events[ev + '_trial_time'].loc[idx_cond].apply(
                         lambda x: np.count_nonzero(~isnan([i for i in x if i>0])))

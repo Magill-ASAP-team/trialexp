@@ -1730,10 +1730,10 @@ class Event_Dataset(Trials_Dataset):
                         & (metadata_df['subject_ID'] == s),
                         'session_nb'])).copy()
 
-                    ss_sc = [np.NaN] * len(session_nbs)
-                    ss_fl = [np.NaN] * len(session_nbs)
-                    ss_tn = [np.NaN] * len(session_nbs)
-                    ss_sr = [np.NaN] * len(session_nbs)
+                    ss_sc = [np.nan] * len(session_nbs)
+                    ss_fl = [np.nan] * len(session_nbs)
+                    ss_tn = [np.nan] * len(session_nbs)
+                    ss_sr = [np.nan] * len(session_nbs)
                     ss_dt = [None] * len(session_nbs) # import datetime; datetime.time()
 
                     for ss_idx, ss in enumerate(session_nbs):

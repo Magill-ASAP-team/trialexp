@@ -21,6 +21,7 @@ from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 import platform
 from dotenv import load_dotenv
 import os
+from loguru import logger
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
@@ -71,8 +72,12 @@ def parse_session_dataframe(df_session):
 def parse_trial_param(s):
     pattern = r'([a-zA-Z_ ]+):\s*([\d.]+|\w+)'
     d={}
-    for m in re.finditer(pattern, s):
-        d.update({m.group(1):m.group(2)})
+    
+    try:
+        for m in re.finditer(pattern, s):
+            d.update({m.group(1):m.group(2)})
+    except TypeError:
+        logger.debug(f'Cannot parse print line for {s}')
     return d
 
 def print2event(df_events, conditions, trial_parameters):
@@ -261,8 +266,8 @@ def plot_session(df:pd.DataFrame, keys: list = None, state_def: list = None, pri
             all_off_sec = df[(df.event_name == state_def_dict['offset'])].time.values
             # print(all_on_sec)
 
-            onsets_sec = [np.NaN] * len(all_on_sec)
-            offsets_sec = [np.NaN] * len(all_on_sec)
+            onsets_sec = [np.nan] * len(all_on_sec)
+            offsets_sec = [np.nan] * len(all_on_sec)
 
             for i, this_onset in enumerate(all_on_sec):  # slow
                 good_offset_list_ms = []
@@ -285,7 +290,7 @@ def plot_session(df:pd.DataFrame, keys: list = None, state_def: list = None, pri
             # print(onsets_sec)
 
             state_sec = map(list, zip(onsets_sec, offsets_sec,
-                           [np.NaN] * len(onsets_sec)))
+                           [np.nan] * len(onsets_sec)))
             # [onset1, offset1, NaN, onset2, offset2, NaN, ....]
             state_sec = [item for sublist in state_sec for item in sublist]
             # print(state_sec)
@@ -946,7 +951,7 @@ def find_last_time_before_list(list_ev, list_lim):
     if not isinstance(list_lim, list):
         list_lim =[list_lim]
     
-    last_time = max([i for i in list_ev if i < find_min_time_list(list_lim)], default=np.NaN)
+    last_time = max([i for i in list_ev if i < find_min_time_list(list_lim)], default=np.nan)
 
         
     return last_time
@@ -956,9 +961,9 @@ def find_min_time_list(x):
     
     if isinstance(x, list):
         if len(x) == 0:
-            min_time = np.NaN
+            min_time = np.nan
         else:
-            min_time = min([i for i in x if i>0], default=np.NaN)
+            min_time = min([i for i in x if i>0], default=np.nan)
     else:
         min_time = x
 
@@ -966,11 +971,11 @@ def find_min_time_list(x):
 
 def find_max_time_list(x):
     if len(x) >= 1:
-        max_time = max([i for i in x if i>0], default=np.NaN)
+        max_time = max([i for i in x if i>0], default=np.nan)
     elif isinstance(x, int) and x > 0:
         max_time = x
     elif len(x) == 0:
-        max_time = np.NaN
+        max_time = np.nan
     else:
         print(x,type(x))
 
@@ -986,15 +991,15 @@ def find_if_event_within_timelim(df_item, timelim):
 
 def time_delta_by_row(df_events_row, col_idx_start, col_idx_end):
     #print(df_events_row)
-    start_time = min([i for i in df_events_row[col_idx_start] if i > 0], default=np.NaN)
+    start_time = min([i for i in df_events_row[col_idx_start] if i > 0], default=np.nan)
     if isinstance(start_time, float):
-        return np.NaN
+        return np.nan
     else:
-        end_time = min([i for i in df_events_row[col_idx_end] if i > start_time], default=np.NaN)
+        end_time = min([i for i in df_events_row[col_idx_end] if i > start_time], default=np.nan)
         if isinstance(end_time, int):
             return end_time - start_time
         else:
-            return np.NaN
+            return np.nan
 
 def cmap10():
     """
