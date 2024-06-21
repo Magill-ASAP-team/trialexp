@@ -47,8 +47,11 @@ def auto_load_dotenv(workspace_dir=''):
         except:
             pass                    
         
-        # print('Loading linux .env')            
-        load_dotenv(workspace_dir+'linux.env')
+        # print('Loading linux .env')     
+        if platform.node() == 'lapis':       
+            load_dotenv(workspace_dir+'linux_lapis.env')
+        else:
+            load_dotenv(workspace_dir+'linux.env')
         
 
 ######## Analyzing event data
