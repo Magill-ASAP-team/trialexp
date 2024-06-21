@@ -1126,7 +1126,7 @@ def extract_event_data(trigger_timestamp, window, dataArray, sampling_rate,
                     data.append(dataArray.data[:,start_idx:end_idx])   
                 event_found.append(True)
             else:
-                logger.debug(f'Warning: not enough data found {start_idx}:{end_idx}')
+                # logger.debug(f'Warning: not enough data found {start_idx}:{end_idx}')
                 x = np.zeros((int((window[1]-window[0])/1000*sampling_rate),))*np.nan
                 data.append([x])
                 event_found.append(False)
