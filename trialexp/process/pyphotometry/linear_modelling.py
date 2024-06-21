@@ -674,6 +674,9 @@ def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False)
     
     sns.lineplot(df2plot, x='time',y='beta', ax=ax)
     ax.set_xlabel('Time around events (ms)')
+    
+    ticks, ticks_labels = compute_ticks(extraction_specs)
+    ax.set_xticks(ticks, labels =ticks_labels, rotation=30);
 
     if display_pvalue:
         highlight_pvalues_consec_win(df2plot, ax, threshold=0.01, consec_win=3)
