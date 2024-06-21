@@ -11,28 +11,31 @@ from shiny.types import ImgData
 import pandas as pd
 import base64
 from pathlib import Path
+import settings
+import os
 ## read the cohort information
 
 logger.debug('Reading sessions data from ettin...')
-root_path = '/home/MRC.OX.AC.UK/ndcn1330/ettin/Julien/ASAP/Data/'
+root_path = os.environ['SESSION_ROOT_DIR']
 logger.debug('done')
 
 ui.page_opts(title="Hello sidebar!")
 
 df_img2plot = reactive.value() # used to store the dataframe of images to plot
+df_session_info = build_session_info_cohort(root_path)
 
 
 
 @reactive.calc
 def session_info():
     
-    session_file = Path('df_session_info.pkl')
-    if session_file.exists():
-        df_session_info = pd.read_pickle(session_file)
-        print('Loaded existing df_session_info dataframe')
-    else:
-        df_session_info = build_session_info_cohort(root_path, load_pycontrol=True, pycontrol_parameters=['hold_time_required_ms'])
-        df_session_info.to_pickle('df_session_info.pkl') #TODO: update the session dataframe incrementally
+    # session_file = Path('df_session_info.pkl')
+    # if session_file.exists():
+    #     df_session_info = pd.read_pickle(session_file)
+    #     print('Loaded existing df_session_info dataframe')
+    # else:
+    #     df_session_info = build_session_info_cohort(root_path)
+    #     df_session_info.to_pickle('df_session_info.pkl') #TODO: update the session dataframe incrementally
 
     idx = df_session_info.cohort==input.cohort()
     if len(input.animal_id())>0:
@@ -43,8 +46,9 @@ def session_info():
     return df_session_info[idx].sort_values('expt_datetime')
 
     
-with ui.sidebar(width=500):
-    df = session_info()
+with ui.sidebar(width=600):
+    # df = session_info()
+    df = df_session_info
     cohorts = df.cohort.unique().tolist()
     ui.input_select("cohort", "Select cohort", choices=cohorts, selected=cohorts[0])
     ui.input_checkbox_group('animal_id', 'Animals', choices=[])
@@ -95,6 +99,8 @@ def update_figures_list():
         if src.exists():
             img_info.append({'animal_id': row.animal_id,
                             'task_name': row.task_name,
+                            'expt_datetime': row.expt_datetime,
+                            'session_id': row.session_id,
                             'src': row.path/'processed'/'figures'/'photometry'/fig_name})
             
     df_img2plot.set(pd.DataFrame(img_info)) # need to assign a new object so that shiny know it has been changed
@@ -109,20 +115,15 @@ def show_figures():
         with ui.card():
             ui.card_header(animal_id)
             with ui.layout_column_wrap(width=1/5):
-                for src in df[df.animal_id==animal_id].src:
-                    p = Path(src)
+                df_animal = df[df.animal_id==animal_id].sort_values('expt_datetime')
+                for _, row in df_animal.iterrows():
+                    p = Path(row.src)
                     if p.exists():
                         with open(p, 'rb') as f:
                             mime_type = p.suffix
                             b64_str = base64.b64encode(f.read()).decode("utf-8")
-                            ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly, TODO: change the src address
+                            with ui.card():
+                                ui.card_header(row.session_id)
+                                ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly, TODO: change the src address
                         
             
-    
-# @render.plot
-# def hist():
-#     hue = "species" if input.species() else None
-#     sns.kdeplot(df, x=input.var(), hue=hue)
-#     if input.show_rug():
-#         sns.rugplot(df, x=input.var(), hue=hue, color="black", alpha=0.25)
-
