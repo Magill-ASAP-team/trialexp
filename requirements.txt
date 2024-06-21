@@ -12,3 +12,6 @@ jupyterlab
 kilosort[gui]
 ipywidgets
 h5netcdf
+loguru
+pulp==2.7.0
+neo
