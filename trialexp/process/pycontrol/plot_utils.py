@@ -83,6 +83,68 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     return g
 
 
+def plot_event_distribution2(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=None, **kwargs):
+    # kwargs: keyword argument that will be passed to the underlying sns.scatterplot function
+    #   can be used to configure additional plotting scales
+    # # Use joingrid directly because the x and y axis are usually in different units
+
+    plt.rcParams['axes.spines.top'] = False
+    plt.rcParams['axes.spines.right'] = False
+    plt.rcParams['xtick.direction'] = 'out'
+    plt.rcParams['ytick.direction'] = 'out'
+    plt.rcParams["legend.frameon"] = False
+    if os.name == 'nt':
+        plt.rcParams['font.family'] = ['Arial']
+    elif os.name == 'posix':
+        plt.rcParams['font.family'] = ['Lato']
+
+    g = sns.JointGrid()
+    
+    #plot spout touch
+    df_spout = df2plot[df2plot.content=='spout']
+    if len(df_spout) == 0:
+        return g
+    
+    df_spout = df_spout.replace({'jackpot':'success','omission':'success'})
+    ax = sns.scatterplot(y=y, x=x, marker='|' , hue='trial_outcome', palette=trial_outcome_palette,
+                       data= df_spout, ax = g.ax_joint, lw=2, **kwargs)
+    
+    ax.axvline(1, ls='--',color='green', alpha=0.7)
+    if len(df_spout)>1:
+        sns.histplot(x=x, binwidth=xbinwidth, ax=g.ax_marg_x, data=df_spout)
+        if ybinwidth>0 and len(df2plot[y].unique())>1:
+            sns.histplot(y=y, binwidth=ybinwidth, ax=g.ax_marg_y, data=df_spout)
+    
+    # #plot aborted bar off
+    df_baroff = df2plot[(df2plot.content=='bar_off') & (df2plot.trial_outcome =='aborted')]
+    ax = sns.scatterplot(y=y, x=x, marker='.' , hue='trial_outcome', palette=trial_outcome_palette,
+                       data= df_baroff, ax = g.ax_joint, legend=False, **kwargs)
+
+    
+    # indicate the no reach condition
+    # df_trial = df2plot.groupby('trial_nb').first()
+    # df_noreach = df_trial[df_trial.trial_outcome.str.contains('no_reach')]
+    # ax = sns.scatterplot(y=y, x=0, marker='x' , hue='trial_outcome', palette=trial_outcome_palette,
+    #                 data= df_noreach, ax = g.ax_joint, **kwargs)
+    
+    if xlim is not None:
+        ax.set(xlim=xlim)
+
+
+    try: 
+        sns.move_legend(ax, "upper left", bbox_to_anchor=(1.2, 1))
+    except ValueError:
+        pass
+    
+    # add another legend manually for the markers
+    g.figure.text(1,0.3, '|    target bar touch')
+    g.figure.text(1,0.35, '*    bar off (aborted)')
+    # g.figure.text(1,0.4, 'x    no reach')
+
+    return g
+
+
+
 def style_event_distribution(g, xlabel, ylabel, trigger_name):
     # g: sns.JointGrid object from the plot_event_distribution
     g.ax_joint.axvline(0, ls='--');

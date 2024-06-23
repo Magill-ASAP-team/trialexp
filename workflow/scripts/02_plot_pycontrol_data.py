@@ -17,7 +17,7 @@ triggers = df_events_cond.attrs['triggers']
 df2plot = df_events_cond.copy()
 df2plot['trial_time'] = df2plot['trial_time']/1000
 xlim = [trial_window[0]/1000, np.percentile(df2plot['trial_time'],95)]
-g = plot_event_distribution(df2plot, 'trial_time', 'trial_nb', xbinwidth=0.1, ybinwidth=0, xlim=xlim)
+g = plot_event_distribution2(df2plot, 'trial_time', 'trial_nb', xbinwidth=0.1, ybinwidth=0, xlim=xlim)
 trigger_text = triggers[0].replace('_', ' ')
 style_event_distribution(g, 'Time (s)', 'Trial number', trigger_text)
 
