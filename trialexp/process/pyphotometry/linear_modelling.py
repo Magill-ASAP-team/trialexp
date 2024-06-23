@@ -359,7 +359,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger,
 
 
 def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, 
-                      ax=None, draw_protected_region=True, hue='trial_outcome', palette_colors=None):
+                      ax=None, hue='trial_outcome', palette_colors=None):
     
     if palette_colors is None:
         palette_colors = plt.cm.tab10.colors
@@ -409,35 +409,58 @@ def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger,
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         
-        # add a bit of padding for text later
-        # ylim = ax.get_ylim()
-        # yrange = ylim[1] -ylim[0]
-        # ax.set_ylim(ylim[0], ylim[1]+yrange*0.3)
+def flatten_level(df):
+    if 'trial_id' in df.index.names or 'trial_nb' in df.index.names:
+        df = df.droplevel([1,2])
+        df['trial_id'] = df['session_id'].astype(str) + '_' + df['trial_nb'].astype(str)
+        df = df.reset_index()   
+    else:
+        df = df.reset_index()
+        df['trial_id'] = df['trial_nb']
+
+    return df
+
+def plot_timewarp_dataframe(df, signal_var, extraction_specs,trigger, 
+                      ax=None, hue='trial_outcome', palette_colors=None):
+    # plot time wrapped dataframe, the dataframe must be already flatten by the flatten_evel function
+    
+    if palette_colors is None:
+        palette_colors = plt.cm.tab10.colors
+
+    df = df.dropna()
+    
+    if len(df)>0:
+        # sometime when the event time doesn't matter the extraction_specs
+        # no trial can be extracted
         
-        # # plot the time point in the extraction_specs
+         #add in the trial number information
+         
+        df_outcome = df.groupby('trial_id').first().dropna()
+        df_outcome_count = df_outcome.groupby(hue).count().time
+        labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
+        df.loc[:,hue] = df[hue].replace(labels)
         
-        # # only plot the time line if there are at least some trials that contain that event
-        # # idx  = df_interp_res.index.intersection(xa_cond.trial_nb)
-        # # event2plot = df_interp_res.loc[idx].any() #Find if there is any trial having that event
+        outcomes = sorted(df[hue].unique())[::-1]
         
-        # trigger_window = extraction_specs[trigger]['event_window']
-        # cur_time = trigger_window[0]
-        # colors = (c for c in plt.cm.tab10.colors)
+        palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
         
-        # for evt, specs in extraction_specs.items():
-        #     pre_time, post_time = specs['event_window']
-        #     padding = specs['padding']
-            
-        #     color = next(colors)
-            
-        #     if xa_cond['interp_'+evt].any():
-        #         ax.axvline(cur_time-pre_time,color= color, ls='--')
-        #         if draw_protected_region:
-        #             ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
-        #             label = specs.get('label', evt.replace('_', ' '))
-        #             ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
-                    
-        #     cur_time += (post_time-pre_time)+padding
+
+        sns.lineplot(df, x='time',y=signal_var, 
+                    hue=hue, palette=palette, ax = ax, n_boot=100)
+        
+        sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
+        ax.set(xlabel='Time around events (ms)', ylabel = 'z-scored dF/F', xlim=[-500,2300])
+        
+        # add in the warp information
+        
+        add_warp_info(ax, extraction_specs, 'hold_for_water')
+        sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
+        ticks, ticks_labels = compute_ticks(extraction_specs)
+        ax.set_xticks(ticks, labels =ticks_labels, rotation=30);
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+    
 
 
 def draw_event_line(extraction_specs,trigger, ax=None, show_label=True, draw_protected_region=False):
