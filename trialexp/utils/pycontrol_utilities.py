@@ -41,6 +41,8 @@ def parse_pycontrol_fn(fn):
                     'session_length': session_length,
                     'task_name': task_name}
         except Exception as e:
+            print(f'Error while import file {fn}')
+            print(e)
             return { 'subject_id': subject_id,
                     'path': fn,                 
                     'session_id': fn.stem,

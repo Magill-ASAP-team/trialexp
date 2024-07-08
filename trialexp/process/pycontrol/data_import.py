@@ -430,6 +430,7 @@ def session_dataframe(file_path, paired_events={}, pair_end_suffix=None, time_un
 
     elif filetype == ".tsv":  # Load data from .tsv file.
         df = pd.read_csv(file_path, delimiter="\t")
+        assert df['time'].dtype == np.float64, 'Error in time column, please double check file'
 
         if time_unit == "ms":
             df["time"] = (df["time"] * 1000).astype(int)
