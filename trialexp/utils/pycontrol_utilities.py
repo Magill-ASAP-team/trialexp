@@ -7,13 +7,21 @@ to find events timestamps for differential trial alignment.
 
 It is possibly best to store the remaining methods in appropriate modules
 '''
+from pathlib import Path
+import shutil
+
+from tqdm import tqdm
 import numpy as np
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 from re import search
 import pandas as pd
 from trialexp.process.pycontrol.data_import import session_dataframe
 from trialexp.process.pycontrol.utils import parse_session_dataframe
+from trialexp.process.pyphotometry.utils import import_ppd_auto
+from trialexp.utils.ephys_utilities import create_ephys_rsync, get_recordings_properties
+from trialexp.utils.pyphotometry_utilities import create_photo_sync
+from loguru import logger
 
 
 
@@ -315,3 +323,169 @@ def load_analog_data(file_path):
     '''
     with open(file_path, 'rb') as f:
         return np.fromfile(f, dtype='<i').reshape(-1,2)
+
+
+def parse_video_fn(fn):
+    # parse the filename of video file and extract its timestamp and direction
+    pattern = r'(.+?)_([\w\d+]+)_Rig_(\d+)_(\w+).mp4'
+    date_format = '%m-%d-%y_%H-%M-%S.%f'    
+    
+    m = search(pattern, fn.name)
+    if m:
+        date_string = m.group(1)
+        subject_id = m.group(2)
+        rig = m.group(3)
+        camera = m.group(4)
+
+        data = {
+            'subject_id': subject_id,
+                'path':fn, 
+                'filename':fn.stem, 
+                'rig' : int(rig),
+                'camera': camera,
+                'start_time': date_string
+            }
+        
+        try:
+            expt_datetime = datetime.strptime(date_string, date_format)
+        
+            data['timestamp']  = expt_datetime
+        except ValueError:
+            data['timestamp']  = None
+    else:
+        data = {
+        'subject_id': None,
+            'path':None, 
+            'filename':None, 
+            'rig' : None,
+            'camera': None,
+            'timestamp': None,
+            'start_time': None
+        } 
+        
+    return data
+
+def get_df_video(video_folder):
+    video_files = list(video_folder.glob('*.mp4'))
+    df_video = pd.DataFrame(list(map(parse_video_fn, video_files)))
+    df_video = df_video.dropna()
+    return df_video
+
+def get_matched_timestamp(df, df_pycontrol_row, camera_no=2, min_minute=3):
+    df = df[df.subject_id == df_pycontrol_row.subject_id]
+    # find the closet match in time
+    if not df.empty:
+        min_td = np.min(abs(df_pycontrol_row.timestamp - df.timestamp))
+        idx = np.argmin(abs(df_pycontrol_row.timestamp - df.timestamp))
+        if min_td < timedelta(minutes=min_minute):
+            #Find videos from other cameras
+            cameras =  df[df.iloc[idx].timestamp == df.timestamp]
+            return cameras
+    else:
+        return None
+
+def match_video(df_pycontrol, df_video):
+    matched_video_names = []
+    # Matching videos
+    for _, row in df_pycontrol.iterrows():
+
+        matched_videos = get_matched_timestamp(df_video,row)
+        if matched_videos is not None:
+            matched_video_names.append(matched_videos.filename.values)
+        else:
+            matched_video_names.append(None)
+            
+    df_pycontrol['video_names'] = matched_video_names
+
+def copy_if_not_exist(src, dest):
+    if not (dest/src.name).exists():
+        shutil.copy(src, dest)
+    
+def move_folders(df_pycontrol, export_base_path, ephys_base_path):
+    for i in tqdm(range(len(df_pycontrol))):
+        row = df_pycontrol.iloc[i]
+        session_id = row.session_id
+        subject_id = row.subject_id
+        task_name = row.task_name
+        
+        target_pycontrol_folder = Path(export_base_path,task_name, session_id, 'pycontrol')
+        target_pyphoto_folder = Path(export_base_path, task_name, session_id, 'pyphotometry')
+        target_ephys_folder = Path(export_base_path,  task_name, session_id, 'ephys')
+        target_video_folder = Path(export_base_path, task_name, session_id, 'video')
+        
+        if not target_pycontrol_folder.exists():
+            # create the base folder
+            target_pycontrol_folder.mkdir(parents=True)
+            
+        if not target_pyphoto_folder.exists():
+            target_pyphoto_folder.mkdir(parents=True)
+
+        if not target_ephys_folder.exists():
+            target_ephys_folder.mkdir(parents=True)
+            
+        if not target_video_folder.exists():
+            target_video_folder.mkdir(parents=True)
+            
+        pycontrol_file = row.path
+        pyphotometry_file = row.pyphoto_path
+        video_files = row.video_names
+
+        #copy the pycontrol files
+        # print(pycontrol_file, target_pycontrol_folder)
+        copy_if_not_exist(pycontrol_file, target_pycontrol_folder)
+        
+        #copy all the analog data
+        analog_files = list(pycontrol_file.parent.glob(f'{session_id}*.pca')) + list(pycontrol_file.parent.glob(f'{session_id}*.npy'))
+        for f in analog_files:
+            copy_if_not_exist(f, target_pycontrol_folder) 
+            
+        #Copy pyphotometry file if they match
+        if pyphotometry_file is not None:
+            data_pycontrol = session_dataframe(pycontrol_file)
+            data_pyphotmetry = import_ppd_auto(pyphotometry_file)
+            if create_photo_sync(data_pycontrol, data_pyphotmetry) is not None:
+                copy_if_not_exist(pyphotometry_file, target_pyphoto_folder)
+            else:
+                logger.debug(f'Cannot sync photometry data for {pyphotometry_file.name}')
+
+                
+        # write down the filename of the video file
+        video_list_file = target_video_folder/'video_list.txt'
+        if row.video_names is not None and not video_list_file.exists():
+            np.savetxt(video_list_file, row.video_names, '%s')
+
+
+        #write information about ephys recrodings in the ephys folder
+        if row.ephys_folder_name:
+
+            recordings_properties = get_recordings_properties(ephys_base_path, row.ephys_folder_name)
+            # try to sync ephys recordings
+            recordings_properties['syncable'] = False
+            recordings_properties['longest'] = False
+            sync_paths = recordings_properties.sync_path.unique()
+            for sync_path in sync_paths:
+                # copy syncing files in 
+                if create_ephys_rsync(str(pycontrol_file), sync_path) is not None:
+                    recordings_properties.loc[recordings_properties.sync_path == sync_path, 'syncable'] = True
+                else:
+                    print(f'Cannot sync ephys data for {sync_path.parent.name}')
+            longest_syncable = recordings_properties.loc[recordings_properties.syncable == True, 'duration'].max()
+            recordings_properties.loc[(recordings_properties.duration == longest_syncable) & (recordings_properties.syncable == True), 'longest'] = True
+
+            sync_path = recordings_properties.loc[recordings_properties.longest == True, 'sync_path'].unique()
+            
+            if len(sync_path) > 1:
+                raise NotImplementedError(f'multiple valids sync_path for the session, something went wrong: {row.ephys_folder_name}')
+            
+            # copy sync files from the longest syncable recording
+            elif len(sync_path) == 1:
+
+                copy_if_not_exist(sync_path[0] / 'states.npy', target_ephys_folder)
+                copy_if_not_exist(sync_path[0] / 'timestamps.npy', target_ephys_folder)
+
+            else:
+                # no syncable recordings
+                ...
+
+
+            recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
