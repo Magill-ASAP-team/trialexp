@@ -10,14 +10,6 @@ The workflows are developed using [**snakemake**](https://snakemake.github.io/).
 5. Ability to generate detailed reports for each recording sessions
 6. Possibility to run the code in a computing cluster to greatly speed up the analysis
 
-## Dependencies
-The snakemake workflow may contain additional dependency requirement. You will need to update your virtual environment with 
-
-```
-conda env update -f trialexp.yaml
-```
-
-
 
 ## Configuration
 
