@@ -4,12 +4,9 @@ from trialexp.process.folder_org.utils import build_session_info_cohort, load_an
 import os
 from figure_viewer.gallery import gallery_server, gallery_ui
 import pandas as pd
-import settings
-
-settings.auto_load_dotenv()
 
 logger.debug('Reading sessions data from ettin...')
-root_path = os.environ['SESSION_ROOT_DIR']
+root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
 logger.debug('done')
 df_img2plot = reactive.value() # used to store the dataframe of images to plot
 df_session_info = build_session_info_cohort(root_path)
