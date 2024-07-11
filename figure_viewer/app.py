@@ -62,7 +62,9 @@ def server(input, output, session):
         
         figure_names = [f.name for f in figure_names]
         figure_names = sorted(list(set(figure_names)))
-        ui.update_radio_buttons('figure_list', choices=figure_names)
+        if len(figure_names) == 0: # hack for handling the case when no image can be found, radio button forces us to at least provide on option
+            figure_names =['None']
+        ui.update_radio_buttons('figure_list', choices=figure_names, selected=None)
         
         
     @reactive.effect

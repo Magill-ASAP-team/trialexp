@@ -23,7 +23,8 @@ def gallery_server(input, output, session, animal_id, df_img2plot):
         for _, row in df_animal.iterrows():
             p = Path(row.src)
             if p.exists():
-                id = row.session_id.replace('-','_')
+                id = row.session_id.replace('-','_')+'_'+row.src.stem
+                print(id)
                 card_list.append(figure_ui(id))
                 figure_server(id, figure_info=row)
         
@@ -54,6 +55,16 @@ def figure_server(input, output, session, figure_info):
     @reactive.Effect
     @reactive.event(input.show_figure)
     def show_figure():
-        m = ui.modal('this is a test')
-        ui.modal_show(m)
+        p = Path(figure_info.src)
+        with open(p, 'rb') as f:
+            mime_type = p.suffix
+            b64_str = base64.b64encode(f.read()).decode("utf-8")
+            id = figure_info.session_id.replace('-','_')
+            card = ui.card(
+                            ui.card_header(label=figure_info.session_id),
+                            ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly
+                        )
+            
+            m = ui.modal(card, size='l', easy_close=True)
+            ui.modal_show(m)
     
