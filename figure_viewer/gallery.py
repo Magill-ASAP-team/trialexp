@@ -65,6 +65,6 @@ def figure_server(input, output, session, figure_info):
                             ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly
                         )
             
-            m = ui.modal(card, size='l', easy_close=True)
+            m = ui.modal(card, size='l', easy_close=True, fade=False)
             ui.modal_show(m)
     
