@@ -4,6 +4,9 @@ from trialexp.process.folder_org.utils import build_session_info_cohort, load_an
 import os
 from figure_viewer.gallery import gallery_server, gallery_ui
 import pandas as pd
+import settings
+
+settings.auto_load_dotenv()
 
 logger.debug('Reading sessions data from ettin...')
 root_path = os.environ['SESSION_ROOT_DIR']
