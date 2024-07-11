@@ -21,6 +21,7 @@ from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 import platform
 from dotenv import load_dotenv
 import os
+from loguru import logger
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
@@ -74,8 +75,12 @@ def parse_session_dataframe(df_session):
 def parse_trial_param(s):
     pattern = r'([a-zA-Z_ ]+):\s*([\d.]+|\w+)'
     d={}
-    for m in re.finditer(pattern, s):
-        d.update({m.group(1):m.group(2)})
+    
+    try:
+        for m in re.finditer(pattern, s):
+            d.update({m.group(1):m.group(2)})
+    except TypeError:
+        logger.debug(f'Cannot parse print line for {s}')
     return d
 
 def print2event(df_events, conditions, trial_parameters):

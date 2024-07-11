@@ -14,5 +14,6 @@ kilosort[gui]
 ipywidgets
 h5netcdf
 neo
-loguru
 shiny
+loguru
+

@@ -49,9 +49,10 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     ax = sns.scatterplot(y=y, x=x, marker='|' , hue='trial_outcome', palette=trial_outcome_palette,
                        data= df_spout, ax = g.ax_joint, **kwargs)
     
-    sns.histplot(x=x, binwidth=xbinwidth, ax=g.ax_marg_x, data=df_spout)
-    if ybinwidth>0 and len(df2plot[y].unique())>1:
-        sns.histplot(y=y, binwidth=ybinwidth, ax=g.ax_marg_y, data=df_spout)
+    if len(df_spout)>1:
+        sns.histplot(x=x, binwidth=xbinwidth, ax=g.ax_marg_x, data=df_spout)
+        if ybinwidth>0 and len(df2plot[y].unique())>1:
+            sns.histplot(y=y, binwidth=ybinwidth, ax=g.ax_marg_y, data=df_spout)
     
     #plot aborted bar off
     df_baroff = df2plot[(df2plot.content=='bar_off') & (df2plot.trial_outcome =='aborted')]

@@ -121,4 +121,35 @@ def create_ephys_rsync(pycontrol_file: str, sync_path: str, ephys_start_time: fl
         except (RsyncError, ValueError) as e:
             return None
         
+  
         
+def match_ephys(df_pycontrol, df_ephys_exp, ephys_base_path):
+    matched_ephys_path = []
+    matched_ephys_fn  = []
+    
+    for _, row in df_pycontrol.iterrows():
+        if not df_ephys_exp.empty:
+            df_ephys_exp_subject = df_ephys_exp[df_ephys_exp.subject_id == row.subject_id]
+            if not df_ephys_exp_subject.empty:
+                
+                # need to be more careful about the matching because ephys can start
+                # much earlier than pycontrol session
+                # find all potential match, choose the one that is earlier and closest
+                td = (row.timestamp - df_ephys_exp_subject.exp_datetime)
+                td = np.array([t.total_seconds() for t in td])
+                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1] # pycontrol is later
+                
+                if len(df_ephys_exp_subject) > 0:
+                    min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                    idx = np.argmin(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))
+                    if min_td < timedelta(days=0.25):
+                        matched_ephys_path.append(ephys_base_path / df_ephys_exp_subject.iloc[idx].foldername)
+                        matched_ephys_fn.append(df_ephys_exp_subject.iloc[idx].foldername)
+                        continue
+    
+        # some error occur, append None
+        matched_ephys_path.append(None)
+        matched_ephys_fn.append(None)
+    
+    df_pycontrol['ephys_path'] = matched_ephys_path
+    df_pycontrol['ephys_folder_name'] = matched_ephys_fn
