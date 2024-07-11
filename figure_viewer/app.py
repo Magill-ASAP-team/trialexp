@@ -5,12 +5,10 @@ import os
 from figure_viewer.gallery import gallery_server, gallery_ui
 import pandas as pd
 
-logger.debug('Reading sessions data from ettin...')
+# logger.debug('Reading sessions data from ettin...')
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
-logger.debug('done')
-df_img2plot = reactive.value() # used to store the dataframe of images to plot
 df_session_info = build_session_info_cohort(root_path)
-
+# TODO: reload on each user session
 df = df_session_info
 cohorts = df.cohort.unique().tolist()
 
@@ -28,6 +26,12 @@ app_ui = ui.page_sidebar(
 
 
 def server(input, output, session):
+
+    # Variables defined inside here user session specific
+    df_img2plot = reactive.value() # used to store the dataframe of images to plot
+
+    
+    
     @reactive.calc
     def session_info():
         idx = df_session_info.cohort==input.cohort()
