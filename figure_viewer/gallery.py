@@ -1,6 +1,7 @@
 from shiny import module, ui, render, reactive
 from pathlib import Path
 import base64
+import uuid
 
 @module.ui
 def gallery_ui(animal_id):
@@ -23,8 +24,7 @@ def gallery_server(input, output, session, animal_id, df_img2plot):
         for _, row in df_animal.iterrows():
             p = Path(row.src)
             if p.exists():
-                id = row.session_id.replace('-','_')+'_'+row.src.stem
-                print(id)
+                id = str(uuid.uuid4()).replace('-','')
                 card_list.append(figure_ui(id))
                 figure_server(id, figure_info=row)
         
