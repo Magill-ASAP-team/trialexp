@@ -11,6 +11,7 @@ from collections import Counter
 from matplotlib.patches import Polygon
 from matplotlib.path import Path
 import matplotlib.patches as patches
+from sklearn import preprocessing
 
 def extract_event(df_events, event, order, dependent_event=None, alternative=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
@@ -518,7 +519,7 @@ def prepare_regression_data(xa_cond, signal_var):
     
     return (data, {'trial_outcome': x_event, 'trial_nb':x_trial_nb})
 
-def perform_linear_regression(xa_cond, data, formula, data2=None, **predictor_vars):
+def perform_linear_regression(xa_cond, data, formula, data2=None, scale_data=True, **predictor_vars):
     """
     Perform linear regression on the given data.
 
@@ -547,6 +548,12 @@ def perform_linear_regression(xa_cond, data, formula, data2=None, **predictor_va
         
         for k, v in predictor_vars.items():
             df2fit[k] = v[t, :]
+        
+        if scale_data:
+            #Normalize the data so that their ranges are the same
+            scaler = preprocessing.StandardScaler()
+            df2fit[df2fit.columns] = scaler.fit_transform(df2fit)
+            
         
         # display(df2fit)
         mod = smf.ols(formula=formula, data=df2fit.dropna())
@@ -702,6 +709,7 @@ def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False)
     
     ticks, ticks_labels = compute_ticks(extraction_specs)
     ax.set_xticks(ticks, labels =ticks_labels, rotation=30);
+    ax.margins(x=0)
 
     if display_pvalue:
         highlight_pvalues_consec_win(df2plot, ax, threshold=0.01, consec_win=3)
