@@ -359,7 +359,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger,
             cur_time += (post_time-pre_time)+padding
 
 
-def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, 
+def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
                        ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
     
     if palette_colors is None:
@@ -396,6 +396,9 @@ def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger,
 
         sns.lineplot(df, x='time',y=signal_var, 
                     hue=hue, palette=palette, ax = ax, n_boot=100)
+        
+        if ylim is not None:
+            ax.set_ylim(ylim)
         
         if ylabel is None:
             ylabel = 'z-scored dF/F'
