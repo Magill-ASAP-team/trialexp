@@ -93,12 +93,30 @@ df_interp_res['trial_nb'] = xa.trial_nb
 df_interp_res = df_interp_res.set_index('trial_nb')
 xr_interp_res = df_interp_res.to_xarray()
 
-xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
+
+
+
+# %% Also do time wrapping on the licking rate
+lick_on = df_events_cond[df_events_cond.content=='lick'].time
+
+lick_rate,_ = np.histogram(lick_on, xr_photometry.time)
+lick_rate = np.clip(lick_rate,0,1)
+xa_lick_rate = xr.DataArray(lick_rate, name='lick_rate',
+                            coords={'time':xr_photometry.time[:-1]},dims=['time'])
+
+xa, interp_results_list = lm.time_warp_data(df_events_cond, 
+                        xa_lick_rate, 
+                        extraction_specs, 
+                        trigger,
+                        xr_photometry.attrs['sampling_rate'],
+                        verbose=False)
+
+xa_list.append(xa)
+
 
 #%% Save data
-
+xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
-
 
 #%% Plot the time wrapped data
 for var in signal2analyze:
@@ -117,3 +135,17 @@ for var in signal2analyze:
 
 
 # %%
+var='lick_rate'
+unique_outcome = np.unique(xr_warped.trial_outcome)
+fig, axes = plt.subplots(len(outcome2plot),1,figsize=(10,4*len(outcome2plot)))
+
+if type(axes) is not np.ndarray:
+    axes =[axes]
+    
+for outcome, ax in zip(outcome2plot, axes):
+    xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
+    lm.plot_warpped_data2(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking probability')
+    ax.set_ylim([ax.get_ylim()[0],1])
+
+fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
+

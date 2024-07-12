@@ -262,7 +262,7 @@ def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected
         marker_size = (ylim[1]-ylim[0])*0.05
         if i != len(extraction_specs.keys())-1:
             # add_break_mark(ax, cur_time-padding/2, ax.get_ylim()[0], 5, 20, marker_size)
-            add_compressed_mark(ax, cur_time-padding/2, ax.get_ylim()[0],0.05,10)
+            add_compressed_mark(ax, cur_time-padding/2, ax.get_ylim()[0],ax.get_ylim()[1]/30,10)
 
 
     return ax
@@ -359,7 +359,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger,
 
 
 def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, 
-                      ax=None, hue='trial_outcome', palette_colors=None):
+                       ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
     
     if palette_colors is None:
         palette_colors = plt.cm.tab10.colors
@@ -396,8 +396,10 @@ def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger,
         sns.lineplot(df, x='time',y=signal_var, 
                     hue=hue, palette=palette, ax = ax, n_boot=100)
         
+        if ylabel is None:
+            ylabel = 'z-scored dF/F'
         sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
-        ax.set(xlabel='Time around events (ms)', ylabel = 'z-scored dF/F', xlim=[-500,2300])
+        ax.set(xlabel='Time around events (ms)', ylabel = ylabel, xlim=[-500,2300])
         
         # add in the warp information
         
