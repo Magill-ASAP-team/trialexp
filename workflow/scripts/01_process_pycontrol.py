@@ -37,8 +37,22 @@ task_name = df_pycontrol.attrs['task_name']
 session_id = Path(sinput.session_path).name
 
 df_pycontrol.attrs['session_id'] = session_id
+
+#%% process lick events
+# check if lick event is in the pycontrol file, if not, try to analyze it from the analog signal
+lick_signal_path = list(path.glob('*_lick_analog.data*'))
+
+if len(lick_signal_path)>0:
+    lick_signal_path = list(path.glob('*_lick_analog.data*'))[0]
+    lick_ts_path = list(path.glob('*_lick_analog.time*'))[0]
+    lick_on, lick_off, lick = analyze_lick_signal(lick_signal_path, lick_ts_path)
+    # add lick back to pycontrol
+    df_pycontrol = add_lick_events(df_pycontrol, lick_on, lick_off)
+
+    
 df_pycontrol.to_pickle(soutput.pycontrol_dataframe)
 
+    
 #%% Read task definition
 tasks = pd.read_csv('params/tasks_params.csv', index_col=0)
 

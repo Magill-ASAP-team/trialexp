@@ -22,6 +22,7 @@ import platform
 from dotenv import load_dotenv
 import os
 from loguru import logger
+import scipy
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
@@ -1118,3 +1119,60 @@ def get_sync_time(df_pycontrol):
         return df_pycontrol[df_pycontrol.content=='rsync'].time
     else:
         return df_pycontrol[df_pycontrol.subtype=='sync'].time
+
+
+####### Lick detection
+
+
+def analyze_lick_signal(lick_signal_path, lick_ts_path, lick_fs=200):
+    
+    lick_signal = np.load(lick_signal_path).astype(float)
+    lick_ts = np.load(lick_ts_path).astype(float)
+
+    [b,a]  = scipy.signal.butter(5, 10/(lick_fs/2))
+    lick = scipy.signal.filtfilt(b,a,lick_signal)
+    lick = scipy.signal.savgol_filter(lick, 51,1)
+    
+    
+    # check if the signal is inverted or not
+    mean_lick = np.mean(lick)
+    pos_peaks_ratio = np.mean(lick > mean_lick+2*np.std(lick))
+    neg_trough_ratio = np.mean(lick < mean_lick-2*np.std(lick))
+    
+    if neg_trough_ratio> pos_peaks_ratio:
+        # signal is probably inverted, convert trough to peak
+        lick = -(lick - mean_lick)
+    else:
+        lick = lick - mean_lick
+        
+    thres = 2*np.std(lick)
+    lick_on = lick>thres
+    
+    lick_on_t = lick_ts[np.diff(lick_on, append=[0])==1] *1000 # be consistent in ms unit
+    lick_off_t = lick_ts[np.diff(lick_on, append=[0])==-1] *1000
+    
+    assert len(lick_on_t) == len(lick_off_t), 'lick_on and lick_off does not match'
+
+    return (lick_on_t, lick_off_t, lick)
+
+def add_lick_events(df_pycontrol, lick_on, lick_off):
+    df_lick_on = pd.DataFrame({
+        'time':lick_on,
+        'type': 'event',
+        'subtype': 'task',
+        'content': 'lick'
+    })
+    
+    df_lick_off = pd.DataFrame({
+        'time':lick_off,
+        'type': 'event',
+        'subtype': 'task',
+        'content': 'lick_off'
+    })
+    
+    attrs = df_pycontrol.attrs # for some reason concat does not perserve the attrs
+    
+    df_pycontrol = pd.concat([df_pycontrol, df_lick_on, df_lick_off]).sort_values('time').reset_index()
+    df_pycontrol.attrs = attrs
+    
+    return df_pycontrol
