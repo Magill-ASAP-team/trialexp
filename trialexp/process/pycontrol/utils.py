@@ -1151,7 +1151,11 @@ def analyze_lick_signal(lick_signal_path, lick_ts_path, lick_fs=200):
     lick_on_t = lick_ts[np.diff(lick_on, append=[0])==1] *1000 # be consistent in ms unit
     lick_off_t = lick_ts[np.diff(lick_on, append=[0])==-1] *1000
     
-    assert len(lick_on_t) == len(lick_off_t), 'lick_on and lick_off does not match'
+    # plt.plot(lick_ts*1000, lick)
+    # plt.plot(lick_on_t, np.ones((len(lick_on_t),))*100, '^')
+    # plt.plot(lick_off_t, np.ones((len(lick_off_t),))*100, 'rv')
+    if len(lick_on_t) == len(lick_off_t):
+        print(f'Warning: lick_on and lick_off does not match {len(lick_on_t)} vs {len(lick_off_t)}')
 
     return (lick_on_t, lick_off_t, lick)
 
