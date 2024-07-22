@@ -75,8 +75,19 @@ def get_recordings_properties(ephys_base_path, fn):
                 rec_prop['rec_start_datetime'] = exp_dict['exp_datetime'] + timedelta(0, rec_prop['tstart'])
                 rec_prop['full_path'] = Path(cur_stream['raw_filename']).parent
                 
-                sync_path = Path(all_streams[block_index][seg_index]['events']['Record Node 104#TTL']['timestamps_npy']).parents[2]
-                rec_prop['sync_path'] = sync_path/'NI-DAQmx-103.PXIe-6341' / 'TTL'
+                try:
+                    event_info = all_streams[block_index][seg_index]['events']
+                    if 'Record Node 104#TTL' in event_info:
+                        sync_path = Path(all_streams[block_index][seg_index]['events']['Record Node 104#TTL']['timestamps_npy']).parents[2]
+                    else:
+                        sync_path = Path(all_streams[block_index][seg_index]['events']['Record Node 104#NI-DAQmx-103.PXIe-6341']['timestamps_npy']).parents[2]
+
+                    rec_prop['sync_path'] = sync_path/'NI-DAQmx-103.PXIe-6341' / 'TTL'
+                except KeyError:
+                    print(f'Cannot find sync info for {fn}')
+                    print(f"I only have {all_streams[block_index][seg_index]['events'].keys()}")
+                    rec_prop['sync_path'] = None
+                    
                 rec_prop['duration'] = int(get_recording_duration(rec_prop['full_path'], cur_stream['sample_rate']))
                 
                 # get the expt_no and recording number from the path
