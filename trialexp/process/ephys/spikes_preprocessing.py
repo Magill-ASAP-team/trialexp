@@ -31,9 +31,24 @@ def get_max_timestamps_from_probes(timestamp_files: list):
         max_ts[f_idx] = np.nanmax(synced_ts)
     return max(max_ts)
 
+def load_kilosort(ks_result_folder):
+    #load the results from kilosort
+    ks_results = {}
+    for f in Path(ks_result_folder).glob('*.npy'):
+        ks_results[f.stem]=np.load(f, allow_pickle=True)
+        
+    for f in Path(ks_result_folder).glob('*.tsv'):
+        ks_results[f.stem]=pd.read_csv(f, sep='\t')
+        
+    return ks_results
+
+
 def get_spike_trains(
         synced_timestamp_files: list, 
-        spike_clusters_files: list):
+        spike_clusters_files: list, 
+        kslabels:list):
+    
+    
     
     # Note: UID is the id used internally in cellexplorer
     # clusID the is the label from kilosort
@@ -41,6 +56,8 @@ def get_spike_trains(
     # by default, cell explorer will only load good unit from kilosort as defined in the cluster_KSLabel.tsv
     # defination of 'good' is  ContamPct < 10, ContamPct is based on a refactory period of 2msec
     # so the all_clusters_UIDs here is the super-set of the cluID from Cell Explorer
+    
+    assert len(synced_timestamp_files) == len(spike_clusters_files) == len(kslabels), 'Cluster files do not match'
     
     max_ts = get_max_timestamps_from_probes(synced_timestamp_files)
 
@@ -70,8 +87,16 @@ def get_spike_trains(
                                                    t_stop=max_ts, 
                                                    name=all_clusters_UIDs[cluster_idx], 
                                                    file_origin=synced_file))
-            
-    return spike_trains, all_clusters_UIDs
+         
+    df_kslabels = []
+    for idx_probe, kslabel in enumerate(kslabels):
+        df_ks = pd.read_csv(kslabel, sep='\t')
+        df_ks['cluster_id'] = df_ks['cluster_id'].apply(lambda x: all_clusters_UIDs[x])
+        df_kslabels.append(df_ks)
+        
+    df_kslabels = pd.concat(df_kslabels)
+        
+    return spike_trains, all_clusters_UIDs, df_kslabels
 
 
 def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration):
@@ -120,11 +145,11 @@ def get_cluster_UIDs_from_path(cluster_file: Path):
     # take Path or str
     cluster_file = Path(cluster_file)
     # extract session and probe name from folder structure
-    session_id = cluster_file.parts[-6]
-    probe_name = cluster_file.parts[-3]
+    session_id = cluster_file.parts[-5]
+    probe_name = cluster_file.parts[-2]
 
     # unique cluster nb
-    cluster_nbs = np.unique(np.load(cluster_file))
+    cluster_nbs = sorted(np.unique(np.load(cluster_file)))
 
     # return list of unique cluster IDs strings format <session_ID>_<probe_name>_<cluster_nb>
     cluster_UIDs = [session_id + '_' + probe_name + '_' + str(cluster_nb) for cluster_nb in cluster_nbs]

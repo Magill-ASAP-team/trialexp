@@ -19,7 +19,7 @@ from snakehelper.SnakeIOHelper import getSnake
 
 from trialexp.process.ephys.spikes_preprocessing import (
     build_evt_fr_xarray, extract_trial_data, get_max_timestamps_from_probes,
-    get_spike_trains, make_evt_dataframe, merge_cell_metrics_and_spikes)
+    get_spike_trains, make_evt_dataframe, merge_cell_metrics_and_spikes, load_kilosort)
 from trialexp.process.ephys.utils import (binned_firing_rate, compare_fr_with_random)
 from trialexp.process.pyphotometry.utils import *
 import settings
@@ -37,13 +37,14 @@ verbose = True
 root_path = Path(os.environ['SESSION_ROOT_DIR'])
 
 # Get probe names from folder path
-sorting_path = Path(sinput.xr_session).parent/'kilosort'
+sorting_path = Path(sinput.xr_session).parent/'kilosort4'
 probe_names = [folder.stem for folder in list(sorting_path.glob('*'))]
 
 # Fetch file paths from all probes
-synced_timestamp_files = list(sorting_path.glob('*/sorter_output/rsync_corrected_spike_times.npy'))
-spike_clusters_files = list(sorting_path.glob('*/sorter_output/spike_clusters.npy'))
-ce_cell_metrics_full= Path(sinput.cell_matrics_full)
+synced_timestamp_files = list(sorting_path.glob('*/rsync_corrected_spike_times.npy'))
+spike_clusters_files = list(sorting_path.glob('*/spike_clusters.npy'))
+kslabels = list(sorting_path.glob('*/cluster_KSLabel.tsv'))
+
 
 # session outputs
 session_figure_path = Path(sinput.xr_session).parent / 'figures'
@@ -59,14 +60,12 @@ trial_window = (500, 2000) # time before and after timestamps to extract
 
 #%% File loading
 
-xr_cell_metrics = xr.load_dataset(ce_cell_metrics_full)
 xr_session = xr.load_dataset(sinput.xr_session)
 session_root_path = Path(sinput.xr_session).parent
 df_events_cond = pd.read_pickle(session_root_path / 'df_events_cond.pkl')
 df_conditions = pd.read_pickle(session_root_path / 'df_conditions.pkl')
 df_trials = pd.read_pickle(session_root_path / 'df_trials.pkl')
 
-# trigger = df_events_cond.attrs['triggers'][0]
 
 
 #%% Gathering trial outcomes and timestamps of different phases
@@ -77,11 +76,14 @@ df_aggregated = make_evt_dataframe(df_trials, df_conditions, df_events_cond)
 behav_phases = list(df_aggregated.columns)
 behav_phases.remove('trial_outcome')# exclude trial outcome column
 
+
+ks_results = load_kilosort(sorting_path/'ProbeA')
 #%% Extract instantaneous rates (continuous) from spike times (discrete)
 
-spike_trains, all_clusters_UIDs = get_spike_trains(
+spike_trains, all_clusters_UIDs, df_kslabels = get_spike_trains(
                     synced_timestamp_files = synced_timestamp_files, 
-                    spike_clusters_files = spike_clusters_files)
+                    spike_clusters_files = spike_clusters_files,
+                    kslabels=kslabels)
 
 
 t_stop = get_max_timestamps_from_probes(synced_timestamp_files)
@@ -130,9 +132,11 @@ spike_zfr_xr_session = xr.DataArray(
     dims=('time', 'cluID')
     )
 
+xr_kslabel = xr.Dataset.from_dataframe(df_kslabels)
+
 # Take reference only from the cells included in Cell Explorer
-xr_spikes_fr = xr.merge([spike_fr_xr_session, spike_zfr_xr_session], join='inner')
-xr_spikes_fr = xr_spikes_fr.sel(cluID=xr_cell_metrics.cluID) #only choose the 'good' cell from kilosort
+xr_spikes_fr = xr.merge([spike_fr_xr_session, spike_zfr_xr_session, xr_kslabel], join='inner')
+# xr_spikes_fr = xr_spikes_fr.sel(cluID=xr_cell_metrics.cluID) #only choose the 'good' cell from kilosort
 xr_spikes_fr.attrs['bin_duration'] = bin_duration
 xr_spikes_fr.attrs['sigma_ms'] = sigma_ms
 xr_spikes_fr.attrs['kernel'] = 'ExponentialKernel'
@@ -182,13 +186,15 @@ trial_ts = xr.DataArray(
 
 )
 
-xr_spikes_trials = xr.merge([xr_cell_metrics, trial_out, trial_ts, *da_list], join='inner')
+xr_spikes_trials = xr.merge([trial_out, trial_ts, *da_list], join='inner')
 xr_spikes_trials.attrs['bin_duration'] = bin_duration
 xr_spikes_trials.attrs['sigma_ms'] = sigma_ms
 xr_spikes_trials.attrs['kernel'] = 'ExponentialKernel'
 xr_spikes_trials.attrs['trial_window'] = trial_window
-
+xr_spikes_trials.attrs['session_id'] = df_events_cond.attrs['session_id']
 
 xr_spikes_trials.to_netcdf(Path(soutput.xr_spikes_trials), engine='h5netcdf')
 xr_spikes_trials.close()
 
+
+# %%

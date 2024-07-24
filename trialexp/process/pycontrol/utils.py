@@ -49,10 +49,10 @@ def auto_load_dotenv(workspace_dir=''):
         except:
             pass                    
         
-        # print('Loading linux .env')     
         if platform.node() == 'lapis':    
             load_dotenv(workspace_dir+'linux_lapis.env')
         else:
+            print('Loading linux .env')     
             load_dotenv(workspace_dir+'linux.env')
         
 

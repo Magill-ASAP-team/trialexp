@@ -1,5 +1,6 @@
 snakemake == 7.25.0
 pulp == 2.7.0
+kilosort[gui]
 scipy
 sonpy
 git+https://github.com/teristam/snakehelper.git
@@ -10,10 +11,13 @@ plotly
 xarray
 scikit-learn
 jupyterlab
-kilosort[gui]
 ipywidgets
 h5netcdf
 neo
 shiny
 loguru
-
+spikeinterface
+elephant
+fastdtw
+tslearn
+pingouin
