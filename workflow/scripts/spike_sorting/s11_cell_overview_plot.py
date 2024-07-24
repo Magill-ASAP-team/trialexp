@@ -37,7 +37,7 @@ figures_path = Path(soutput.figures_path)
 
 xr_spikes_trials = xr.load_dataset(Path(sinput.xr_spikes_trials)) 
 xr_fr = xr.load_dataset(Path(sinput.xr_spikes_fr))
-session_ID = xr_spikes_trials.attrs['session_ID']
+session_ID = xr_spikes_trials.attrs['session_id']
 df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
 
 

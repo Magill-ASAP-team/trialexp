@@ -47,25 +47,25 @@ rule spike_sorting:
         "scripts/spike_sorting/s01_sort_ks3.py"
 
 
-rule spike_metrics_ks3:
-    input:
-        rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done',
-    output:
-        metrics_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_metrics.done'),
-        kilosort_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort'),
-    threads: 32
-    priority: 10
-    script:
-        "scripts/spike_sorting/s02_cluster_metrics_ks3.py"
+# rule spike_metrics_ks3:
+#     input:
+#         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
+#         sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done',
+#     output:
+#         metrics_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_metrics.done'),
+#         kilosort_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort'),
+#     threads: 32
+#     priority: 10
+#     script:
+#         "scripts/spike_sorting/s02_cluster_metrics_ks3.py"
 
 
 rule waveform_and_quality_metrics:
     input:
-        kilosort_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort',
+        kilosort_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort4',
         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        si_output_folder = '{sessions}/{task_path}/{session_id}/processed/si/kilosort3',
-        # sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'
+        # si_output_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort4',
+        sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'
     output:
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
         si_quality_complete = touch('{sessions}/{task_path}/{session_id}/processed/si_quality.done')
@@ -82,21 +82,21 @@ rule ephys_sync:
     script:
         "scripts/spike_sorting/s04_ephys_sync.py"
 
-rule cell_metrics_processing:
-    input:
-        rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
-    output:
-        cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc'
-    script:
-        "scripts/spike_sorting/s05_cell_metrics_processing.py"
+# rule cell_metrics_processing:
+#     input:
+#         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
+#         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
+#     output:
+#         cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc'
+#     script:
+#         "scripts/spike_sorting/s05_cell_metrics_processing.py"
 
 
 rule cells_to_xarray:
     input:
         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',   
-        cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc' 
+        # cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc' 
     output:
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',

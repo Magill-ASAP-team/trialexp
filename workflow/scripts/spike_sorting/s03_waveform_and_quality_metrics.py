@@ -12,15 +12,15 @@ import spikeinterface.full as si
 import spikeinterface.extractors as se
 import spikeinterface.widgets as sw
 
-
 from spikeinterface.core import select_segment_recording
 from spikeinterface.postprocessing import compute_principal_components
 from snakehelper.SnakeIOHelper import getSnake
 import spikeinterface.extractors as se
 from spikeinterface import qualitymetrics
-import settings
 from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid
+import shutil
 
+import settings
 #%% Load inputs
 
 
@@ -35,7 +35,7 @@ sorter_name = 'kilosort'
 verbose = True
 
 rec_properties_path = Path(sinput.rec_properties)
-si_folder = Path(sinput.si_output_folder)
+# si_folder = Path(sinput.si_output_folder)
 kilosort_folder = Path(sinput.kilosort_folder)
 
 # Get the location of the recording
@@ -47,7 +47,7 @@ df_quality_metrics = []
 for probe_folder in kilosort_folder.glob('Probe*'):
     
     # Check which recording we should load
-    rec_properties = pd.read_csv(probe_folder/'sorter_output'/'rec_prop.csv').iloc[0]
+    rec_properties = pd.read_csv(probe_folder.parent/'rec_prop.csv').iloc[0]
     recording_path = root_data_path/Path('/'.join(Path(rec_properties.full_path).parts[-10:-3]))
     stream = rec_properties.AP_stream
     segment_num = rec_properties.seg_index
@@ -57,7 +57,8 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     
     
     # load sorting
-    sorting = si.load_extractor(probe_folder.parents[1]/'si'/'kilosort3'/probe_name)
+    sorting = se.read_kilosort(probe_folder)
+    # sorting = si.load_extractor(probe_folder.parents[1]/'si'/'kilosort3'/probe_name)
     
     # remove MUA to speed up processing later
     units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
@@ -73,11 +74,13 @@ for probe_folder in kilosort_folder.glob('Probe*'):
 
     waveform_folder = probe_folder.parents[1]/'si'/'waveform'/probe_name
     
-    # extract waveforms
+    # remove waveform folder if it exists, stupid spikeinterface can't handle it itself
+    if waveform_folder.exists():
+        shutil.rmtree(waveform_folder)
+    
     we = si.extract_waveforms(recording, 
                             sorting, 
                             folder=waveform_folder,
-                            overwrite=True,
                             max_spikes_per_unit=100, 
                             ms_before=1,
                             ms_after=2,
@@ -129,3 +132,5 @@ for probe_folder in kilosort_folder.glob('Probe*'):
 #%% save output
 df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
 df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
+
+# %%

@@ -17,7 +17,7 @@ else:
 debug_folder = os.path.join(os.environ['SESSION_ROOT_DIR'], 
                             '2024_August_cohort',
                             'by_sessions',
-                            'reaching_go_spout_incr_break2_April24',
-                            'HC103-2024-08-21-103747')
+                            'reaching_go_spout_bar_VR_April24',
+                            'RE015-2024-07-17-174310')
 # debug_folder = r'/home/MRC.OX.AC.UK/phar0732/ettin/Data/head-fixed/by_sessions/reaching_go_spout_bar_nov22/kms062-2023-03-06-182344'
 # %%

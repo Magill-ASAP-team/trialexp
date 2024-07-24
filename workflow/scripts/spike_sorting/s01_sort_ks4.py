@@ -22,7 +22,6 @@ import torch
 
 #%% Load inputs
 spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
-# print(spike_sorting_done_path)
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
  [spike_sorting_done_path], 'spike_sorting')
 
@@ -84,10 +83,11 @@ for idx_rec in idx_to_sort:
                 'results_dir': output_si_sorted_folder/probe_name}
     
     
-    # run_kilosort(settings=settings, probe_name='neuropixPhase3B1_kilosortChanMap.mat', device=device)
+    run_kilosort(settings=settings, probe_name='neuropixPhase3B1_kilosortChanMap.mat', device=device)
     
         
     rec2save = rec_properties.iloc[[idx_rec]].copy()
+    # cannot save in the probe folder otherwise spikeinterface will complain
     rec2save.to_csv(output_si_sorted_folder/'rec_prop.csv', index=False) #also save the recording property
 
 
