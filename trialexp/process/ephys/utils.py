@@ -40,6 +40,35 @@ def denest_string_cell(cell):
             return str(cell[0])
 
 
+def analyzer2dataframe(analyzer):
+    # Convert the sorting analyzer object in spikeinterface to dataframe
+    units_ids = analyzer.unit_ids
+    metrics = {}
+    df2join=[]
+    other_metrics = {}
+    for extension in analyzer.get_loaded_extension_names():
+        wv = analyzer.get_extension(
+            extension_name=extension
+        )
+        data = wv.get_data()
+
+        if type(data) is np.ndarray and data.shape[0] == len(units_ids):
+            metrics[extension] = data.tolist()
+        elif type(data) is pd.core.frame.DataFrame:
+            df2join.append(data)
+        else:
+            other_metrics[extension] = data
+            
+
+    df_metrics = pd.DataFrame(metrics)
+    df_metrics['unit_id'] = units_ids
+    for df in df2join:
+        df['unit_id'] = units_ids
+        df_metrics = df_metrics.merge(df, on='unit_id')
+        
+    df_metrics.attrs.update(other_metrics)
+    
+    return df_metrics
 def session_and_probe_specific_uid(session_ID: str, probe_name: str, uid: int):
     '''
     Build unique cluster identifier string of cluster (UID),

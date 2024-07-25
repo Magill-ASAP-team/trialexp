@@ -17,7 +17,7 @@ from spikeinterface.postprocessing import compute_principal_components
 from snakehelper.SnakeIOHelper import getSnake
 import spikeinterface.extractors as se
 from spikeinterface import qualitymetrics
-from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid
+from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid, analyzer2dataframe
 import shutil
 import settings
 import time
@@ -104,6 +104,14 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
     analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
     
+    
+    df_metrics = analyzer2dataframe(analyzer)
+    df_metrics['session_ID'] = session_ID
+    df_metrics['probe_name'] = probe_name
+    df_metrics['cluster_id'] = df_metrics['unit_id']
+    df_metrics['cluID'] = df_metrics['unit_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
+    
+    df_quality_metrics.append(df_metrics)
     # remove waveform folder if it exists, stupid spikeinterface can't handle it itself
     # if waveform_folder.exists():
     #     shutil.rmtree(waveform_folder)
@@ -146,7 +154,7 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # #                                        n_jobs=10)
 
 
-    # # combine all the metrics into a dataframe
+    # # combine all the metrics into a dataframe'
 
     # metrics['correlograms'] = si_correlograms.tolist()
     # metrics['template_similarities'] = si_template_similarities.tolist()
@@ -162,32 +170,5 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # df_quality_metrics.append(metrics)
     
 #%% save output
-# df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
-# df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
-
-# %%
-# Combine all metrics together
-units_ids = analyzer.unit_ids
-metrics = {}
-df2join=[]
-for extension in analyzer.get_loaded_extension_names():
-    wv = analyzer.get_extension(
-        extension_name=extension
-    )
-    print(extension)
-    data = wv.get_data()
-    print(type(data))
-    try:
-        print(wv.get_data().shape)
-    except:
-        print(wv.get_data())
-        
-    if type(data) is np.ndarray and data.shape[0] == len(units_ids):
-        metrics[extension] = data.tolist()
-    elif type(data) is pd.core.frame.DataFrame:
-        df2join.append(data)
-        
-
-df_metrics = pd.DataFrame(metrics)
-df_metrics['cluster_id'] = units_ids
-# %%
+df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
+df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
