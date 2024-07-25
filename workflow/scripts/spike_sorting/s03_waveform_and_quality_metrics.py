@@ -19,8 +19,8 @@ import spikeinterface.extractors as se
 from spikeinterface import qualitymetrics
 from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid
 import shutil
-
 import settings
+import time
 #%% Load inputs
 
 
@@ -72,65 +72,122 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # double check we have the correct recording
     assert int(recording.get_total_duration()) == int(duration), 'Error: recording durations do not match!'
 
-    waveform_folder = probe_folder.parents[1]/'si'/'waveform'/probe_name
+    waveform_folder = probe_folder.parents[1]/'si'/probe_name
     
-    # remove waveform folder if it exists, stupid spikeinterface can't handle it itself
     if waveform_folder.exists():
         shutil.rmtree(waveform_folder)
+        
+    # Calculate metrics for the sorting
+    analyzer = si.create_sorting_analyzer(sorting=sorting, recording=recording
+                                          )
     
-    we = si.extract_waveforms(recording, 
-                            sorting, 
-                            folder=waveform_folder,
-                            max_spikes_per_unit=100, 
-                            ms_before=1,
-                            ms_after=2,
-                            chunk_duration = '10s',
-                            n_jobs=10, # too high may over-subscribe the resouces of Jade, and actually slower
-                            progress_bar=True
-                            )
+    analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=100)
+    analyzer.compute("waveforms")
+    analyzer.compute("templates")
+    analyzer.compute("unit_locations")
+    analyzer.compute("template_metrics")
+    analyzer.compute("noise_levels")
+    analyzer.compute(input="correlograms",
+                        window_ms=50.0,
+                        bin_ms=1.0,
+                        method="auto")
+    isi =  analyzer.compute(input="isi_histograms",
+                         window_ms=50.0,
+                         bin_ms=1.0,
+                         method="auto")
+
+    print('I am now calculating the quality metrics of the sorting')
+    # analyzer.compute("principal_components")
+    
+    metric_names=['firing_rate', 'presence_ratio', 'snr', 'isi_violation', 'amplitude_cutoff']
+
+    amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
+    analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
+    
+    # remove waveform folder if it exists, stupid spikeinterface can't handle it itself
+    # if waveform_folder.exists():
+    #     shutil.rmtree(waveform_folder)
+        
+    # time.sleep(1)
+    
+    # we = si.extract_waveforms(recording, 
+    #                         sorting, 
+    #                         folder=waveform_folder,
+    #                         max_spikes_per_unit=100, 
+    #                         ms_before=1,
+    #                         ms_after=2,
+    #                         chunk_duration = '10s',
+    #                         n_jobs=10, # too high may over-subscribe the resouces of Jade, and actually slower
+    #                         progress_bar=True
+    #                         )
  
-    # we = si.load_waveforms(waveform_folder) #only for debugging
+    # # we = si.load_waveforms(waveform_folder) #only for debugging
     
-    # compute all other informations
-    si_correlograms, correlo_bins = si.compute_correlograms(we)
-    si_template_similarities = si.compute_template_similarity(we)
-    si_locations = si.compute_unit_locations(we)
+    # # compute all other informations
+    # si_correlograms, correlo_bins = si.compute_correlograms(we)
+    # si_template_similarities = si.compute_template_similarity(we)
+    # si_locations = si.compute_unit_locations(we)
     
-    # note: need to be using spikeinterface >0.98
-    metric_names =  qualitymetrics.get_quality_metric_list()
-    metric_names.remove('sliding_rp_violation')
-    metrics = qualitymetrics.compute_quality_metrics(we, 
-        progress_bar = True, 
-        n_jobs = 10,       
-        metric_names = metric_names)
+    # # note: need to be using spikeinterface >0.98
+    # metric_names =  qualitymetrics.get_quality_metric_list()
+    # metric_names.remove('sliding_rp_violation')
+    # metrics = qualitymetrics.compute_quality_metrics(we, 
+    #     progress_bar = True, 
+    #     n_jobs = 10,       
+    #     metric_names = metric_names)
 
 
     
-    # PCA metrics are too slow, disabled for now
-    # pca = si.compute_principal_components(we, progress_bar=True, n_jobs=10)
-    # pca_metrics = ['isolation_distance','l_ratio']
-    # qualitymetrics.compute_quality_metrics(we, metric_names=pca_metrics,     
-    #                                        progress_bar = True,
-    #                                        n_jobs=10)
+    # # PCA metrics are too slow, disabled for now
+    # # pca = si.compute_principal_components(we, progress_bar=True, n_jobs=10)
+    # # pca_metrics = ['isolation_distance','l_ratio']
+    # # qualitymetrics.compute_quality_metrics(we, metric_names=pca_metrics,     
+    # #                                        progress_bar = True,
+    # #                                        n_jobs=10)
 
 
-    # combine all the metrics into a dataframe
+    # # combine all the metrics into a dataframe
 
-    metrics['correlograms'] = si_correlograms.tolist()
-    metrics['template_similarities'] = si_template_similarities.tolist()
-    metrics['locations'] = si_locations.tolist()
-    # metrics.attrs['correlo_bins'] = correlo_bins
+    # metrics['correlograms'] = si_correlograms.tolist()
+    # metrics['template_similarities'] = si_template_similarities.tolist()
+    # metrics['locations'] = si_locations.tolist()
+    # # metrics.attrs['correlo_bins'] = correlo_bins
 
 
-    metrics['session_ID'] = session_ID
-    metrics['probe_name'] = probe_name
-    metrics['cluster_id'] = metrics.index.values
-    metrics['cluID'] = metrics['cluster_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
+    # metrics['session_ID'] = session_ID
+    # metrics['probe_name'] = probe_name
+    # metrics['cluster_id'] = metrics.index.values
+    # metrics['cluID'] = metrics['cluster_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
 
-    df_quality_metrics.append(metrics)
+    # df_quality_metrics.append(metrics)
     
 #%% save output
-df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
-df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
+# df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
+# df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
 
+# %%
+# Combine all metrics together
+units_ids = analyzer.unit_ids
+metrics = {}
+df2join=[]
+for extension in analyzer.get_loaded_extension_names():
+    wv = analyzer.get_extension(
+        extension_name=extension
+    )
+    print(extension)
+    data = wv.get_data()
+    print(type(data))
+    try:
+        print(wv.get_data().shape)
+    except:
+        print(wv.get_data())
+        
+    if type(data) is np.ndarray and data.shape[0] == len(units_ids):
+        metrics[extension] = data.tolist()
+    elif type(data) is pd.core.frame.DataFrame:
+        df2join.append(data)
+        
+
+df_metrics = pd.DataFrame(metrics)
+df_metrics['cluster_id'] = units_ids
 # %%
