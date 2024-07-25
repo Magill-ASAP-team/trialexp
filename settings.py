@@ -9,6 +9,8 @@ from pathlib import Path
 cwd = Path(os.getcwd())
 if cwd.name == 'scripts':
     auto_load_dotenv(str(cwd.parents[1]))
+if cwd.parent.name == 'scripts':
+    auto_load_dotenv(str(cwd.parents[2]))
 else:
     auto_load_dotenv()
 
