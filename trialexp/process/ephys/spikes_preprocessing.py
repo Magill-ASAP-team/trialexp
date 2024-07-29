@@ -43,6 +43,20 @@ def load_kilosort(ks_result_folder):
     return ks_results
 
 
+def add_ks_metadata(ks_results, df_metrics):
+    
+
+    templates = ks_results['templates']
+    max_chans = [np.argmax(np.max(np.abs(te),axis=0)) for te in templates]
+    chan_pos = [ks_results['channel_positions'][ch] for ch in max_chans]
+    
+    df_metrics['maxWaveformCh'] = max_chans
+    df_metrics['ks_chan_pos'] = chan_pos
+    df_metrics['ks_labels'] = ks_results['cluster_KSLabel']['KSLabel']
+    
+    # make sure the order is correct
+    assert all(df_metrics['unit_id'] == ks_results['cluster_KSLabel']['cluster_id'])
+
 def get_spike_trains(
         synced_timestamp_files: list, 
         spike_clusters_files: list, 
