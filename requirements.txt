@@ -1,6 +1,7 @@
 snakemake == 7.25.0
 pulp == 2.7.0
-numpy == 1.26.4
+numpy >=1.26,<2 #required by kilosort4
+pandas >=2.1,<2.2 #2.2 requires numpy 2
 kilosort[gui]
 scipy
 sonpy
