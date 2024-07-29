@@ -44,14 +44,23 @@ def load_kilosort(ks_result_folder):
 
 
 def add_ks_metadata(ks_results, df_metrics):
+    """
+    Adds metadata from ks_results to df_metrics DataFrame.
     
-
+    Args:
+        ks_results (dict): Dictionary containing results from Kilosort spike sorting.
+        df_metrics (pandas.DataFrame): DataFrame containing spike metrics.
+    
+    Returns:
+        None
+    """
     templates = ks_results['templates']
     max_chans = [np.argmax(np.max(np.abs(te),axis=0)) for te in templates]
-    chan_pos = [ks_results['channel_positions'][ch] for ch in max_chans]
+    chan_pos = np.stack([ks_results['channel_positions'][ch] for ch in max_chans])
     
     df_metrics['maxWaveformCh'] = max_chans
-    df_metrics['ks_chan_pos'] = chan_pos
+    df_metrics['ks_chan_pos_x'] = chan_pos[:,0]
+    df_metrics['ks_chan_pos_y'] = chan_pos[:,1]
     df_metrics['ks_labels'] = ks_results['cluster_KSLabel']['KSLabel']
     
     # make sure the order is correct

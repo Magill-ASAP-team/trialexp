@@ -57,7 +57,7 @@ def analyzer2dataframe(analyzer):
         elif type(data) is pd.core.frame.DataFrame:
             df2join.append(data)
         else:
-            if extension is not 'waveforms':
+            if extension != 'waveforms':
                 other_metrics[extension] = data
             
 
@@ -245,7 +245,7 @@ def plot_firing_rate(xr_fr_coord, xr_session, df_pycontrol, events2plot, xlim=No
     # the xr_fr_coord should already be sorted in pos_y
     
     style_plot()
-    assert all(np.diff(xr_fr_coord.pos_y)>=0), 'Error! Datset must be first sorted by pos_y'
+    assert all(np.diff(xr_fr_coord.ks_chan_pos_y)>=0), 'Error! Datset must be first sorted by pos_y'
     bin_duration = xr_fr_coord.attrs['bin_duration']
 
     
@@ -267,7 +267,7 @@ def plot_firing_rate(xr_fr_coord, xr_session, df_pycontrol, events2plot, xlim=No
     
     
     ax_fr.set_yticks(yticks)
-    ax_fr.set_yticklabels(xr_fr_coord.pos_y.data[yticks]); #the cooresponding label for the tick
+    ax_fr.set_yticklabels(xr_fr_coord.ks_chan_pos_y.data[yticks]); #the cooresponding label for the tick
     ax_fr.invert_yaxis()
     
     
@@ -283,13 +283,13 @@ def plot_firing_rate(xr_fr_coord, xr_session, df_pycontrol, events2plot, xlim=No
 
     # also plot the important pycontrol events
     
-    events2plot = df_pycontrol[df_pycontrol.name.isin(events2plot)]
+    events2plot = df_pycontrol[df_pycontrol.content.isin(events2plot)]
 
     ## Event
     evt_colours =['r','g','b','w']
     # Note: the time coordinate of the firing map corresponds to the time bins
-    for i, event in enumerate(events2plot.name.unique()):
-        evt_time = events2plot[events2plot.name==event].time
+    for i, event in enumerate(events2plot.content.unique()):
+        evt_time = events2plot[events2plot.content==event].time
         evt_time_idx = [np.searchsorted(xr_fr_coord.time, t) for t in evt_time]
         # evt_time = evt_time/bin_duration
         ax_event.eventplot(evt_time_idx, lineoffsets=80+20*i, linelengths=20,label=event, color=evt_colours[i])
