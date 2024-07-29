@@ -57,7 +57,8 @@ def analyzer2dataframe(analyzer):
         elif type(data) is pd.core.frame.DataFrame:
             df2join.append(data)
         else:
-            other_metrics[extension] = data
+            if extension is not 'waveforms':
+                other_metrics[extension] = data
             
 
     df_metrics = pd.DataFrame(metrics)
