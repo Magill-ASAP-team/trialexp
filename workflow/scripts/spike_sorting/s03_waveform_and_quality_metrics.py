@@ -112,63 +112,10 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     df_metrics['cluID'] = df_metrics['unit_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
     
     df_quality_metrics.append(df_metrics)
-    # remove waveform folder if it exists, stupid spikeinterface can't handle it itself
-    # if waveform_folder.exists():
-    #     shutil.rmtree(waveform_folder)
-        
-    # time.sleep(1)
-    
-    # we = si.extract_waveforms(recording, 
-    #                         sorting, 
-    #                         folder=waveform_folder,
-    #                         max_spikes_per_unit=100, 
-    #                         ms_before=1,
-    #                         ms_after=2,
-    #                         chunk_duration = '10s',
-    #                         n_jobs=10, # too high may over-subscribe the resouces of Jade, and actually slower
-    #                         progress_bar=True
-    #                         )
- 
-    # # we = si.load_waveforms(waveform_folder) #only for debugging
-    
-    # # compute all other informations
-    # si_correlograms, correlo_bins = si.compute_correlograms(we)
-    # si_template_similarities = si.compute_template_similarity(we)
-    # si_locations = si.compute_unit_locations(we)
-    
-    # # note: need to be using spikeinterface >0.98
-    # metric_names =  qualitymetrics.get_quality_metric_list()
-    # metric_names.remove('sliding_rp_violation')
-    # metrics = qualitymetrics.compute_quality_metrics(we, 
-    #     progress_bar = True, 
-    #     n_jobs = 10,       
-    #     metric_names = metric_names)
 
 
-    
-    # # PCA metrics are too slow, disabled for now
-    # # pca = si.compute_principal_components(we, progress_bar=True, n_jobs=10)
-    # # pca_metrics = ['isolation_distance','l_ratio']
-    # # qualitymetrics.compute_quality_metrics(we, metric_names=pca_metrics,     
-    # #                                        progress_bar = True,
-    # #                                        n_jobs=10)
-
-
-    # # combine all the metrics into a dataframe'
-
-    # metrics['correlograms'] = si_correlograms.tolist()
-    # metrics['template_similarities'] = si_template_similarities.tolist()
-    # metrics['locations'] = si_locations.tolist()
-    # # metrics.attrs['correlo_bins'] = correlo_bins
-
-
-    # metrics['session_ID'] = session_ID
-    # metrics['probe_name'] = probe_name
-    # metrics['cluster_id'] = metrics.index.values
-    # metrics['cluID'] = metrics['cluster_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
-
-    # df_quality_metrics.append(metrics)
-    
 #%% save output
 df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
 df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
+
+# %%

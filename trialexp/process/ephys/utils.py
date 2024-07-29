@@ -66,6 +66,11 @@ def analyzer2dataframe(analyzer):
         df['unit_id'] = units_ids
         df_metrics = df_metrics.merge(df, on='unit_id')
         
+    #Special processing for correlogram
+    # only extract the auto-correlogram
+    if 'correlograms' in other_metrics.keys():
+        df_metrics['acg'] = [other_metrics['correlograms'][0][i,i] for i in range(len(df_metrics))]
+        
     df_metrics.attrs.update(other_metrics)
     
     return df_metrics
