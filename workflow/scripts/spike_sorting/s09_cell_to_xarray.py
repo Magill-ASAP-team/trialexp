@@ -186,7 +186,7 @@ trial_ts = xr.DataArray(
 
 )
 
-xr_spikes_trials = xr.merge([trial_out, trial_ts, *da_list], join='inner')
+xr_spikes_trials = xr.merge([trial_out, trial_ts,xr_kslabel, *da_list], join='inner')
 xr_spikes_trials.attrs['bin_duration'] = bin_duration
 xr_spikes_trials.attrs['sigma_ms'] = sigma_ms
 xr_spikes_trials.attrs['kernel'] = 'ExponentialKernel'

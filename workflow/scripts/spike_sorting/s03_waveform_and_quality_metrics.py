@@ -17,6 +17,7 @@ from spikeinterface.postprocessing import compute_principal_components
 from snakehelper.SnakeIOHelper import getSnake
 import spikeinterface.extractors as se
 from spikeinterface import qualitymetrics
+from trialexp.process.ephys.spikes_preprocessing import load_kilosort, add_ks_metadata
 from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid, analyzer2dataframe
 import shutil
 import settings
@@ -61,8 +62,8 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # sorting = si.load_extractor(probe_folder.parents[1]/'si'/'kilosort3'/probe_name)
     
     # remove MUA to speed up processing later
-    units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
-    sorting = sorting.remove_units(units2remove)
+    # units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
+    # sorting = sorting.remove_units(units2remove)
     
     # load the correct recording
     recording = se.read_openephys(recording_path, stream_name=stream)
@@ -81,7 +82,7 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     analyzer = si.create_sorting_analyzer(sorting=sorting, recording=recording
                                           )
     
-    analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=100)
+    analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=500)
     analyzer.compute("waveforms")
     analyzer.compute("templates")
     analyzer.compute("unit_locations")
@@ -111,6 +112,14 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     df_metrics['cluster_id'] = df_metrics['unit_id']
     df_metrics['cluID'] = df_metrics['unit_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
     
+    # Calculate the unit position
+    # unit_positions from spikeinterface is calculated using monopolar interpolation (Boussard 2021, NeurIPS)
+    # but sometimes it may gives us some crazy locations
+    # ks_chan_pos is just calculated using the location of the channel with the largest amplitude
+    # the two positions in general align with each other except for MUA neurons
+    ks_results = load_kilosort(probe_folder)
+    add_ks_metadata(ks_results, df_metrics)
+
     df_quality_metrics.append(df_metrics)
 
 
