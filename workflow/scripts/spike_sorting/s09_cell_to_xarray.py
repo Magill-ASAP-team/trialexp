@@ -132,8 +132,6 @@ spike_zfr_xr_session = xr.DataArray(
     dims=('time', 'cluID')
     )
 
-xr_kslabel = xr.Dataset.from_dataframe(df_kslabels)
-
 # Take reference only from the cells included in Cell Explorer
 xr_spikes_fr = xr.merge([spike_fr_xr_session, spike_zfr_xr_session, xr_kslabel], join='inner')
 # xr_spikes_fr = xr_spikes_fr.sel(cluID=xr_cell_metrics.cluID) #only choose the 'good' cell from kilosort
@@ -186,7 +184,17 @@ trial_ts = xr.DataArray(
 
 )
 
-xr_spikes_trials = xr.merge([trial_out, trial_ts,xr_kslabel, *da_list], join='inner')
+#%% load 
+df_quality_metrics = pd.read_pickle(sinput.df_quality_metrics)
+df_quality_metrics = df_quality_metrics.set_index('cluID')
+xr_metrics = xr.Dataset.from_dataframe(df_quality_metrics[['ks_chan_pos_x',
+                                                           'ks_chan_pos_y',
+                                                           'probe_name',
+                                                           'maxWaveformCh',
+                                                           'ks_labels']])
+#%%
+
+xr_spikes_trials = xr.merge([trial_out, trial_ts,xr_metrics, *da_list], join='inner')
 xr_spikes_trials.attrs['bin_duration'] = bin_duration
 xr_spikes_trials.attrs['sigma_ms'] = sigma_ms
 xr_spikes_trials.attrs['kernel'] = 'ExponentialKernel'

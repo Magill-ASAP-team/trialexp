@@ -94,9 +94,9 @@ rule ephys_sync:
 
 rule cells_to_xarray:
     input:
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',   
-        # cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc' 
     output:
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
