@@ -48,7 +48,7 @@ df_quality_metrics = []
 for probe_folder in kilosort_folder.glob('Probe*'):
     
     # Check which recording we should load
-    rec_properties = pd.read_csv(probe_folder.parent/'rec_prop.csv').iloc[0]
+    rec_properties = pd.read_csv(probe_folder.parent/f'rec_prop_{probe_folder.name}.csv').iloc[0]
     recording_path = root_data_path/Path('/'.join(Path(rec_properties.full_path).parts[-10:-3]))
     stream = rec_properties.AP_stream
     segment_num = rec_properties.seg_index
@@ -62,8 +62,8 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # sorting = si.load_extractor(probe_folder.parents[1]/'si'/'kilosort3'/probe_name)
     
     # remove MUA to speed up processing later
-    # units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
-    # sorting = sorting.remove_units(units2remove)
+    units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
+    sorting = sorting.remove_units(units2remove)
     
     # load the correct recording
     recording = se.read_openephys(recording_path, stream_name=stream)
@@ -118,7 +118,7 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # ks_chan_pos is just calculated using the location of the channel with the largest amplitude
     # the two positions in general align with each other except for MUA neurons
     ks_results = load_kilosort(probe_folder)
-    add_ks_metadata(ks_results, df_metrics)
+    add_ks_metadata(ks_results, df_metrics, good_only=True)
 
     df_quality_metrics.append(df_metrics)
 

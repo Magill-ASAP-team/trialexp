@@ -64,11 +64,9 @@ rule waveform_and_quality_metrics:
     input:
         kilosort_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort4',
         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        # si_output_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort4',
         sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'
     output:
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
-        si_quality_complete = touch('{sessions}/{task_path}/{session_id}/processed/si_quality.done')
     threads: 32
     script:
         "scripts/spike_sorting/s03_waveform_and_quality_metrics.py"
@@ -76,7 +74,7 @@ rule waveform_and_quality_metrics:
 
 rule ephys_sync:
     input:
-        metrics_complete = '{sessions}/{task_path}/{session_id}/processed/spike_metrics.done'
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     output:
         ephys_sync_complete = touch('{sessions}/{task_path}/{session_id}/processed/ephys_sync.done')
     script:
