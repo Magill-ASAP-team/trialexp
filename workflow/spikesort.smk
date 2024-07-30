@@ -99,6 +99,7 @@ rule cells_to_xarray:
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         neo_spike_train = '{sessions}/{task_path}/{session_id}/processed/neo_spiketrain.pkl',
+        df_aggregate = '{sessions}/{task_path}/{session_id}/processed/df_aggregate.pkl',
     script:
         "scripts/spike_sorting/s09_cell_to_xarray.py"
 
@@ -141,6 +142,7 @@ def session_correlations_input(wildcards):
 rule session_correlations:
     input: 
         xr_spike_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
+        xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
     output:
         df_cross_corr = '{sessions}/{task_path}/{session_id}/processed/df_cross_corr.pkl',
         corr_plot = '{sessions}/{task_path}/{session_id}/processed/ephys/correlated_cells.png',

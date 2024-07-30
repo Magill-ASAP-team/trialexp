@@ -135,15 +135,15 @@ def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration
     num_clusters = len(xr_inst_rates.cluID)
     time_vector = xr_inst_rates.time
 
-    num_time_points = int(trial_window[0] + trial_window[1]) // bin_duration +1
-    trial_time_vec = np.linspace(-trial_window[0], trial_window[1], num_time_points)
+    num_time_points = int(trial_window[1]-trial_window[0]) // bin_duration +1
+    trial_time_vec = np.linspace(trial_window[0], trial_window[1], num_time_points)
     trial_data = np.empty((num_trials, num_time_points, num_clusters))
 
     for i, timestamp in enumerate(evt_timestamps):
         if np.isnan(timestamp):  # Skip NaN timestamps
             continue
         
-        start_time = timestamp - trial_window[0]
+        start_time = timestamp + trial_window[0]
 
         # Find the indices of the time points within the trial window
         start_idx = np.searchsorted(time_vector, start_time, side='left')
@@ -157,17 +157,31 @@ def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration
     return trial_data, trial_time_vec
 
 
-def build_evt_fr_xarray(fr_xr, timestamps, trial_index, name, trial_window, bin_duration):
+def build_evt_fr_xarray(fr_xr, timestamps, trial_index, name, trial_window, bin_duration, trial_based=True):
     # Construct an xr.DataArray with firing rate triggered by the specified timestamps
     
-    trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
     
-    da = xr.DataArray(
-        trial_rates,
-        name = name,
-        coords={'trial_nb': trial_index, 'spk_event_time': trial_time_vec, 'cluID': fr_xr.cluID},
-        dims=('trial_nb', 'spk_event_time', 'cluID')
-        )
+    if trial_based:
+        trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
+        da = xr.DataArray(
+            trial_rates,
+            name = name,
+            coords={'trial_nb': trial_index, 'spk_event_time': trial_time_vec, 'cluID': fr_xr.cluID},
+            dims=('trial_nb', 'spk_event_time', 'cluID')
+            )
+    else:
+        # Concatenate the timestamps
+        timestamps = timestamps.dropna()
+        timestamps = timestamps.sum()
+        trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
+        
+        da = xr.DataArray(
+            trial_rates,
+            name = name,
+            coords={f'{name}_idx': np.arange(len(timestamps)), 'spk_event_time': trial_time_vec, 'cluID': fr_xr.cluID},
+            dims=(f'{name}_idx', 'spk_event_time', 'cluID')
+            )
+        
     
     return da
 
@@ -240,10 +254,18 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
         # add timestamp of particuliar behavioral phases
         df_aggregated = pd.concat([df_aggregated, event_filters.extract_event_time(df_events_cond, filter, dict())], axis=1)
 
+    #add any extra event triggers
+    extra_event_triggers = df_events_cond.attrs['extra_event_triggers']
+    for ev_name in extra_event_triggers:
+        df = event_filters.get_events_from_name(df_events_cond, ev_name)
+        evt_col = df.groupby('trial_nb')['time'].agg(list)
+        df_aggregated = pd.concat([df_aggregated, evt_col], axis=1)
 
+    
     # rename the columns
-    df_aggregated.columns = ['trial_outcome', 'trial_onset',  *behav_phases_filters.keys()]
+    trigger = df_events_cond.attrs['triggers'][0]
+    df_aggregated.columns = ['trial_outcome', 'trial_onset',  *behav_phases_filters.keys(), *extra_event_triggers]
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
-    df_aggregated['pre-cue1000'] = df_aggregated.trial_onset - 1000 # Hard coded, 2000ms resting period, perhaps adapt to a parameter?
+    df_aggregated[trigger] = df_aggregated.trial_onset
 
     return df_aggregated
