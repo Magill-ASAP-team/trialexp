@@ -56,7 +56,6 @@ bin_duration = 10 # ms for binning spike timestamps
 #ms for half-gaussian kernel size (1SD duration), 
 # 20ms as suggest from Martin et al (1999) https://www.sciencedirect.com/science/article/pii/S0165027099001272#FIG4
 sigma_ms = 20 #
-trial_window = (500, 2000) # time before and after timestamps to extract
 
 #%% File loading
 
@@ -75,6 +74,8 @@ xr_metrics = xr.Dataset.from_dataframe(df_quality_metrics[['ks_chan_pos_x',
                                                            'ks_labels']])
 
 
+trial_window = df_events_cond.attrs['trial_window']
+
 #%% Gathering trial outcomes and timestamps of different phases
 
 
@@ -82,9 +83,11 @@ df_aggregated = make_evt_dataframe(df_trials, df_conditions, df_events_cond)
 
 behav_phases = list(df_aggregated.columns)
 behav_phases.remove('trial_outcome')# exclude trial outcome column
+extra_behav_phases = df_events_cond.attrs['extra_event_triggers'] # events not fixed to trial structure
 
+df_aggregated.attrs['extra_behav_phases'] = extra_behav_phases
 
-ks_results = load_kilosort(sorting_path/'ProbeA')
+df_aggregated.to_pickle(soutput.df_aggregate)
 #%% Extract instantaneous rates (continuous) from spike times (discrete)
 
 spike_trains, all_clusters_UIDs, df_kslabels = get_spike_trains(
@@ -160,16 +163,17 @@ da_list = []
 for ev_idx, ev_name in enumerate(behav_phases): 
 
     timestamps = df_aggregated[ev_name]
-    # # Binning by trials, 3D output (trial, time, cluster)
-    da_list.append(build_evt_fr_xarray(spike_fr_xr_session, timestamps,
-                                       df_aggregated.index, f'spikes_FR.{ev_name}', 
-                                        trial_window, bin_duration))
     
-    da_list.append(build_evt_fr_xarray(spike_zfr_xr_session,
+    trial_based = False if ev_name in extra_behav_phases else True
+
+    # # Binning by trials, 3D output (trial, time, cluster)
+    da_list.append(build_evt_fr_xarray(xr_spikes_fr['spikes_FR_session'], timestamps,
+                                       df_aggregated.index, f'spikes_FR.{ev_name}', 
+                                        trial_window, bin_duration, trial_based=trial_based))
+    
+    da_list.append(build_evt_fr_xarray(xr_spikes_fr['spikes_zFR_session'],
                                        timestamps, df_aggregated.index, f'spikes_zFR.{ev_name}',
-                                        trial_window, bin_duration))
-
-
+                                        trial_window, bin_duration, trial_based=trial_based))
 
 #%% Adding trials metadata
 
@@ -182,19 +186,10 @@ trial_out = xr.DataArray(
 
 )
 
-# trial timestamps
-trial_ts = xr.DataArray(
-    df_aggregated.iloc[:,1:],
-    name= 'trial_timestamps',
-    coords= {'trial_nb': df_aggregated.index, 'trial_phase': df_aggregated.columns[1:]},
-    dims = ('trial_nb', 'trial_phase')
-
-)
-
 
 #%%
 # TODO: only work on good unit to save time and storage
-xr_spikes_trials = xr.merge([trial_out, trial_ts,xr_metrics, *da_list], join='inner')
+xr_spikes_trials = xr.merge([trial_out,xr_metrics, *da_list], join='inner')
 xr_spikes_trials.attrs['bin_duration'] = bin_duration
 xr_spikes_trials.attrs['sigma_ms'] = sigma_ms
 xr_spikes_trials.attrs['kernel'] = 'ExponentialKernel'
