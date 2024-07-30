@@ -144,7 +144,6 @@ spike_zfr_xr_session = xr.DataArray(
 
 # Take reference only from the cells included in Cell Explorer
 xr_spikes_fr = xr.merge([spike_fr_xr_session, spike_zfr_xr_session, xr_metrics], join='inner')
-# xr_spikes_fr = xr_spikes_fr.sel(cluID=xr_cell_metrics.cluID) #only choose the 'good' cell from kilosort
 xr_spikes_fr.attrs['bin_duration'] = bin_duration
 xr_spikes_fr.attrs['sigma_ms'] = sigma_ms
 xr_spikes_fr.attrs['kernel'] = 'ExponentialKernel'
@@ -164,9 +163,8 @@ for ev_idx, ev_name in enumerate(behav_phases):
 
     timestamps = df_aggregated[ev_name]
     
-    trial_based = False if ev_name in extra_behav_phases else True
+    trial_based = False if ev_name in extra_behav_phases else True #whether we should group by trial or not
 
-    # # Binning by trials, 3D output (trial, time, cluster)
     da_list.append(build_evt_fr_xarray(xr_spikes_fr['spikes_FR_session'], timestamps,
                                        df_aggregated.index, f'spikes_FR.{ev_name}', 
                                         trial_window, bin_duration, trial_based=trial_based))

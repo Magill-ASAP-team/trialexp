@@ -783,17 +783,36 @@ def get_random_evt_data(xr_fr, da, trial_window, num_sample=1000):
     return da_rand
 
 def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5):
+    """
+    Create a comparison dataframe by combining two input DataArrays and adding group labels.
+
+    Parameters:
+    - da_rand (xarray.DataArray): Random DataArray.
+    - da (xarray.DataArray): Event-triggered DataArray.
+    - cluID (str): Cluster ID.
+    - dpvar_name (str): Name of the dependent variable.
+    - coarsen_factor (int, optional): Coarsening factor for spk_event_time. Default is 5.
+
+    Returns:
+    - data2test (pandas.DataFrame): Comparison dataframe with group labels.
+
+    """
     da1 = da_rand.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
-    da1 = da1.to_dataframe().reset_index()
-    da1['group'] = 'random'
-    da1 = da1.dropna()
+    df_da1 = da1.to_dataframe().reset_index()
+    df_da1['group'] = 'random'
+    df_da1 = df_da1.dropna()
 
     da2 = da.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
-    da2 = da2.to_dataframe().reset_index()
-    da2['group'] = 'event-triggered'
-    da2['trial_nb'] += da1.trial_nb.max()
+    df_da2 = da2.to_dataframe().reset_index()
+    df_da2['group'] = 'event-triggered'
+    
+    # Do it separately for data without a trial structure
+    if 'trial_nb' not in da2.dims:
+        # rename the column to make a dummy trial_nb
+        df_da2 = df_da2.rename(columns={da2.dims[0]:'trial_nb'})
 
-    data2test = pd.concat([da1, da2])
+    df_da2['trial_nb'] += df_da1.trial_nb.max()+1
+    data2test = pd.concat([df_da1, df_da2])
     
     data2test = data2test.rename(columns={dpvar_name:'dv'})
     data2test = data2test.dropna()

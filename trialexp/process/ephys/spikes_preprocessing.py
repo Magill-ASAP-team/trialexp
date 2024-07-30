@@ -264,8 +264,7 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
     
     # rename the columns
     trigger = df_events_cond.attrs['triggers'][0]
-    df_aggregated.columns = ['trial_outcome', 'trial_onset',  *behav_phases_filters.keys(), *extra_event_triggers]
+    df_aggregated.columns = ['trial_outcome', trigger,  *behav_phases_filters.keys(), *extra_event_triggers]
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
-    df_aggregated[trigger] = df_aggregated.trial_onset
 
     return df_aggregated
