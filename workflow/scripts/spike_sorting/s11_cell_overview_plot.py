@@ -82,8 +82,9 @@ for probe_name in probe_names:
     # a zoomed in version
     fig = plot_firing_rate(xr_fr_coord_probe, xr_session, df_pycontrol,
                         ['hold_for_water', 'spout','bar_off','aborted'],
-                        xlim=[2*60*1000, 3*60*1000]);
+                        xlim=[10*60*1000, 12*60*1000]);
 
     fig.savefig(figures_path/f'firing_map_{probe_name}_2min.png',dpi=200)
     
     
+# %%

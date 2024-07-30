@@ -66,6 +66,13 @@ df_events_cond = pd.read_pickle(session_root_path / 'df_events_cond.pkl')
 df_conditions = pd.read_pickle(session_root_path / 'df_conditions.pkl')
 df_trials = pd.read_pickle(session_root_path / 'df_trials.pkl')
 
+df_quality_metrics = pd.read_pickle(sinput.df_quality_metrics)
+df_quality_metrics = df_quality_metrics.set_index('cluID')
+xr_metrics = xr.Dataset.from_dataframe(df_quality_metrics[['ks_chan_pos_x',
+                                                           'ks_chan_pos_y',
+                                                           'probe_name',
+                                                           'maxWaveformCh',
+                                                           'ks_labels']])
 
 
 #%% Gathering trial outcomes and timestamps of different phases
@@ -133,7 +140,7 @@ spike_zfr_xr_session = xr.DataArray(
     )
 
 # Take reference only from the cells included in Cell Explorer
-xr_spikes_fr = xr.merge([spike_fr_xr_session, spike_zfr_xr_session, xr_kslabel], join='inner')
+xr_spikes_fr = xr.merge([spike_fr_xr_session, spike_zfr_xr_session, xr_metrics], join='inner')
 # xr_spikes_fr = xr_spikes_fr.sel(cluID=xr_cell_metrics.cluID) #only choose the 'good' cell from kilosort
 xr_spikes_fr.attrs['bin_duration'] = bin_duration
 xr_spikes_fr.attrs['sigma_ms'] = sigma_ms
@@ -184,16 +191,9 @@ trial_ts = xr.DataArray(
 
 )
 
-#%% load 
-df_quality_metrics = pd.read_pickle(sinput.df_quality_metrics)
-df_quality_metrics = df_quality_metrics.set_index('cluID')
-xr_metrics = xr.Dataset.from_dataframe(df_quality_metrics[['ks_chan_pos_x',
-                                                           'ks_chan_pos_y',
-                                                           'probe_name',
-                                                           'maxWaveformCh',
-                                                           'ks_labels']])
-#%%
 
+#%%
+# TODO: only work on good unit to save time and storage
 xr_spikes_trials = xr.merge([trial_out, trial_ts,xr_metrics, *da_list], join='inner')
 xr_spikes_trials.attrs['bin_duration'] = bin_duration
 xr_spikes_trials.attrs['sigma_ms'] = sigma_ms

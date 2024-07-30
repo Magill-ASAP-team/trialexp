@@ -43,7 +43,7 @@ def load_kilosort(ks_result_folder):
     return ks_results
 
 
-def add_ks_metadata(ks_results, df_metrics):
+def add_ks_metadata(ks_results, df_metrics, good_only=False):
     """
     Adds metadata from ks_results to df_metrics DataFrame.
     
@@ -54,17 +54,24 @@ def add_ks_metadata(ks_results, df_metrics):
     Returns:
         None
     """
+    ks_labels = ks_results['cluster_KSLabel']['KSLabel'].values
+    good_idx = (ks_labels=='good')
+    
+    sel_idx = np.arange(len(ks_labels))
+    if good_only:
+        sel_idx = good_idx
+            
     templates = ks_results['templates']
-    max_chans = [np.argmax(np.max(np.abs(te),axis=0)) for te in templates]
+    max_chans = np.array([np.argmax(np.max(np.abs(te),axis=0)) for te in templates])
     chan_pos = np.stack([ks_results['channel_positions'][ch] for ch in max_chans])
     
-    df_metrics['maxWaveformCh'] = max_chans
-    df_metrics['ks_chan_pos_x'] = chan_pos[:,0]
-    df_metrics['ks_chan_pos_y'] = chan_pos[:,1]
-    df_metrics['ks_labels'] = ks_results['cluster_KSLabel']['KSLabel']
+    df_metrics['maxWaveformCh'] = max_chans[sel_idx]
+    df_metrics['ks_chan_pos_x'] = chan_pos[sel_idx,0]
+    df_metrics['ks_chan_pos_y'] = chan_pos[sel_idx,1]
+    df_metrics['ks_labels'] = ks_labels[sel_idx]
     
     # make sure the order is correct
-    assert all(df_metrics['unit_id'] == ks_results['cluster_KSLabel']['cluster_id'])
+    assert all(df_metrics['unit_id'].values == ks_results['cluster_KSLabel']['cluster_id'][sel_idx].values), 'unit_id mismatch'
 
 def get_spike_trains(
         synced_timestamp_files: list, 
