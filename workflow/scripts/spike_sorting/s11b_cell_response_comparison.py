@@ -43,14 +43,14 @@ style_plot()
 df_list = []
 
 success_trial = xr_spikes_trials.trial_outcome=='success'
-
 if np.sum(success_trial)>0:
     for varname in var2plot:
         print('I will now do the comparison for ', varname)
         da = xr_spikes_trials[varname]
         
         #only select successful trial
-        da = da.sel(trial_nb = success_trial)
+        if 'trial_nb' in da.dims:
+            da = da.sel(trial_nb = success_trial)
         
         da_rand = get_random_evt_data(xr_fr, da, trial_window)
 
