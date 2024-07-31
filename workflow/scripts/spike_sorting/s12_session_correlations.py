@@ -18,16 +18,18 @@ from matplotlib import pyplot as plt
 from plotly.subplots import make_subplots
 from snakehelper.SnakeIOHelper import getSnake
 
-from trialexp.process.ephys.utils import crosscorr_lag_range, plot_correlated_neurons
+from trialexp.process.ephys.utils import calculate_pearson_lags
 from trialexp.process.group_analysis.plot_utils import style_plot
 from trialexp.process.pyphotometry.utils import *
 import settings
+import itertools
 from tqdm.auto import tqdm
+from loguru import logger
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/df_cross_corr.pkl'],
+  [settings.debug_folder + r'/processed/xr_corr.nc'],
   'session_correlations')
 
 # %% Path definitions
@@ -52,107 +54,38 @@ df_pycontrol = pd.read_pickle(session_root_path/'df_pycontrol.pkl')
 # calculate the maximum cross-correlation within a range
 photom_vars = ['_zscored_df_over_f', '_zscored_df_over_f_analog_2']
 var = [v.replace(photom_vars[0],'') for v in xr_session.data_vars.keys() if v.endswith(photom_vars[0])]
+var2analyze = list(itertools.product(var, photom_vars))
 
-var2compare = 'first_spout'
-
-fr = xr_spike_fr_interp[f'spikes_FR.{var2compare}']
-photom = xr_session[f'{var2compare}{photom_vars[0]}']
-
-fr_data = fr.data
-photom_data = np.squeeze(photom.data)
-
-#%%
-from scipy.stats import pearsonr
-
-def calculate_pearson_lags(x, y, max_lag, lag_step=1):
-    """
-    Calculate Pearson correlation coefficients and lags between two signals.
+def analyze_correlation(fr_data, photom_data, name, evt_time_step):
+    # Calculate the correlation of each units with the photometry signal
+    photom_data = np.squeeze(photom_data)
     
-    Improve speed by creating a lag matrix.
-    Each row of the lag matrix corresponds to the original signal shifted by some lag.
-    The shifted signals from all trials are flattened into one row.
-
-    Args:
-        x (ndarray): The first signal.
-        y (ndarray): The second signal.
-        max_lag (int): The maximum lag to consider.
-
-    Returns:
-        tuple: A tuple containing:
-            - lags (ndarray): The array of lag values.
-            - correlations (ndarray): The correlation matrix containing the auto and cross correlations.
-            - corr (ndarray): The cross-correlation values.
-     
-    """
-    lags = np.arange(-max_lag, max_lag + 1, lag_step)
-    correlations = np.zeros(len(lags))
-    # y = np.tile(y, (x.shape[0],1)) # expand into a matrix
-    xm = np.zeros((len(lags),x.shape[0]*x.shape[1]))
-    ym = np.zeros_like(xm)
+    print(f'Processing {name}')
+    max_lags = 50
+    lag_step = 2
+    nlags = max_lags//lag_step
     
-    for i, lag in enumerate(lags):
-        if lag < 0:
-            shifted_x = x[:,:lag]
-            shifted_y = y[:,-lag:]
-        elif lag > 0:
-            shifted_x = x[:,lag:]
-            shifted_y = y[:,:-lag]
-        else:
-            shifted_x = x
-            shifted_y = y
-        
-        # remove NAN data
-        valid_idx = ~np.isnan(shifted_y.mean(axis=1))
-        shifted_x = shifted_x[valid_idx,:].ravel()
-        shifted_y = shifted_y[valid_idx,:].ravel() 
-        
-        assert len(shifted_x) == len(shifted_y), f'Length mismatch {len(shifted_x)} vs {len(shifted_y)}'
-        xm[i, :len(shifted_x)] = shifted_x
-        ym[i, :len(shifted_y)] = shifted_y
+    corr = np.zeros((fr_data.shape[2],nlags*2+1))
+    for i in range(fr_data.shape[2]):
+        lags,_, corr[i,:] = calculate_pearson_lags(fr_data[:,:,i], photom_data,max_lags, lag_step)
     
-    correlations= np.corrcoef(xm, ym) #contains the auto and then cross correlation between variables
-    halfw = len(correlations)//2
-    corr = np.diag(correlations[halfw:, :halfw]) # the bottom quandrant is the cross-correlation
-    return lags,correlations,corr
+    xr_data = xr.DataArray(corr,
+                           name = name,
+                           dims=['cluID', 'lag'],
+                           coords={'cludID':fr.cluID, 'lag':lags*evt_time_step})
+    return xr_data
 
-max_lags = 50
-lag_step = 5
-nlags = max_lags//lag_step
-c = np.zeros((fr_data.shape[2], nlags*2+1, fr_data.shape[2]))
-corr = np.zeros((fr_data.shape[2],nlags*2+1))
-for i in tqdm(range(fr_data.shape[2])):
-    lags,_, corr[i,:] = calculate_pearson_lags(fr_data[:,:,i], photom_data,max_lags, lag_step)
-#%%    
-plt.imshow(corr,aspect='auto');plt.colorbar()
-
-#%%
 evt_time = xr_spike_fr_interp.spk_event_time
 evt_time_step = np.mean(np.diff(evt_time))
+results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_fr_interp[f'spikes_FR.{evt_name}'].data,
+                                                           xr_session[f'{evt_name}{sig_name}'].data,
+                                                           evt_name+sig_name,
+                                                           evt_time_step) for evt_name, sig_name in var2analyze)
 
-max_id = np.argsort(corr.min(axis=1))
-plt.plot(lags*evt_time_step, corr[max_id[0],:])
-
-fig, axes = plt.subplots(3,3,figsize=(3*3,3*3))
-
-
-for i,ax in enumerate(axes.flat):
-    ax2 = ax.twinx()
-
-    ax.plot(evt_time, fr_data[:,:,max_id[i]].mean(axis=0), label='unit firing')
-    ax2.plot(evt_time, np.nanmean(photom_data,axis=0),'r', label='photometry')
-
-fig.tight_layout()
 #%%
-df_cross_corr = pd.DataFrame({
-    'cluID': UIDs.values,
-    'cross_corr': cross_corr.tolist()
-})
-df_cross_corr.to_pickle(soutput.df_cross_corr)
-#%% Plot the first few cell with maximum cross correlation with photometry
+xr_corr = xr.merge(results)
+xr_corr.to_netcdf(soutput.xr_corr, engine='h5netcdf')
 
-fig = plot_correlated_neurons(cross_corr, xr_spike_session, lags, n_fig=8)
-fig.savefig(soutput.corr_plot)
+#%%  Plot some example of units with high correlation
 
-# %%
-#TODO: event in specific type of trial
-# snakemake --snakefile workflow/spikesort.smk -n ~/ettin/Julien/Data/head-fixed/by_sessions/reaching_go_spout_bar_nov22/kms058-2023-03-25-184034/processed/spike_workflow.done
+
