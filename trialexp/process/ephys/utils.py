@@ -464,6 +464,8 @@ def calculate_pearson_lags(x, y, max_lag, lag_step=1):
     Improve speed by creating a lag matrix.
     Each row of the lag matrix corresponds to the original signal shifted by some lag.
     The shifted signals from all trials are flattened into one row.
+    
+    At negative lag, y will be shifted left, positive lag vice versa
 
     Args:
         x (ndarray): The first signal.
