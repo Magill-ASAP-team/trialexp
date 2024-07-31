@@ -135,7 +135,7 @@ def session_correlations_input(wildcards):
     # only run if photometry file is present
     ppd_files = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
     if len(ppd_files)>0:
-        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/ephys/correlated_cells.png'
+        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/xr_corr.nc'
     else:
         return []
 
@@ -144,7 +144,7 @@ rule session_correlations:
         xr_spike_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
     output:
-        df_cross_corr = '{sessions}/{task_path}/{session_id}/processed/df_cross_corr.pkl',
+        xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
         corr_plot = '{sessions}/{task_path}/{session_id}/processed/ephys/correlated_cells.png',
     threads: 32
     script:
@@ -152,7 +152,7 @@ rule session_correlations:
 
 rule spikesort_done:
     input:
-        # corr_plot = session_correlations_input, 
+        corr_plot = session_correlations_input, 
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
         cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
         si_quality_complete = '{sessions}/{task_path}/{session_id}/processed/si_quality.done'

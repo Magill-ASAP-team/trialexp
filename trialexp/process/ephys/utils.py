@@ -32,6 +32,8 @@ from tslearn.metrics import dtw_variants
 from tslearn.metrics.dtw_variants import *
 from tslearn.barycenters import softdtw_barycenter
 import scipy
+from scipy.stats import pearsonr
+
 
 def denest_string_cell(cell):
         if len(cell) == 0: 
@@ -453,6 +455,57 @@ def crosscorr_lag_range(datax: pd.Series, datay: pd.Series, lags:list):
         cross_corr[lag_idx] = crosscorr(datax,datay,lag)
 
     return cross_corr
+
+
+def calculate_pearson_lags(x, y, max_lag, lag_step=1):
+    """
+    Calculate Pearson correlation coefficients and lags between two signals.
+    
+    Improve speed by creating a lag matrix.
+    Each row of the lag matrix corresponds to the original signal shifted by some lag.
+    The shifted signals from all trials are flattened into one row.
+
+    Args:
+        x (ndarray): The first signal.
+        y (ndarray): The second signal.
+        max_lag (int): The maximum lag to consider.
+
+    Returns:
+        tuple: A tuple containing:
+            - lags (ndarray): The array of lag values.
+            - correlations (ndarray): The correlation matrix containing the auto and cross correlations.
+            - corr (ndarray): The cross-correlation values.
+     
+    """
+    lags = np.arange(-max_lag, max_lag + 1, lag_step)
+    correlations = np.zeros(len(lags))
+    xm = np.zeros((len(lags),x.shape[0]*x.shape[1]))
+    ym = np.zeros_like(xm)
+    
+    for i, lag in enumerate(lags):
+        if lag < 0:
+            shifted_x = x[:,:lag]
+            shifted_y = y[:,-lag:]
+        elif lag > 0:
+            shifted_x = x[:,lag:]
+            shifted_y = y[:,:-lag]
+        else:
+            shifted_x = x
+            shifted_y = y
+        
+        # remove NAN data
+        valid_idx = ~np.isnan(shifted_y.mean(axis=1))
+        shifted_x = shifted_x[valid_idx,:].ravel()
+        shifted_y = shifted_y[valid_idx,:].ravel() 
+        
+        assert len(shifted_x) == len(shifted_y), f'Length mismatch {len(shifted_x)} vs {len(shifted_y)}'
+        xm[i, :len(shifted_x)] = shifted_x
+        ym[i, :len(shifted_y)] = shifted_y
+    
+    correlations= np.corrcoef(xm, ym) #contains the auto and then cross correlation between variables
+    halfw = len(correlations)//2
+    corr = np.diag(correlations[halfw:, :halfw]) # the bottom quandrant is the cross-correlation
+    return lags,correlations,corr
 
 
 
