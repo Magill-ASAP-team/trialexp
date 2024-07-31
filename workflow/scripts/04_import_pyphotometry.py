@@ -105,7 +105,7 @@ if has_photometry:
         if 'extra_event_triggers' in df_event.attrs:
             for evt_triggers in df_event.attrs['extra_event_triggers']:
                 #Note: df_event only contains event extract around the trigger
-                add_event_data(df_pycontrol, event_filters.get_events_from_name,
+                add_event_data(df_event, event_filters.get_events_from_name,
                     trial_window, dataset, event_time_coord, 
                     var, evt_triggers, dataset.attrs['sampling_rate'],
                     groupby_col=None,
@@ -171,4 +171,3 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
-
