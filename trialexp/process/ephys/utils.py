@@ -457,7 +457,7 @@ def crosscorr_lag_range(datax: pd.Series, datay: pd.Series, lags:list):
     return cross_corr
 
 
-def calculate_pearson_lags(x, y, max_lag, lag_step=1):
+def calculate_pearson_lags(x, y, max_lag, lag_step=1, trial_average=True):
     """
     Calculate Pearson correlation coefficients and lags between two signals.
     
@@ -471,6 +471,7 @@ def calculate_pearson_lags(x, y, max_lag, lag_step=1):
         x (ndarray): The first signal.
         y (ndarray): The second signal.
         max_lag (int): The maximum lag to consider.
+        trial_average (bool): whether to compute the correlation only on trial average
 
     Returns:
         tuple: A tuple containing:
@@ -481,9 +482,14 @@ def calculate_pearson_lags(x, y, max_lag, lag_step=1):
     """
     lags = np.arange(-max_lag, max_lag + 1, lag_step)
     correlations = np.zeros(len(lags))
-    xm = np.zeros((len(lags),x.shape[0]*x.shape[1]))
-    ym = np.zeros_like(xm)
     
+    if trial_average:
+        xm = np.zeros((len(lags),x.shape[1]))
+        ym = np.zeros_like(xm)
+    else:
+        xm = np.zeros((len(lags),x.shape[0]*x.shape[1]))
+        ym = np.zeros_like(xm)
+        
     for i, lag in enumerate(lags):
         if lag < 0:
             shifted_x = x[:,:lag]
@@ -497,9 +503,13 @@ def calculate_pearson_lags(x, y, max_lag, lag_step=1):
         
         # remove NAN data
         valid_idx = ~np.isnan(shifted_y.mean(axis=1))
-        shifted_x = shifted_x[valid_idx,:].ravel()
-        shifted_y = shifted_y[valid_idx,:].ravel() 
-        
+        if trial_average:
+            shifted_x = shifted_x[valid_idx,:].mean(axis=0)
+            shifted_y = shifted_y[valid_idx,:].mean(axis=0) 
+        else:
+            shifted_x = shifted_x[valid_idx,:].ravel()
+            shifted_y = shifted_y[valid_idx,:].ravel() 
+            
         assert len(shifted_x) == len(shifted_y), f'Length mismatch {len(shifted_x)} vs {len(shifted_y)}'
         xm[i, :len(shifted_x)] = shifted_x
         ym[i, :len(shifted_y)] = shifted_y

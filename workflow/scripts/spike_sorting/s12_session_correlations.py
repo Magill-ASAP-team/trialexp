@@ -23,6 +23,7 @@ import settings
 import itertools
 from tqdm.auto import tqdm
 from loguru import logger
+import seaborn as sns
 
 #%% Load inputs
 
@@ -44,20 +45,22 @@ xr_spike_fr_interp = xr_spike_trial.interp(spk_event_time=xr_session.event_time)
 photom_vars = ['_zscored_df_over_f', '_zscored_df_over_f_analog_2']
 var = [v.replace(photom_vars[0],'') for v in xr_session.data_vars.keys() if v.endswith(photom_vars[0])]
 var2analyze = list(itertools.product(var, photom_vars))
+evt_time = xr_spike_fr_interp.spk_event_time
+evt_time_step = np.mean(np.diff(evt_time))
 
-def analyze_correlation(fr_data, photom_data, name, evt_time_step, cluID):
+def analyze_correlation(fr_data, photom_data, name, evt_time_step, cluID, average_trial):
     # Calculate the correlation of each units with the photometry signal
     photom_data = np.squeeze(photom_data)
     
     print(f'Processing {name}')
-    max_lags = 50 # corresponds to arround 400ms at 50Hz
-    lag_step = 5
+    max_lags = 5 # corresponds to arround 100ms at 50Hz, larger shift may risk mixing with other events
+    lag_step = 1
     nlags = max_lags//lag_step
     
     corr = np.zeros((fr_data.shape[2],nlags*2+1))
     for i in range(fr_data.shape[2]):
         # Negative lag means the photometry signal will be shifted left
-        lags,_, corr[i,:] = calculate_pearson_lags(fr_data[:,:,i], photom_data,max_lags, lag_step)
+        lags,_, corr[i,:] = calculate_pearson_lags(fr_data[:,:,i], photom_data,max_lags, lag_step, average_trial)
     
     xr_data = xr.DataArray(corr,
                            name = name,
@@ -65,7 +68,23 @@ def analyze_correlation(fr_data, photom_data, name, evt_time_step, cluID):
                            coords={'cludID':cluID, 'lag':lags*evt_time_step})
     return xr_data
 
-# Calculate the time step for each unit of lag
+#%%
+# evt_name = 'first_spout'
+# sig_name = '_zscored_df_over_f_analog_2'
+# evt_time = xr_spike_fr_interp.spk_event_time
+# evt_time_step = np.mean(np.diff(evt_time))
+
+# xr_data = analyze_correlation(xr_spike_fr_interp[f'spikes_FR.{evt_name}'].data,
+#                                                            xr_session[f'{evt_name}{sig_name}'].data,
+#                                                            evt_name+sig_name,
+#                                                            evt_time_step,
+#                                                            xr_spike_trial.cluID,
+#                                                            average_trial=True)
+
+
+
+
+#%% Calculate the time step for each unit of lag
 evt_time = xr_spike_fr_interp.spk_event_time
 evt_time_step = np.mean(np.diff(evt_time))
 #TODO do correlation on the average curve instead
@@ -73,47 +92,11 @@ results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_f
                                                            xr_session[f'{evt_name}{sig_name}'].data,
                                                            evt_name+sig_name,
                                                            evt_time_step,
-                                                           xr_spike_trial.cluID) for evt_name, sig_name in var2analyze)
+                                                           xr_spike_trial.cluID,
+                                                           average_trial=True) for evt_name, sig_name in var2analyze)
 
 #%% Save
 xr_corr = xr.merge(results)
 xr_corr.to_netcdf(soutput.xr_corr, engine='h5netcdf')
 xr_spike_trial.close()
 
-#%%  Plot some example of units with high correlation
-
-evt_name = 'hold_for_water'
-sig_name = '_zscored_df_over_f_analog_2'
-var_name = evt_name+sig_name
-
-corr = xr_corr[var_name].data
-max_corr = corr.max(axis=1)
-lag = xr_corr.lag.data
-max_corr_loc = lag[corr.argmax(axis=1)]
-sorted_idx = np.argsort(max_corr)[::-1] #sort the coefficient in descending order
-
-photom_data = np.squeeze(xr_session[var_name].values)
-fr = xr_spike_fr_interp[f'spikes_FR.{evt_name}'].data
-# plt.plot(fr.mean(axis=0))
-
-fig, axes = plt.subplots(3,3,figsize=(3*4,3*3))
-label1 = None
-label2 = None
-for i,ax in enumerate(axes.flat):
-    ax2 = ax.twinx()
-
-    if i == len(axes.flat)-1:
-        label1='unit firing'
-        label2='photmetry'
-    
-    x = fr[:,:,sorted_idx[i]].mean(axis=0)
-    y = np.nanmean(photom_data,axis=0)
-    shift = int(max_corr_loc[sorted_idx[i]]/(1000/50))
-    c = np.corrcoef(x[:shift],y[-shift:])[0,1]
-    ax.plot(x[:shift], label=label1)
-    ax2.plot(y[-shift:],'r', label=label2)
-    ax.set_title(f'{c:.2f} Max. corr = {max_corr[sorted_idx[i]]:.2f} at {max_corr_loc[sorted_idx[i]]:.1f}ms')
-
-fig.tight_layout()
-fig.legend()
-# %%
