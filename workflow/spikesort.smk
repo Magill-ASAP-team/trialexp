@@ -141,11 +141,13 @@ def session_correlations_input(wildcards):
 
 rule session_correlations:
     input: 
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
         xr_spike_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
     output:
         xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
-        corr_plot = '{sessions}/{task_path}/{session_id}/processed/ephys/correlated_cells.png',
+        corr_plots = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/correlations'),
+        corr_dist_plot = '{sessions}/{task_path}/{session_id}/processed/figures/ephys/correlations/corr_dist.png'
     threads: 32
     script:
         "scripts/spike_sorting/s12_session_correlations.py"

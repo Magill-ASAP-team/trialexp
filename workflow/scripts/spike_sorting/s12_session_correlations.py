@@ -24,6 +24,7 @@ import itertools
 from tqdm.auto import tqdm
 from loguru import logger
 import seaborn as sns
+from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr_spatial_distribution
 
 #%% Load inputs
 
@@ -40,6 +41,8 @@ xr_spike_trial = xr.open_dataset(sinput.xr_spikes_trials) #file is huge, use laz
 session_root_path = Path(sinput.xr_spike_fr).parent
 xr_session = xr.load_dataset(session_root_path/'xr_session.nc')
 xr_spike_fr_interp = xr_spike_trial.interp(spk_event_time=xr_session.event_time)
+df_metrics = pd.read_pickle(sinput.df_quality_metrics)
+
 
 #%% Calculate cross-correlation between unit activity and photometry signals
 photom_vars = ['_zscored_df_over_f', '_zscored_df_over_f_analog_2']
@@ -65,23 +68,8 @@ def analyze_correlation(fr_data, photom_data, name, evt_time_step, cluID, averag
     xr_data = xr.DataArray(corr,
                            name = name,
                            dims=['cluID', 'lag'],
-                           coords={'cludID':cluID, 'lag':lags*evt_time_step})
+                           coords={'cluID':cluID, 'lag':lags*evt_time_step})
     return xr_data
-
-#%%
-# evt_name = 'first_spout'
-# sig_name = '_zscored_df_over_f_analog_2'
-# evt_time = xr_spike_fr_interp.spk_event_time
-# evt_time_step = np.mean(np.diff(evt_time))
-
-# xr_data = analyze_correlation(xr_spike_fr_interp[f'spikes_FR.{evt_name}'].data,
-#                                                            xr_session[f'{evt_name}{sig_name}'].data,
-#                                                            evt_name+sig_name,
-#                                                            evt_time_step,
-#                                                            xr_spike_trial.cluID,
-#                                                            average_trial=True)
-
-
 
 
 #%% Calculate the time step for each unit of lag
@@ -100,3 +88,25 @@ xr_corr = xr.merge(results)
 xr_corr.to_netcdf(soutput.xr_corr, engine='h5netcdf')
 xr_spike_trial.close()
 
+
+#%% Plot the correlation figures
+for evt_name, sig_name in var2analyze:
+    fig = plot_extrem_corr(xr_corr, xr_spike_fr_interp, xr_session, evt_name, sig_name)
+    fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}.png',dpi=200)
+
+# %% plot the overall distribution
+sig_names = ['_zscored_df_over_f','_zscored_df_over_f_analog_2']
+fig,axes = plt.subplots(1,2,figsize=(10,10),dpi=200)
+
+for i, sn in enumerate(sig_names):
+    df_meancorr = get_corr_spatial_distribution(xr_corr, df_metrics, sn)
+    
+    sns.heatmap(df_meancorr,cmap='vlag',ax=axes[i])
+    axes[i].invert_yaxis()
+    axes[i].set_title(sn)
+    axes[i].set_ylabel('Depth um')
+
+fig.tight_layout()
+fig.savefig(soutput.corr_dist_plot)
+
+# %%
