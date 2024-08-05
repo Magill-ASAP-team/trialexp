@@ -24,7 +24,7 @@ import itertools
 from tqdm.auto import tqdm
 from loguru import logger
 import seaborn as sns
-from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr_spatial_distribution
+from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr_spatial_distribution, analyze_correlation
 
 #%% Load inputs
 
@@ -47,41 +47,25 @@ df_metrics = pd.read_pickle(sinput.df_quality_metrics)
 #%% Calculate cross-correlation between unit activity and photometry signals
 photom_vars = ['_zscored_df_over_f', '_zscored_df_over_f_analog_2']
 var = [v.replace(photom_vars[0],'') for v in xr_session.data_vars.keys() if v.endswith(photom_vars[0])]
-var2analyze = list(itertools.product(var, photom_vars))
+trial_outcomes = np.unique(xr_spike_fr_interp.trial_outcome)
+var2analyze = list(itertools.product(var, photom_vars, trial_outcomes))
 evt_time = xr_spike_fr_interp.spk_event_time
 evt_time_step = np.mean(np.diff(evt_time))
-
-def analyze_correlation(fr_data, photom_data, name, evt_time_step, cluID, average_trial):
-    # Calculate the correlation of each units with the photometry signal
-    photom_data = np.squeeze(photom_data)
-    
-    print(f'Processing {name}')
-    max_lags = 5 # corresponds to arround 100ms at 50Hz, larger shift may risk mixing with other events
-    lag_step = 1
-    nlags = max_lags//lag_step
-    
-    corr = np.zeros((fr_data.shape[2],nlags*2+1))
-    for i in range(fr_data.shape[2]):
-        # Negative lag means the photometry signal will be shifted left
-        lags,_, corr[i,:] = calculate_pearson_lags(fr_data[:,:,i], photom_data,max_lags, lag_step, average_trial)
-    
-    xr_data = xr.DataArray(corr,
-                           name = name,
-                           dims=['cluID', 'lag'],
-                           coords={'cluID':cluID, 'lag':lags*evt_time_step})
-    return xr_data
 
 
 #%% Calculate the time step for each unit of lag
 evt_time = xr_spike_fr_interp.spk_event_time
 evt_time_step = np.mean(np.diff(evt_time))
-#TODO do correlation on the average curve instead
-results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_fr_interp[f'spikes_FR.{evt_name}'].data,
-                                                           xr_session[f'{evt_name}{sig_name}'].data,
-                                                           evt_name+sig_name,
+#TODO investigate smoothing the photometry signal first
+results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_fr_interp,
+                                                           xr_session,
+                                                           evt_name,
+                                                           sig_name,
                                                            evt_time_step,
                                                            xr_spike_trial.cluID,
-                                                           average_trial=True) for evt_name, sig_name in var2analyze)
+                                                           trial_outcome=trial_outcome,
+                                                           average_trial=True) for evt_name, sig_name, trial_outcome in var2analyze)
+
 
 #%% Save
 xr_corr = xr.merge(results)
@@ -90,23 +74,32 @@ xr_spike_trial.close()
 
 
 #%% Plot the correlation figures
-for evt_name, sig_name in var2analyze:
-    fig = plot_extrem_corr(xr_corr, xr_spike_fr_interp, xr_session, evt_name, sig_name)
-    fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}.png',dpi=200)
+for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success','aborted']):
+    # only plot successful trials
+    idx = xr_session.isel(session_id=0).trial_outcome ==outcome
+    xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
+    xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
+    xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
+    
+    fig = plot_extrem_corr(xr_corr2plot, xr_spike2plot, xr_session2plot, evt_name, sig_name)
+    fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}_{outcome}.png',dpi=200)
 
 # %% plot the overall distribution
 sig_names = ['_zscored_df_over_f','_zscored_df_over_f_analog_2']
-fig,axes = plt.subplots(1,2,figsize=(10,10),dpi=200)
 
-for i, sn in enumerate(sig_names):
-    df_meancorr = get_corr_spatial_distribution(xr_corr, df_metrics, sn)
-    
-    sns.heatmap(df_meancorr,cmap='vlag',ax=axes[i])
-    axes[i].invert_yaxis()
-    axes[i].set_title(sn)
-    axes[i].set_ylabel('Depth um')
 
-fig.tight_layout()
-fig.savefig(soutput.corr_dist_plot)
+for outcome in trial_outcomes:
+    fig,axes = plt.subplots(1,2,figsize=(10,10),dpi=200)
+
+    for i, sn in enumerate(sig_names):
+        df_meancorr = get_corr_spatial_distribution(xr_corr.sel(trial_outcome=outcome), df_metrics, sn)
+        
+        sns.heatmap(df_meancorr,cmap='vlag',ax=axes[i])
+        axes[i].invert_yaxis()
+        axes[i].set_title(sn)
+        axes[i].set_ylabel('Depth um')
+
+    fig.tight_layout()
+    fig.savefig(Path(soutput.corr_plots)/f'corr_dist_{outcome}.png', dpi=200)
 
 # %%
