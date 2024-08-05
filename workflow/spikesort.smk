@@ -147,7 +147,6 @@ rule session_correlations:
     output:
         xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
         corr_plots = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/correlations'),
-        corr_dist_plot = '{sessions}/{task_path}/{session_id}/processed/figures/ephys/correlations/corr_dist.png'
     threads: 32
     script:
         "scripts/spike_sorting/s12_session_correlations.py"

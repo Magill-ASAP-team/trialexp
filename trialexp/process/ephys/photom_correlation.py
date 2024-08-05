@@ -1,6 +1,8 @@
 import numpy as np 
 import matplotlib.pylab as plt
 import pandas as pd
+from trialexp.process.ephys.utils import calculate_pearson_lags
+import xarray as xr
 
 def plot_extrem_corr(xr_corr, xr_spike_fr_interp, xr_session, evt_name, sig_name, mode='abs'):
     '''
@@ -89,3 +91,37 @@ def get_corr_spatial_distribution(xr_corr, df_metrics, signal_name):
     # simplfy the column for plotting
     df_meancorr.columns = [c.replace(signal_name,'') for c in df_meancorr.columns]
     return df_meancorr
+
+
+def analyze_correlation(xr_spike_fr_interp, xr_session, evt_name, sig_name, evt_time_step, cluID, average_trial, trial_outcome=None):
+    
+    fr_data= xr_spike_fr_interp[f'spikes_FR.{evt_name}']
+    xr_session  = xr_session.isel(session_id=0) # reduce the dimension for easier processing
+    photom_data=xr_session[f'{evt_name}{sig_name}']
+    
+    if trial_outcome is not None and 'trial_nb' in photom_data.coords:
+        photom_data = np.squeeze(photom_data.sel(trial_nb = (xr_session.trial_outcome==trial_outcome)).data)
+        fr_data = fr_data.sel(trial_nb = (xr_spike_fr_interp.trial_outcome == trial_outcome)).data
+    else:
+        # Calculate the correlation of each units with the photometry signal
+        photom_data = np.squeeze(photom_data)
+        fr_data = fr_data.data
+        trial_outcome = 'success'
+    
+    print(f'Processing {evt_name+sig_name} for {trial_outcome}')
+    max_lags = 5 # corresponds to arround 100ms at 50Hz, larger shift may risk mixing with other events
+    lag_step = 1
+    nlags = max_lags//lag_step
+    
+    corr = np.zeros((fr_data.shape[2],nlags*2+1))
+    for i in range(fr_data.shape[2]):
+        # Negative lag means the photometry signal will be shifted left
+        lags,_, corr[i,:] = calculate_pearson_lags(fr_data[:,:,i], photom_data,max_lags, lag_step, average_trial)
+    
+    xr_data = xr.DataArray(corr,
+                           name = evt_name+sig_name,
+                           dims=['cluID', 'lag'],
+                           coords={'cluID':cluID, 'lag':lags*evt_time_step})
+    
+    xr_data = xr_data.expand_dims({'trial_outcome':[trial_outcome]})
+    return xr_data
