@@ -26,7 +26,7 @@ import time
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/si_quality.done'],
+  [settings.debug_folder + r'/processed/df_quality_metrics.pkl'],
   'waveform_and_quality_metrics')
 
 

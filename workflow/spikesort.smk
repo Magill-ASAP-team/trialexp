@@ -34,7 +34,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
 rule spike_all:
      # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    input: session2analyze(cohort=['2024_Jan_cohort'], tasks=['reaching_go_spout_bar_VR_Dec23'])
+    input: session2analyze(cohort=['2024_April_cohort'], tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule spike_sorting:
     input:
@@ -42,22 +42,9 @@ rule spike_sorting:
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
         si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
-    threads: 32
+    threads: 96
     script:
-        "scripts/spike_sorting/s01_sort_ks3.py"
-
-
-# rule spike_metrics_ks3:
-#     input:
-#         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-#         sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done',
-#     output:
-#         metrics_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_metrics.done'),
-#         kilosort_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort'),
-#     threads: 32
-#     priority: 10
-#     script:
-#         "scripts/spike_sorting/s02_cluster_metrics_ks3.py"
+        "scripts/spike_sorting/s01_sort_ks4.py"
 
 
 rule waveform_and_quality_metrics:
@@ -79,15 +66,6 @@ rule ephys_sync:
         ephys_sync_complete = touch('{sessions}/{task_path}/{session_id}/processed/ephys_sync.done')
     script:
         "scripts/spike_sorting/s04_ephys_sync.py"
-
-# rule cell_metrics_processing:
-#     input:
-#         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-#         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
-#     output:
-#         cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc'
-#     script:
-#         "scripts/spike_sorting/s05_cell_metrics_processing.py"
 
 
 rule cells_to_xarray:
@@ -156,7 +134,6 @@ rule spikesort_done:
         corr_plot = session_correlations_input, 
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
         cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
-        si_quality_complete = '{sessions}/{task_path}/{session_id}/processed/si_quality.done'
     priority: 20
     output:
         spike_sort_done = touch('{sessions}/{task_path}/{session_id}/processed/spikesort.done'),
