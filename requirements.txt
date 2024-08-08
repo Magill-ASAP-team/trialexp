@@ -23,3 +23,7 @@ elephant
 fastdtw
 tslearn
 pingouin
+open-ephys-python-tools
+datashader
+dask[dataframe]
+holoviews

@@ -70,7 +70,7 @@ for idx_rec in idx_to_sort:
         (output_si_sorted_folder/probe_name).mkdir()
     
     # use kilosort4 directly
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:1')
     settings = {'data_dir': recording_path, 
                 'n_chan_bin': 384, 
                 'batch_size' : 30000*8, # for speeding up
