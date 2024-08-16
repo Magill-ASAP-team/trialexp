@@ -407,7 +407,7 @@ def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
         
         # add in the warp information
         
-        add_warp_info(ax, extraction_specs, 'hold_for_water')
+        add_warp_info(ax, extraction_specs, trigger)
         sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
         ticks, ticks_labels = compute_ticks(extraction_specs)
         ax.set_xticks(ticks, labels =ticks_labels, rotation=30);

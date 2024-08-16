@@ -44,7 +44,8 @@ trigger = df_events_cond.attrs['triggers'][0]
 if task_name in ['pavlovian_spontanous_reaching_oct23',
                  'pavlovian_reaching_Oct26',
                  'pavlovian_spontanous_reaching_march23',
-                 'pavlovian_spontanous_reaching_oct23']:
+                 'pavlovian_spontanous_reaching_oct23',
+                 'pavlovian_spontanous_reaching_April24']:
     
     extraction_specs = specs['spontanous_reaching']
     outcome2plot = df_conditions.trial_outcome.unique()
