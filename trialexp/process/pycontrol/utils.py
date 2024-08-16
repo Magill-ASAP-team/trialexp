@@ -1128,6 +1128,10 @@ def analyze_lick_signal(lick_signal_path, lick_ts_path, lick_fs=200):
     
     lick_signal = np.load(lick_signal_path).astype(float)
     lick_ts = np.load(lick_ts_path).astype(float)
+    
+    if len(lick_signal)< lick_fs*60:
+        print('Warning: Lick signal is too short')
+        return ([],[],[])
 
     [b,a]  = scipy.signal.butter(5, 10/(lick_fs/2))
     lick = scipy.signal.filtfilt(b,a,lick_signal)
