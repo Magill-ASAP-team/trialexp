@@ -8,13 +8,12 @@ import pandas as pd
 # logger.debug('Reading sessions data from ettin...')
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
 df_session_info = build_session_info_cohort(root_path)
-# TODO: reload on each user session
-df = df_session_info
-cohorts = df.cohort.unique().tolist()
+
+
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
-        ui.input_select("cohort", "Select cohort", choices=cohorts, selected=cohorts[-1]),
+        ui.input_select("cohort", "Select cohort", choices=[]),
         ui.input_checkbox_group('animal_id', 'Animals', choices=[]),
         ui.input_checkbox_group('task_name', 'Task', choices=[]),
         ui.input_radio_buttons('figure_list', 'Figures', choices=[0,1]),
@@ -30,6 +29,11 @@ def server(input, output, session):
     # Variables defined inside here user session specific
     df_img2plot = reactive.value() # used to store the dataframe of images to plot
 
+    
+    df_session_info = build_session_info_cohort(root_path)
+    df = df_session_info
+    cohorts = df.cohort.unique().tolist()
+    ui.update_select('cohort', choices=cohorts, selected=cohorts[-1])
     
     
     @reactive.calc

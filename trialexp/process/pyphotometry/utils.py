@@ -1373,8 +1373,8 @@ def remove_outliner_mad(x,thres_factor):
     
 def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseline_method='lowpass'):
     # analog1:  GFP
-    # analog2: isosbestic
-    # analog3: RFP
+    # analog2: RFP
+    # analog3: isosbestic
     '''
     Analysis notes:
     When the isosbestic channel is very noisy, and shadow artifact appears in the signal, it is be very difficult to cancel it.
