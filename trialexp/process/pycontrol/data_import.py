@@ -433,7 +433,7 @@ def session_dataframe(file_path, paired_events={}, pair_end_suffix=None, time_un
                          on_bad_lines='skip')
         
         # Take care of the case when there is error written to the tsv file
-        df = df.dropna()
+        df = df.dropna(subset='type')
         df['time'] = df['time'].astype(np.float64)
         
         if time_unit == "ms":

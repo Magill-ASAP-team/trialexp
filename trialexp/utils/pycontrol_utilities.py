@@ -408,6 +408,11 @@ def move_folders(df_pycontrol, export_base_path, ephys_base_path):
         subject_id = row.subject_id
         task_name = row.task_name
         
+        if '\\' in task_name:
+            #skip copying for incorrect task name
+            print(f'{task_name} is not a proper task name. Skipping')
+            continue
+        
         target_pycontrol_folder = Path(export_base_path,task_name, session_id, 'pycontrol')
         target_pyphoto_folder = Path(export_base_path, task_name, session_id, 'pyphotometry')
         target_ephys_folder = Path(export_base_path,  task_name, session_id, 'ephys')
