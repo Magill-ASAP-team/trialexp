@@ -58,19 +58,22 @@ for idx_rec in idx_to_sort:
     # Define outputs folder, specific for each probe and sorter
     temp_output_sorter_specific_folder = temp_sorter_folder / sorter_name / probe_name
 
-    ephys_path = Path(rec_properties.full_path.iloc[idx_rec]).parents[4]
+    # ephys_path = Path(rec_properties.full_path.iloc[idx_rec]).parents[4]
     
     # Maybe not the best method to get it
     # has introduced some bugs for forgotten reason related to folder changes
-    # TODO improve to join just before relative_ephys_path and root_data_path overlap
-    relative_ephys_path = os.path.join(*ephys_path.parts[5:])
-    ephys_path = os.path.join(root_data_path, relative_ephys_path)
+    # # TODO improve to join just before relative_ephys_path and root_data_path overlap
+    # relative_ephys_path = os.path.join(*ephys_path.parts[5:])
+    # ephys_path = os.path.join(root_data_path, relative_ephys_path)
+    ephys_path = Path(rec_properties.full_path.iloc[idx_rec]).parts[-10:]
+    
+    recording_path = os.path.join(root_data_path, *ephys_path)
     
     if not (output_si_sorted_folder/probe_name).exists():
         (output_si_sorted_folder/probe_name).mkdir()
     
     # use kilosort4 directly
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:0')
     settings = {'data_dir': recording_path, 
                 'n_chan_bin': 384, 
                 'batch_size' : 30000*8, # for speeding up
