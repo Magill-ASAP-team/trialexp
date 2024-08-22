@@ -32,8 +32,6 @@ rule process_pycontrol:
         condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
         pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
         trial_dataframe = '{session_path}/{task}/{session_id}/processed/df_trials.pkl'
-    log:
-        '{session_path}/{task}/{session_id}/processed/log/process_pycontrol.log'
     script:
         'scripts/01_process_pycontrol.py'
 
