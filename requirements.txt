@@ -27,3 +27,10 @@ open-ephys-python-tools
 datashader
 dask[dataframe]
 holoviews
+cupy-cuda12x
+
+'''
+Other installation requirement:
+You will need to install cudatool kit 12.1 for cupy to work
+conda install cuda -c nvidia/label/cuda-12.1.0
+'''
