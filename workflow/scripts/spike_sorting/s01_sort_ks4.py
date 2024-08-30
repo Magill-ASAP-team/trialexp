@@ -19,6 +19,8 @@ from spikeinterface.core import select_segment_recording
 from kilosort import run_kilosort
 import settings
 import torch
+from trialexp.process.ephys.artifact_removal import filter_artifact_sensor
+from kilosort.io import BinaryFiltered
 
 #%% Load inputs
 spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
@@ -76,10 +78,14 @@ for idx_rec in idx_to_sort:
     device = torch.device('cuda:0')
     settings = {'data_dir': recording_path, 
                 'n_chan_bin': 384, 
-                'batch_size' : 30000*8, # for speeding up
+                'batch_size' : 30000*8, # 8*Fs for speeding up, for bad session, use a smaller batch_size
                 'save_extra_vars': True,
+                # 'tmax':1600,
                 'results_dir': output_si_sorted_folder/probe_name}
     
+    #####
+    # artifact removal. Only activate this on bad session
+    # BinaryFiltered.filter = filter_artifact_sensor 
     
     run_kilosort(settings=settings, probe_name='neuropixPhase3B1_kilosortChanMap.mat', device=device)
     
