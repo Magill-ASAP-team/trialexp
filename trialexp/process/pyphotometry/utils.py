@@ -1350,6 +1350,8 @@ def fit_a2b(a,b):
     # fit array a to b with linear regression
     slope, intercept, r_value, p_value, std_err = linregress(x=a, y=b)
     output = intercept + slope * a
+    if abs(slope)>0.5:
+        print(f'Large motion artifact detected: slope: {slope}')
     return output
 
 def remove_outliner_mad(x,thres_factor):
@@ -1389,12 +1391,6 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
 
     try:
-        # method 1
-        # slope, intercept, r_value, p_value, std_err = linregress(x=photometry_dict['analog_3_filt'], y=photometry_dict['analog_1_filt'])
-        # photometry_dict['analog_1_est_motion'] = intercept + slope * photometry_dict['analog_3_filt']
-        # photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt'] - photometry_dict['analog_1_est_motion']
-        
-        # method 2: correct motion after baseline removed from both analog1 and isosbestic
         isos_bleach_baseline = lowpass_baseline(photometry_dict['analog_3_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
         analog_1_bleach_baseline = lowpass_baseline(photometry_dict['analog_1_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
         analog_1_detrend = photometry_dict['analog_1_filt'] - analog_1_bleach_baseline
@@ -1406,12 +1402,15 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         photometry_dict['isos_detrend'] = isos_detrend
         
         # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
+        # photometry_dict['analog_1_est_motion'] = isos_detrend
         photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
-        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion']
+        photometry_dict['analog_1_est_motion_scaled'] = fit_a2b(photometry_dict['analog_1_est_motion'], analog_1_detrend) # match the scale
         
-        # method 3
-        # GFP_baseline = lowpass_baseline(photometry_dict['analog_1_filt'],sampling_rate)
-        # photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
+        # photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion_scaled']
+        
+        _,  photometry_dict['analog_1_corrected'] = window_subtraction(photometry_dict['analog_1_detrend'],
+                                                                     photometry_dict['analog_1_est_motion_scaled'],
+                                                                     sampling_rate)
         
         # For RFP, remove baseline
         if baseline_method == 'lowpass':
