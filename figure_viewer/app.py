@@ -7,7 +7,6 @@ import pandas as pd
 
 # logger.debug('Reading sessions data from ettin...')
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
-df_session_info = build_session_info_cohort(root_path)
 
 
 
