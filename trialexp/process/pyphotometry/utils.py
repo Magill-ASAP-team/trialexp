@@ -231,28 +231,21 @@ def window_subtraction(analog1, analog2, sampling_rate, win_size_s=30) -> dict:
     # Splitting the data into chucks and do fitting on each chunk
     start_index_chunks = []
     analog_1_est_motion_chunks = []
-    p_vals = []
-    r_vals = []
+    # p_vals = []
+    # r_vals = []
     for start_ind, chunk1, chunk2 in overlapping_chunks(
             analog1, analog2, 
             n_win_size, n_overlap):
         try:
-            slope, intercept, r_value, p_value, std_err = linregress(chunk2, chunk1)
+            analog_1_est_motion_chunks.append(fit_a2b(chunk2, chunk1, deg=2))
         except ValueError as e:
             print(f'Warning: regression error. I will skip wndow subtraction for {start_ind}')
-            r_value = 0
-            p_value = 0
-            r_value = 0
-            slope = 0
+            analog_1_est_motion_chunks.append(0 * chunk2)
             
         start_index_chunks.append(start_ind)
-
-        analog_1_est_motion_chunks.append(slope * chunk2 + intercept)
-        p_vals.append(p_value)
-        r_vals.append(r_value)
         
-    if any(np.array(r_vals)< -0.2):
-        warnings.warn('Some slope has a large negative value!')
+    # if any(np.array(r_vals)< -0.2):
+    #     warnings.warn('Some slope has a large negative value!')
 
     # Joining the fitted data together
     analog_1_est_motion_joined = np.zeros(np.size(analog1))
@@ -1346,13 +1339,12 @@ def fit_exp_baseline(curve, sampling_rate, smooth_window=4001):
 
     return baseline
 
-def fit_a2b(a,b):
+def fit_a2b(a,b, deg=1):
     # fit array a to b with linear regression
-    slope, intercept, r_value, p_value, std_err = linregress(x=a, y=b)
-    output = intercept + slope * a
-    if abs(slope)>0.5:
-        print(f'Large motion artifact detected: slope: {slope}')
-    return output
+    
+    z= np.polyfit(a,b, deg)
+    p = np.poly1d(z)
+    return p(a)
 
 def remove_outliner_mad(x,thres_factor):
     '''
@@ -1404,7 +1396,7 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
         # photometry_dict['analog_1_est_motion'] = isos_detrend
         photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
-        photometry_dict['analog_1_est_motion_scaled'] = fit_a2b(photometry_dict['analog_1_est_motion'], analog_1_detrend) # match the scale
+        photometry_dict['analog_1_est_motion_scaled'] = fit_a2b(photometry_dict['analog_1_est_motion'], analog_1_detrend, deg=2) # match the scale
         
         # photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion_scaled']
         
