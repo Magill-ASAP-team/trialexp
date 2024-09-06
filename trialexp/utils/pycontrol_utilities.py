@@ -468,12 +468,16 @@ def move_folders(df_pycontrol, export_base_path, ephys_base_path):
             recordings_properties['syncable'] = False
             recordings_properties['longest'] = False
             sync_paths = recordings_properties.sync_path.unique()
+            sync_file_found = False
             for sync_path in sync_paths:
                 # copy syncing files in 
                 if create_ephys_rsync(str(pycontrol_file), sync_path) is not None:
                     recordings_properties.loc[recordings_properties.sync_path == sync_path, 'syncable'] = True
-                else:
-                    print(f'Cannot sync ephys data for {sync_path.parent.name}')
+                    sync_file_found = True
+            
+            if not sync_file_found:    
+                print(f'Cannot find ephys data for {row.ephys_folder_name}')
+                
             longest_syncable = recordings_properties.loc[recordings_properties.syncable == True, 'duration'].max()
             recordings_properties.loc[(recordings_properties.duration == longest_syncable) & (recordings_properties.syncable == True), 'longest'] = True
 
