@@ -27,12 +27,7 @@ from pathlib import Path
 
 
 #%%
-task_specific_file = Path(sinput.xr_session).parent/'xr_session_task_specific.nc'
-if task_specific_file.exists():
-    xr_session = xr.load_dataset(task_specific_file)
-else:
-    xr_session = xr.load_dataset(sinput.xr_session)
-
+xr_session = xr.load_dataset(sinput.xr_session)
 figure_dir = soutput.trigger_photo_dir
 
 #%% plot all event-related data
