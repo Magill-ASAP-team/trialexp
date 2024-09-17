@@ -301,14 +301,24 @@ def motion_correction(photometry_dict: dict) -> dict:
 
 
 
-def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> dict:
+def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001, baseline_method='lowpass') -> dict:
     
     if 'analog_1_corrected' not in photometry_dict:
         raise Exception('Analog 1 must be motion corrected before computing dF/F')
     
-    b,a = butter(2, low_pass_cutoff, btype='low', fs=photometry_dict['sampling_rate'])
-    photometry_dict['analog_1_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_1_filt'], padtype='even')
-    photometry_dict['analog_2_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_2_filt'], padtype='even')
+    if baseline_method=='lowpass':
+        b,a = butter(2, low_pass_cutoff, btype='low', fs=photometry_dict['sampling_rate'])
+        photometry_dict['analog_1_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_1_filt'], padtype='even')
+        photometry_dict['analog_2_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_2_filt'], padtype='even')
+
+    else:
+        # use the double exponential baseline
+        photometry_dict['analog_1_baseline_fluo'] = fit_double_exp(photometry_dict['analog_1_filt'],
+                                                                    photometry_dict['sampling_rate']
+)
+        photometry_dict['analog_2_baseline_fluo'] = fit_double_exp(photometry_dict['analog_2_filt'], 
+                                                                   photometry_dict['sampling_rate']
+)
 
     # Now calculate the dF/F by dividing the motion corrected signal by the time varying baseline fluorescence.
     photometry_dict['analog_1_df_over_f'] = photometry_dict['analog_1_corrected'] / photometry_dict['analog_1_baseline_fluo'] 
@@ -319,10 +329,13 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
         photometry_dict['analog_2_df_over_f'] = photometry_dict['analog_2_filt'] / photometry_dict['analog_2_baseline_fluo']
     
     if 'analog_3_detrended' in photometry_dict:
-        photometry_dict['analog_3_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_3_filt'], padtype='even')
+        if baseline_method == 'lowpass':
+            photometry_dict['analog_3_baseline_fluo'] = filtfilt(b,a, photometry_dict['analog_3_filt'], padtype='even')
+        else:
+            photometry_dict['analog_3_baseline_fluo'] = fit_double_exp(photometry_dict['analog_3_filt'], photometry_dict['sampling_rate'])
+
         photometry_dict['analog_3_df_over_f'] = photometry_dict['analog_3_detrended'] / photometry_dict['analog_3_baseline_fluo']
 
-    
     return photometry_dict
 
 #----------------------------------------------------------------------------------
@@ -1325,6 +1338,43 @@ def add_event_data(df_event, filter_func, trial_window,
                                             group=groupby_col,
                                             dim_name=event_name)
     dataset[f'{event_name}_{data_var_name}'] = xr_event_data
+
+
+#%% 
+
+
+# Fit curve to dLight signal.
+
+
+def fit_double_exp(curve, sampling_rate):
+    # adapt from Thomas Atkam
+    # https://github.com/ThomasAkam/photometry_preprocessing/blob/master/Photometry%20data%20preprocessing.ipynb
+
+    def double_exponential(t, const, amp_fast, amp_slow, tau_slow, tau_multiplier):
+
+        '''Compute a double exponential function with constant offset.
+        Parameters:
+        t       : Time vector in seconds.
+        const   : Amplitude of the constant offset. 
+        amp_fast: Amplitude of the fast component.  
+        amp_slow: Amplitude of the slow component.  
+        tau_slow: Time constant of slow component in seconds.
+        tau_multiplier: Time constant of fast component relative to slow. 
+        '''
+        tau_fast = tau_slow*tau_multiplier
+        return const+amp_slow*np.exp(-t/tau_slow)+amp_fast*np.exp(-t/tau_fast)
+    
+
+    max_sig = np.max(curve)
+    inital_params = [max_sig/2, max_sig/4, max_sig/4, 3600, 0.1]
+    bounds = ([0      , 0      , 0      , 600  , 0],
+            [max_sig, max_sig, max_sig, 36000, 1])
+    time_seconds = np.arange(len(curve))/sampling_rate
+    params, parm_cov = curve_fit(double_exponential, time_seconds, curve, 
+                                    p0=inital_params, bounds=bounds, maxfev=1000)
+    curve_expfit = double_exponential(time_seconds, *params)
+
+    return curve_expfit
 # %%
 def fit_exp_baseline(curve, sampling_rate, smooth_window=4001):
 
@@ -1375,6 +1425,8 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
     When we stretch the isosbestic signal to match the shadow artifact in the RFP channel, the noise from the isosbestic channel will be 
     stretched too. Substracting this amplified noise from the RFP will totally mask the original signal.
     We can probably smooth the signal to avoid the noise but that it will affect the results when there are real motion-artifact
+    In the current time-division mode (17/9/24), the shadow artifact should already be subtracted from the background, so it is less of an issue
+
     TODO: develop some specified way to remove the shadow artifact, probably by setting a threshold and just remove that data
     '''
     sampling_rate = photometry_dict['sampling_rate']
@@ -1383,8 +1435,15 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
 
     try:
-        isos_bleach_baseline = lowpass_baseline(photometry_dict['analog_3_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
-        analog_1_bleach_baseline = lowpass_baseline(photometry_dict['analog_1_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+        if baseline_method == 'lowpass':
+            isos_bleach_baseline = lowpass_baseline(photometry_dict['analog_3_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+            analog_1_bleach_baseline = lowpass_baseline(photometry_dict['analog_1_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+        else:
+            print('using double exp fit')
+            isos_bleach_baseline = fit_double_exp(photometry_dict['analog_3_filt'], sampling_rate)
+            analog_1_bleach_baseline = fit_double_exp(photometry_dict['analog_1_filt'], sampling_rate) # low freq to only remove the baseline but not the motion artifact
+
+            
         analog_1_detrend = photometry_dict['analog_1_filt'] - analog_1_bleach_baseline
         isos_detrend = photometry_dict['analog_3_filt'] - isos_bleach_baseline
         
@@ -1393,9 +1452,9 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         photometry_dict['analog_1_detrend'] = analog_1_detrend
         photometry_dict['isos_detrend'] = isos_detrend
         
-        # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
-        # photometry_dict['analog_1_est_motion'] = isos_detrend
-        photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
+        photometry_dict['analog_1_est_motion'] = isos_detrend
+
+        # photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
         photometry_dict['analog_1_est_motion_scaled'] = fit_a2b(photometry_dict['analog_1_est_motion'], analog_1_detrend, deg=2) # match the scale
         
         # photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion_scaled']
@@ -1409,8 +1468,8 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
             RFP_baseline =  lowpass_baseline(photometry_dict['analog_2_filt'],sampling_rate)
             isos_baseline = lowpass_baseline(photometry_dict['analog_3_filt'],sampling_rate)
         else:
-            RFP_baseline = fit_exp_baseline(photometry_dict['analog_2_filt'], sampling_rate)
-            isos_baseline = fit_exp_baseline(photometry_dict['analog_3_filt'],sampling_rate)
+            RFP_baseline = fit_double_exp(photometry_dict['analog_2_filt'], sampling_rate)
+            isos_baseline = fit_double_exp(photometry_dict['analog_3_filt'],sampling_rate)
             
         photometry_dict['analog_2_detrended']  = photometry_dict['analog_2_filt'] - RFP_baseline
         photometry_dict['analog_3_detrended'] = photometry_dict['analog_3_filt'] - isos_baseline
@@ -1428,6 +1487,12 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         photometry_dict['analog_2_corrected'] = analog_2_corrected
 
         photometry_dict['motion_corrected'] = 1
+
+
+        # Do some final check to ensure the motion artifact is removed
+        coeff_after = np.corrcoef(photometry_dict['analog_1_corrected'], photometry_dict['analog_3_detrended'])[0,1]
+        coeff_before = np.corrcoef(photometry_dict['analog_1_detrend'], photometry_dict['analog_3_detrended'])[0,1]
+        print(f'Correlation to isosbestic before correction: {coeff_before:.2f} after {coeff_after:.2f}')
         
         return photometry_dict
     
@@ -1460,7 +1525,7 @@ def baseline_correction_multicolor(photometry_dict,baseline_method='lowpass'):
     return photometry_dict
 
     
-def preprocess_photometry(data_photometry, df_pycontrol):
+def preprocess_photometry(data_photometry, df_pycontrol, baseline_method='lowpass'):
     # Perform preprocessing on the photometry data e.g. bleach and motion correcction etc.
     data_photometry = denoise_filter(data_photometry, 20)
     
@@ -1481,14 +1546,14 @@ def preprocess_photometry(data_photometry, df_pycontrol):
 
             else:
                 # Do multicolor correction
-                data_photometry = motion_correction_multicolor(data_photometry)
+                data_photometry = motion_correction_multicolor(data_photometry, baseline_method=baseline_method)
         else:    
             data_photometry = motion_correction_win(data_photometry)
     else:
         data_photometry = motion_correction_win(data_photometry)
     
     
-    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01)
+    data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01, baseline_method=baseline_method)
     data_photometry = compute_zscore(data_photometry)
     return data_photometry
     

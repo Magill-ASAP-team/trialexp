@@ -30,8 +30,14 @@ if fn == []:
 else:
     fn = fn[0]
     data_photometry = import_ppd_auto(fn)
-    data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
-    
+    data_photometry = preprocess_photometry(data_photometry, df_pycontrol, baseline_method='exponential')
+
+#%%
+# x = fit_double_exp(data_photometry['analog_2_filt'], 70)
+# x2 =  lowpass_baseline(data_photometry['analog_2_filt'],70)
+
+# plt.plot(x)
+# plt.plot(x2)
 #%%
 if fn == []:
     photometry_times_pyc = None
