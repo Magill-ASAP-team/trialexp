@@ -38,7 +38,7 @@ try:
     has_photometry = True
     data_photometry = import_ppd_auto(pyphotometry_file)
     print(data_photometry['version'])
-    data_photmetry = preprocess_photometry(data_photometry, df_pycontrol, baseline_method='exponential')
+    data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
     
     # Convert to xarray
     skip_var = ['analog_1_est_motion','time',

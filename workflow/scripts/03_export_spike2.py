@@ -30,7 +30,7 @@ if fn == []:
 else:
     fn = fn[0]
     data_photometry = import_ppd_auto(fn)
-    data_photometry = preprocess_photometry(data_photometry, df_pycontrol, baseline_method='exponential')
+    data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
 
 #%%
 # x = fit_double_exp(data_photometry['analog_2_filt'], 70)
