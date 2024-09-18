@@ -73,20 +73,19 @@ rule import_pyphotometry:
     script:
         'scripts/04_import_pyphotometry.py'
 
-rule task_specifc_analysis:
-    input:
-        event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
-        xr_photometry = '{session_path}/{task}/{session_id}/processed/xr_photometry.nc',
-        xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
-    output:
-        rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done')
-    script:
-        'scripts/task_specific/common.py'
+# rule task_specifc_analysis:
+#     input:
+#         event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
+#         xr_photometry = '{session_path}/{task}/{session_id}/processed/xr_photometry.nc',
+#         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
+#     output:
+#         rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done')
+#     script:
+#         'scripts/task_specific/common.py'
 
 rule photometry_figure:
     input:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
-        task_specific = '{session_path}/{task}/{session_id}/processed/log/task_specific_analysis.done'
     output:
         trigger_photo_dir= directory('{session_path}/{task}/{session_id}/processed/figures/photometry'),
         done = touch('{session_path}/{task}/{session_id}/processed/log/photometry_figure.done'),
