@@ -31,9 +31,54 @@ def get_max_timestamps_from_probes(timestamp_files: list):
         max_ts[f_idx] = np.nanmax(synced_ts)
     return max(max_ts)
 
+def load_kilosort(ks_result_folder):
+    #load the results from kilosort
+    ks_results = {}
+    for f in Path(ks_result_folder).glob('*.npy'):
+        ks_results[f.stem]=np.load(f, allow_pickle=True)
+        
+    for f in Path(ks_result_folder).glob('*.tsv'):
+        ks_results[f.stem]=pd.read_csv(f, sep='\t')
+        
+    return ks_results
+
+
+def add_ks_metadata(ks_results, df_metrics, good_only=False):
+    """
+    Adds metadata from ks_results to df_metrics DataFrame.
+    
+    Args:
+        ks_results (dict): Dictionary containing results from Kilosort spike sorting.
+        df_metrics (pandas.DataFrame): DataFrame containing spike metrics.
+    
+    Returns:
+        None
+    """
+    ks_labels = ks_results['cluster_KSLabel']['KSLabel'].values
+    good_idx = (ks_labels=='good')
+    
+    sel_idx = np.arange(len(ks_labels))
+    if good_only:
+        sel_idx = good_idx
+            
+    templates = ks_results['templates']
+    max_chans = np.array([np.argmax(np.max(np.abs(te),axis=0)) for te in templates])
+    chan_pos = np.stack([ks_results['channel_positions'][ch] for ch in max_chans])
+    
+    df_metrics['maxWaveformCh'] = max_chans[sel_idx]
+    df_metrics['ks_chan_pos_x'] = chan_pos[sel_idx,0]
+    df_metrics['ks_chan_pos_y'] = chan_pos[sel_idx,1]
+    df_metrics['ks_labels'] = ks_labels[sel_idx]
+    
+    # make sure the order is correct
+    assert all(df_metrics['unit_id'].values == ks_results['cluster_KSLabel']['cluster_id'][sel_idx].values), 'unit_id mismatch'
+
 def get_spike_trains(
         synced_timestamp_files: list, 
-        spike_clusters_files: list):
+        spike_clusters_files: list, 
+        kslabels:list):
+    
+    
     
     # Note: UID is the id used internally in cellexplorer
     # clusID the is the label from kilosort
@@ -41,6 +86,8 @@ def get_spike_trains(
     # by default, cell explorer will only load good unit from kilosort as defined in the cluster_KSLabel.tsv
     # defination of 'good' is  ContamPct < 10, ContamPct is based on a refactory period of 2msec
     # so the all_clusters_UIDs here is the super-set of the cluID from Cell Explorer
+    
+    assert len(synced_timestamp_files) == len(spike_clusters_files) == len(kslabels), 'Cluster files do not match'
     
     max_ts = get_max_timestamps_from_probes(synced_timestamp_files)
 
@@ -70,8 +117,16 @@ def get_spike_trains(
                                                    t_stop=max_ts, 
                                                    name=all_clusters_UIDs[cluster_idx], 
                                                    file_origin=synced_file))
-            
-    return spike_trains, all_clusters_UIDs
+         
+    df_kslabels = []
+    for idx_probe, kslabel in enumerate(kslabels):
+        df_ks = pd.read_csv(kslabel, sep='\t')
+        df_ks['cluster_id'] = df_ks['cluster_id'].apply(lambda x: all_clusters_UIDs[x])
+        df_kslabels.append(df_ks)
+        
+    df_kslabels = pd.concat(df_kslabels)
+        
+    return spike_trains, all_clusters_UIDs, df_kslabels
 
 
 def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration):
@@ -80,15 +135,15 @@ def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration
     num_clusters = len(xr_inst_rates.cluID)
     time_vector = xr_inst_rates.time
 
-    num_time_points = int(trial_window[0] + trial_window[1]) // bin_duration +1
-    trial_time_vec = np.linspace(-trial_window[0], trial_window[1], num_time_points)
+    num_time_points = int(trial_window[1]-trial_window[0]) // bin_duration +1
+    trial_time_vec = np.linspace(trial_window[0], trial_window[1], num_time_points)
     trial_data = np.empty((num_trials, num_time_points, num_clusters))
 
     for i, timestamp in enumerate(evt_timestamps):
         if np.isnan(timestamp):  # Skip NaN timestamps
             continue
         
-        start_time = timestamp - trial_window[0]
+        start_time = timestamp + trial_window[0]
 
         # Find the indices of the time points within the trial window
         start_idx = np.searchsorted(time_vector, start_time, side='left')
@@ -102,17 +157,31 @@ def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration
     return trial_data, trial_time_vec
 
 
-def build_evt_fr_xarray(fr_xr, timestamps, trial_index, name, trial_window, bin_duration):
+def build_evt_fr_xarray(fr_xr, timestamps, trial_index, name, trial_window, bin_duration, trial_based=True):
     # Construct an xr.DataArray with firing rate triggered by the specified timestamps
     
-    trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
     
-    da = xr.DataArray(
-        trial_rates,
-        name = name,
-        coords={'trial_nb': trial_index, 'spk_event_time': trial_time_vec, 'cluID': fr_xr.cluID},
-        dims=('trial_nb', 'spk_event_time', 'cluID')
-        )
+    if trial_based:
+        trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
+        da = xr.DataArray(
+            trial_rates,
+            name = name,
+            coords={'trial_nb': trial_index, 'spk_event_time': trial_time_vec, 'cluID': fr_xr.cluID},
+            dims=('trial_nb', 'spk_event_time', 'cluID')
+            )
+    else:
+        # Concatenate the timestamps
+        timestamps = timestamps.dropna()
+        timestamps = timestamps.sum()
+        trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
+        
+        da = xr.DataArray(
+            trial_rates,
+            name = name,
+            coords={f'{name}_idx': np.arange(len(timestamps)), 'spk_event_time': trial_time_vec, 'cluID': fr_xr.cluID},
+            dims=(f'{name}_idx', 'spk_event_time', 'cluID')
+            )
+        
     
     return da
 
@@ -120,11 +189,11 @@ def get_cluster_UIDs_from_path(cluster_file: Path):
     # take Path or str
     cluster_file = Path(cluster_file)
     # extract session and probe name from folder structure
-    session_id = cluster_file.parts[-6]
-    probe_name = cluster_file.parts[-3]
+    session_id = cluster_file.parts[-5]
+    probe_name = cluster_file.parts[-2]
 
     # unique cluster nb
-    cluster_nbs = np.unique(np.load(cluster_file))
+    cluster_nbs = sorted(np.unique(np.load(cluster_file)))
 
     # return list of unique cluster IDs strings format <session_ID>_<probe_name>_<cluster_nb>
     cluster_UIDs = [session_id + '_' + probe_name + '_' + str(cluster_nb) for cluster_nb in cluster_nbs]
@@ -185,10 +254,17 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
         # add timestamp of particuliar behavioral phases
         df_aggregated = pd.concat([df_aggregated, event_filters.extract_event_time(df_events_cond, filter, dict())], axis=1)
 
+    #add any extra event triggers
+    extra_event_triggers = df_events_cond.attrs['extra_event_triggers']
+    for ev_name in extra_event_triggers:
+        df = event_filters.get_events_from_name(df_events_cond, ev_name)
+        evt_col = df.groupby('trial_nb')['time'].agg(list)
+        df_aggregated = pd.concat([df_aggregated, evt_col], axis=1)
 
+    
     # rename the columns
-    df_aggregated.columns = ['trial_outcome', 'trial_onset',  *behav_phases_filters.keys()]
+    trigger = df_events_cond.attrs['triggers'][0]
+    df_aggregated.columns = ['trial_outcome', trigger,  *behav_phases_filters.keys(), *extra_event_triggers]
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
-    df_aggregated['pre-cue1000'] = df_aggregated.trial_onset - 1000 # Hard coded, 2000ms resting period, perhaps adapt to a parameter?
 
     return df_aggregated

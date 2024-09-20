@@ -34,7 +34,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
 rule spike_all:
      # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    input: session2analyze(cohort=['2024_Jan_cohort'], tasks=['reaching_go_spout_bar_VR_Dec23'])
+    input: session2analyze(cohort=['2024_April_cohort'], tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule spike_sorting:
     input:
@@ -42,33 +42,18 @@ rule spike_sorting:
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
         si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
-    threads: 32
+    threads: 96
     script:
-        "scripts/spike_sorting/s01_sort_ks3.py"
-
-
-rule spike_metrics_ks3:
-    input:
-        rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done',
-    output:
-        metrics_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_metrics.done'),
-        kilosort_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort'),
-    threads: 32
-    priority: 10
-    script:
-        "scripts/spike_sorting/s02_cluster_metrics_ks3.py"
+        "scripts/spike_sorting/s01_sort_ks4.py"
 
 
 rule waveform_and_quality_metrics:
     input:
-        kilosort_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort',
+        kilosort_folder = '{sessions}/{task_path}/{session_id}/processed/kilosort4',
         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        si_output_folder = '{sessions}/{task_path}/{session_id}/processed/si/kilosort3',
-        # sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'
+        sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'
     output:
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
-        si_quality_complete = touch('{sessions}/{task_path}/{session_id}/processed/si_quality.done')
     threads: 32
     script:
         "scripts/spike_sorting/s03_waveform_and_quality_metrics.py"
@@ -76,31 +61,23 @@ rule waveform_and_quality_metrics:
 
 rule ephys_sync:
     input:
-        metrics_complete = '{sessions}/{task_path}/{session_id}/processed/spike_metrics.done'
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     output:
         ephys_sync_complete = touch('{sessions}/{task_path}/{session_id}/processed/ephys_sync.done')
     script:
         "scripts/spike_sorting/s04_ephys_sync.py"
 
-rule cell_metrics_processing:
-    input:
-        rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
-        ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
-    output:
-        cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc'
-    script:
-        "scripts/spike_sorting/s05_cell_metrics_processing.py"
-
 
 rule cells_to_xarray:
     input:
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',   
-        cell_matrics_full= '{sessions}/{task_path}/{session_id}/processed/cell_metrics_full.nc' 
     output:
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         neo_spike_train = '{sessions}/{task_path}/{session_id}/processed/neo_spiketrain.pkl',
+        df_aggregate = '{sessions}/{task_path}/{session_id}/processed/df_aggregate.pkl',
     script:
         "scripts/spike_sorting/s09_cell_to_xarray.py"
 
@@ -136,26 +113,27 @@ def session_correlations_input(wildcards):
     # only run if photometry file is present
     ppd_files = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
     if len(ppd_files)>0:
-        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/ephys/correlated_cells.png'
+        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/xr_corr.nc'
     else:
         return []
 
 rule session_correlations:
     input: 
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
         xr_spike_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
+        xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
     output:
-        df_cross_corr = '{sessions}/{task_path}/{session_id}/processed/df_cross_corr.pkl',
-        corr_plot = '{sessions}/{task_path}/{session_id}/processed/ephys/correlated_cells.png',
+        xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
+        corr_plots = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/correlations'),
     threads: 32
     script:
         "scripts/spike_sorting/s12_session_correlations.py"
 
 rule spikesort_done:
     input:
-        # corr_plot = session_correlations_input, 
+        corr_plot = session_correlations_input, 
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
         cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
-        si_quality_complete = '{sessions}/{task_path}/{session_id}/processed/si_quality.done'
     priority: 20
     output:
         spike_sort_done = touch('{sessions}/{task_path}/{session_id}/processed/spikesort.done'),

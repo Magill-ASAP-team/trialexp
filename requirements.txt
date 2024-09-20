@@ -1,5 +1,8 @@
 snakemake == 7.25.0
 pulp == 2.7.0
+numpy >=1.26,<2 #required by kilosort4
+pandas >=2.1,<2.2 #2.2 requires numpy 2
+kilosort[gui]
 scipy
 sonpy
 git+https://github.com/teristam/snakehelper.git
@@ -10,10 +13,24 @@ plotly
 xarray
 scikit-learn
 jupyterlab
-kilosort[gui]
 ipywidgets
 h5netcdf
 neo
 shiny
 loguru
+spikeinterface 
+elephant
+fastdtw
+tslearn
+pingouin
+open-ephys-python-tools
+datashader
+dask[dataframe]
+holoviews
+cupy-cuda12x
 
+'''
+Other installation requirement:
+You will need to install cudatool kit 12.1 for cupy to work
+conda install cuda -c nvidia/label/cuda-12.1.0
+'''

@@ -37,7 +37,6 @@ try:
     pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
     data_photometry = import_ppd_auto(pyphotometry_file)
-    print(data_photometry['version'])
     data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
     
     # Convert to xarray
@@ -105,7 +104,7 @@ if has_photometry:
         if 'extra_event_triggers' in df_event.attrs:
             for evt_triggers in df_event.attrs['extra_event_triggers']:
                 #Note: df_event only contains event extract around the trigger
-                add_event_data(df_pycontrol, event_filters.get_events_from_name,
+                add_event_data(df_event, event_filters.get_events_from_name,
                     trial_window, dataset, event_time_coord, 
                     var, evt_triggers, dataset.attrs['sampling_rate'],
                     groupby_col=None,
@@ -171,4 +170,3 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
-

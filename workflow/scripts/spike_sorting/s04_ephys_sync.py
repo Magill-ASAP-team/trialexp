@@ -29,7 +29,7 @@ ephys_sync_done_path = str(Path(settings.debug_folder) / 'processed' / 'ephys_sy
 verbose = True
 sorter_name = 'kilosort4'
 
-kilosort_folder = Path(sinput.metrics_complete).parent / sorter_name
+kilosort_folder = Path(sinput.df_quality_metrics).parent / sorter_name
 pycontrol_path = (kilosort_folder.parents[1]/'pycontrol')
 pycontrol_path = (list(pycontrol_path.glob('*.txt')) + list(pycontrol_path.glob('*.tsv')))[0]
 sync_path = kilosort_folder.parents[1]/'ephys'
@@ -41,7 +41,7 @@ for probe_dir in  kilosort_folder.glob('Probe*'):
     # event time from open ephys count from the beginning of the acquisition, not recording
     # kilosort time always start from the beginning of the recording
 
-    rec_prop = pd.read_csv(probe_dir/'../rec_prop.csv').iloc[0]
+    rec_prop = pd.read_csv(probe_dir/f'../rec_prop_{probe_dir.name}.csv').iloc[0]
     rsync = create_ephys_rsync(str(pycontrol_path), sync_path, rec_prop.tstart)
     ks_path = probe_dir /'spike_times.npy'
     

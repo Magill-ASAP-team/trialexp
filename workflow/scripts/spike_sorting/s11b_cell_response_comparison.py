@@ -27,7 +27,7 @@ import settings
 
 xr_spikes_trials = xr.load_dataset(Path(sinput.xr_spikes_trials)) 
 xr_fr = xr.load_dataset(Path(sinput.xr_spikes_fr))
-session_ID = xr_spikes_trials.attrs['session_ID']
+session_ID = xr_spikes_trials.attrs['session_id']
 df_pycontrol = pd.read_pickle(sinput.pycontrol_dataframe)
 
 
@@ -43,14 +43,14 @@ style_plot()
 df_list = []
 
 success_trial = xr_spikes_trials.trial_outcome=='success'
-
 if np.sum(success_trial)>0:
     for varname in var2plot:
         print('I will now do the comparison for ', varname)
         da = xr_spikes_trials[varname]
         
         #only select successful trial
-        da = da.sel(trial_nb = success_trial)
+        if 'trial_nb' in da.dims:
+            da = da.sel(trial_nb = success_trial)
         
         da_rand = get_random_evt_data(xr_fr, da, trial_window)
 
@@ -95,8 +95,7 @@ if np.sum(success_trial)>0:
 #%% Combine the comparison results into a dataframe and then save
 if len(df_list)>0:
     df_tuning = pd.concat(df_list)
-    waveform_chan = get_chan_coords(xr_spikes_trials)
-
+    waveform_chan = xr_spikes_trials[['ks_chan_pos_x','ks_chan_pos_y']].to_dataframe()
     df_cell_prop = df_tuning.merge(waveform_chan, on='cluID')
 else:
     df_cell_prop = pd.DataFrame()

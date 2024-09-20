@@ -47,7 +47,7 @@ def figure_server(input, output, session, figure_info):
             b64_str = base64.b64encode(f.read()).decode("utf-8")
             id = figure_info.session_id.replace('-','_')
             return  ui.card(
-                            ui.card_header(ui.input_action_link('show_figure',  label=figure_info.session_id)),
+                            ui.card_header(ui.input_action_link('show_figure',  label=figure_info.task_name + '/' + figure_info.session_id)),
                             ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly
                         )
             
@@ -61,7 +61,7 @@ def figure_server(input, output, session, figure_info):
             b64_str = base64.b64encode(f.read()).decode("utf-8")
             id = figure_info.session_id.replace('-','_')
             card = ui.card(
-                            ui.card_header(label=figure_info.session_id),
+                            ui.card_header(figure_info.session_id),
                             ui.img(src=f"data:{mime_type};base64,{b64_str}") # create html tag directly
                         )
             

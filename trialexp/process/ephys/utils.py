@@ -32,6 +32,8 @@ from tslearn.metrics import dtw_variants
 from tslearn.metrics.dtw_variants import *
 from tslearn.barycenters import softdtw_barycenter
 import scipy
+from scipy.stats import pearsonr
+
 
 def denest_string_cell(cell):
         if len(cell) == 0: 
@@ -40,6 +42,41 @@ def denest_string_cell(cell):
             return str(cell[0])
 
 
+def analyzer2dataframe(analyzer):
+    # Convert the sorting analyzer object in spikeinterface to dataframe
+    units_ids = analyzer.unit_ids
+    metrics = {}
+    df2join=[]
+    other_metrics = {}
+    for extension in analyzer.get_loaded_extension_names():
+        wv = analyzer.get_extension(
+            extension_name=extension
+        )
+        data = wv.get_data()
+
+        if type(data) is np.ndarray and data.shape[0] == len(units_ids):
+            metrics[extension] = data.tolist()
+        elif type(data) is pd.core.frame.DataFrame:
+            df2join.append(data)
+        else:
+            if extension != 'waveforms':
+                other_metrics[extension] = data
+            
+
+    df_metrics = pd.DataFrame(metrics)
+    df_metrics['unit_id'] = units_ids
+    for df in df2join:
+        df['unit_id'] = units_ids
+        df_metrics = df_metrics.merge(df, on='unit_id')
+        
+    #Special processing for correlogram
+    # only extract the auto-correlogram
+    if 'correlograms' in other_metrics.keys():
+        df_metrics['acg'] = [other_metrics['correlograms'][0][i,i] for i in range(len(df_metrics))]
+        
+    df_metrics.attrs.update(other_metrics)
+    
+    return df_metrics
 def session_and_probe_specific_uid(session_ID: str, probe_name: str, uid: int):
     '''
     Build unique cluster identifier string of cluster (UID),
@@ -210,7 +247,7 @@ def plot_firing_rate(xr_fr_coord, xr_session, df_pycontrol, events2plot, xlim=No
     # the xr_fr_coord should already be sorted in pos_y
     
     style_plot()
-    assert all(np.diff(xr_fr_coord.pos_y)>=0), 'Error! Datset must be first sorted by pos_y'
+    assert all(np.diff(xr_fr_coord.ks_chan_pos_y)>=0), 'Error! Datset must be first sorted by pos_y'
     bin_duration = xr_fr_coord.attrs['bin_duration']
 
     
@@ -232,7 +269,7 @@ def plot_firing_rate(xr_fr_coord, xr_session, df_pycontrol, events2plot, xlim=No
     
     
     ax_fr.set_yticks(yticks)
-    ax_fr.set_yticklabels(xr_fr_coord.pos_y.data[yticks]); #the cooresponding label for the tick
+    ax_fr.set_yticklabels(xr_fr_coord.ks_chan_pos_y.data[yticks]); #the cooresponding label for the tick
     ax_fr.invert_yaxis()
     
     
@@ -248,13 +285,13 @@ def plot_firing_rate(xr_fr_coord, xr_session, df_pycontrol, events2plot, xlim=No
 
     # also plot the important pycontrol events
     
-    events2plot = df_pycontrol[df_pycontrol.name.isin(events2plot)]
+    events2plot = df_pycontrol[df_pycontrol.content.isin(events2plot)]
 
     ## Event
     evt_colours =['r','g','b','w']
     # Note: the time coordinate of the firing map corresponds to the time bins
-    for i, event in enumerate(events2plot.name.unique()):
-        evt_time = events2plot[events2plot.name==event].time
+    for i, event in enumerate(events2plot.content.unique()):
+        evt_time = events2plot[events2plot.content==event].time
         evt_time_idx = [np.searchsorted(xr_fr_coord.time, t) for t in evt_time]
         # evt_time = evt_time/bin_duration
         ax_event.eventplot(evt_time_idx, lineoffsets=80+20*i, linelengths=20,label=event, color=evt_colours[i])
@@ -418,6 +455,69 @@ def crosscorr_lag_range(datax: pd.Series, datay: pd.Series, lags:list):
         cross_corr[lag_idx] = crosscorr(datax,datay,lag)
 
     return cross_corr
+
+
+def calculate_pearson_lags(x, y, max_lag, lag_step=1, trial_average=True):
+    """
+    Calculate Pearson correlation coefficients and lags between two signals.
+    
+    Improve speed by creating a lag matrix.
+    Each row of the lag matrix corresponds to the original signal shifted by some lag.
+    The shifted signals from all trials are flattened into one row.
+    
+    At negative lag, y will be shifted left, positive lag vice versa
+
+    Args:
+        x (ndarray): The first signal.
+        y (ndarray): The second signal.
+        max_lag (int): The maximum lag to consider.
+        trial_average (bool): whether to compute the correlation only on trial average
+
+    Returns:
+        tuple: A tuple containing:
+            - lags (ndarray): The array of lag values.
+            - correlations (ndarray): The correlation matrix containing the auto and cross correlations.
+            - corr (ndarray): The cross-correlation values.
+     
+    """
+    lags = np.arange(-max_lag, max_lag + 1, lag_step)
+    correlations = np.zeros(len(lags))
+    
+    if trial_average:
+        xm = np.zeros((len(lags),x.shape[1]))
+        ym = np.zeros_like(xm)
+    else:
+        xm = np.zeros((len(lags),x.shape[0]*x.shape[1]))
+        ym = np.zeros_like(xm)
+        
+    for i, lag in enumerate(lags):
+        if lag < 0:
+            shifted_x = x[:,:lag]
+            shifted_y = y[:,-lag:]
+        elif lag > 0:
+            shifted_x = x[:,lag:]
+            shifted_y = y[:,:-lag]
+        else:
+            shifted_x = x
+            shifted_y = y
+        
+        # remove NAN data
+        valid_idx = ~np.isnan(shifted_y.mean(axis=1))
+        if trial_average:
+            shifted_x = shifted_x[valid_idx,:].mean(axis=0)
+            shifted_y = shifted_y[valid_idx,:].mean(axis=0) 
+        else:
+            shifted_x = shifted_x[valid_idx,:].ravel()
+            shifted_y = shifted_y[valid_idx,:].ravel() 
+            
+        assert len(shifted_x) == len(shifted_y), f'Length mismatch {len(shifted_x)} vs {len(shifted_y)}'
+        xm[i, :len(shifted_x)] = shifted_x
+        ym[i, :len(shifted_y)] = shifted_y
+    
+    correlations= np.corrcoef(xm, ym) #contains the auto and then cross correlation between variables
+    halfw = len(correlations)//2
+    corr = np.diag(correlations[halfw:, :halfw]) # the bottom quandrant is the cross-correlation
+    return lags,correlations,corr
 
 
 
@@ -748,17 +848,36 @@ def get_random_evt_data(xr_fr, da, trial_window, num_sample=1000):
     return da_rand
 
 def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5):
+    """
+    Create a comparison dataframe by combining two input DataArrays and adding group labels.
+
+    Parameters:
+    - da_rand (xarray.DataArray): Random DataArray.
+    - da (xarray.DataArray): Event-triggered DataArray.
+    - cluID (str): Cluster ID.
+    - dpvar_name (str): Name of the dependent variable.
+    - coarsen_factor (int, optional): Coarsening factor for spk_event_time. Default is 5.
+
+    Returns:
+    - data2test (pandas.DataFrame): Comparison dataframe with group labels.
+
+    """
     da1 = da_rand.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
-    da1 = da1.to_dataframe().reset_index()
-    da1['group'] = 'random'
-    da1 = da1.dropna()
+    df_da1 = da1.to_dataframe().reset_index()
+    df_da1['group'] = 'random'
+    df_da1 = df_da1.dropna()
 
     da2 = da.sel(cluID=cluID).coarsen(spk_event_time=coarsen_factor, boundary='trim').mean()
-    da2 = da2.to_dataframe().reset_index()
-    da2['group'] = 'event-triggered'
-    da2['trial_nb'] += da1.trial_nb.max()
+    df_da2 = da2.to_dataframe().reset_index()
+    df_da2['group'] = 'event-triggered'
+    
+    # Do it separately for data without a trial structure
+    if 'trial_nb' not in da2.dims:
+        # rename the column to make a dummy trial_nb
+        df_da2 = df_da2.rename(columns={da2.dims[0]:'trial_nb'})
 
-    data2test = pd.concat([da1, da2])
+    df_da2['trial_nb'] += df_da1.trial_nb.max()+1
+    data2test = pd.concat([df_da1, df_da2])
     
     data2test = data2test.rename(columns={dpvar_name:'dv'})
     data2test = data2test.dropna()
