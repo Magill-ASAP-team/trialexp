@@ -493,34 +493,6 @@ def draw_event_line(extraction_specs,trigger, ax=None, show_label=True, draw_pro
             ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
         cur_time += (post_time-pre_time)+padding
         
-def prepare_regression_data(xa_cond, signal_var):
-    """
-    Prepare the data for regression analysis.
-
-    Parameters:
-    xa_cond (xarray.DataArray): The input xarray containing the condition data.
-    signal_var (str): The name of the variable to be used as the signal.
-
-    Returns:
-    tuple: A tuple containing the data array and a dictionary of predictor variables.
-    """
-    if 'trial_id' in xa_cond.coords:
-        xr_data = xa_cond.dropna(dim='trial_id')
-    else:
-        xr_data = xa_cond.dropna(dim='trial_nb')
-
-    data = np.squeeze(xr_data[signal_var].data)
-
-    # construct the predictor index
-    # trial_outcome
-    event_idx = np.where(xr_data.trial_outcome == 'success')[0]
-    x_event = np.zeros_like(data)
-    x_event[event_idx,:] = 1
-
-    # trial_nb (a proxy for time)
-    x_trial_nb = np.tile(xr_data.trial_nb, [data.shape[1],1]).T
-    
-    return (data, {'trial_outcome': x_event, 'trial_nb':x_trial_nb})
 
 def perform_linear_regression(xa_cond, data, formula, data2=None, scale_data=True, **predictor_vars):
     """
@@ -547,8 +519,7 @@ def perform_linear_regression(xa_cond, data, formula, data2=None, scale_data=Tru
         
         if data2 is not None:
             df2fit['signal2'] = data2[t,:]
-            
-        
+                
         for k, v in predictor_vars.items():
             df2fit[k] = v[t, :]
         
@@ -696,7 +667,7 @@ def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False)
     ax.axhline(0,ls='--',color='gray',alpha=0.5)
     
     ylim = ax.get_ylim()
-    if ylim[1] < 0.1:
+    if ylim[1] < 0.05:
         ax.set_ylim([-1,1]) # don't give the wrong impression of a very small beta
     draw_event_line(extraction_specs, 'hold_for_water', ax, show_label=False)
     
