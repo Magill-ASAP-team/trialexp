@@ -59,7 +59,7 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
 elif task_name in ['reaching_go_spout_bar_VR_April24']:
-    extraction_specs = specs['reaching_go_spout_bar_reward']
+    extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
     outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     
 
@@ -120,7 +120,7 @@ xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
 #%% Plot the time wrapped data
-for var in signal2analyze:
+for var in [signal2analyze[0]]:
     unique_outcome = np.unique(xr_warped.trial_outcome)
     fig, axes = plt.subplots(len(outcome2plot),1,figsize=(10,4*len(outcome2plot)))
     
@@ -129,7 +129,7 @@ for var in signal2analyze:
         
     for outcome, ax in zip(outcome2plot, axes):
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-        lm.plot_warpped_data2(xr2plot, var, extraction_specs, trigger, ax=ax)
+        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
         
     fig.tight_layout()
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
