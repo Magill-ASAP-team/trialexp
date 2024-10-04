@@ -84,7 +84,8 @@ for signal_var in signal2analyze:
                            extraction_specs, 
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
-                           verbose=False)
+                           verbose=True)
+                        
     
     xa_list.append(xa)
     
@@ -119,8 +120,12 @@ xa_list.append(xa)
 xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
+#%% check for valid trials
+valid_trials = np.all(~np.isnan(xr_warped['zscored_df_over_f'].data),axis=1)
+print('Ratio of valid trials:', np.sum(valid_trials)/len(valid_trials))
+
 #%% Plot the time wrapped data
-for var in [signal2analyze[0]]:
+for var in signal2analyze:
     unique_outcome = np.unique(xr_warped.trial_outcome)
     fig, axes = plt.subplots(len(outcome2plot),1,figsize=(10,4*len(outcome2plot)))
     

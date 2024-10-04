@@ -60,10 +60,11 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     event_specs = dict(filter(lambda k: k[0]!=trigger, extraction_specs.items()))
     trigger_specs = extraction_specs[trigger]
 
-    # Construct the interpolation time stamp
-    event_window_len = int(np.sum([v['event_window'][1]-v['event_window'][0] for k,v in extraction_specs.items()])/1000*sampling_rate)
-    total_padding_len = int(np.sum([v['padding'] for k,v in extraction_specs.items()])/1000*sampling_rate)
+    # Construct the interpolation time stamp, need to be consistent with how the window length is calculated later
+    event_window_len = np.sum([int((v['event_window'][1]-v['event_window'][0])/1000*sampling_rate) for k,v in extraction_specs.items()])
+    total_padding_len = np.sum([int(v['padding']/1000*sampling_rate) for k,v in extraction_specs.items()])
     total_len = total_padding_len+event_window_len
+    # print(total_padding_len, event_window_len)
 
     if len(trial_data) < total_len:
         raise ValueError(f'There is not enough data for interpolation required: {total_len}, available: {len(trial_data)}')
@@ -88,6 +89,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     
     interp_result = {'interp_'+trigger:True} #the trigger is always found
     
+    # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
 
     # process the other events one by one
     # TODO  Figure out what to do if one event is missing but not the next
@@ -106,8 +108,14 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         # Note: note there will be nan when the animal touch the spout too close to the start of next trial
         # e.g. in aborted trial
         
-        # warp the inter-event period
-        # Raise error if the padding is too long
+        '''
+        Warp the inter-event period
+        Raise error if the padding is too long
+        cur_time is pointing at the timestamp of last event
+        Note: there will be error when animal put its right paw on the holding bar. This will somtimes result
+        in the spout happening before bar_off, thus searching for the last bar_off before the first spout will fail
+        '''
+
         # TODO: handle this gracefully
         if cur_time + padding > t_event+specs['event_window'][0]:
             raise ValueError(f'Padding too long. {evt}  time diff: {cur_time + padding - t_event+specs["event_window"][0]}')
@@ -126,9 +134,12 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         cur_time = cur_time + event_window_time
         padding = specs['padding']
         padding_len = int(specs['padding']/1000*sampling_rate)
+        # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
         
     # use linear interpolation to warp them
     data_interp  = trial_data.interp(time=t)
+    
+    assert cur_idx == total_len, 'time array not totally filled'
     data_interp['time'] = np.arange(total_len)/sampling_rate*1000 + trigger_specs['event_window'][0]
 
     return data_interp, interp_result
@@ -160,8 +171,9 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
         df_trial = df_events_cond[df_events_cond.trial_nb==i]
     
         pre_time = extraction_specs[trigger]['event_window'][0]-500
+        post_time = list(extraction_specs.values())[-1]['event_window'][1]
         # extract photometry data around trial
-        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time)
+        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time)
         
         #time wrap it
         try:
