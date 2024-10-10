@@ -60,10 +60,11 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     event_specs = dict(filter(lambda k: k[0]!=trigger, extraction_specs.items()))
     trigger_specs = extraction_specs[trigger]
 
-    # Construct the interpolation time stamp
-    event_window_len = int(np.sum([v['event_window'][1]-v['event_window'][0] for k,v in extraction_specs.items()])/1000*sampling_rate)
-    total_padding_len = int(np.sum([v['padding'] for k,v in extraction_specs.items()])/1000*sampling_rate)
+    # Construct the interpolation time stamp, need to be consistent with how the window length is calculated later
+    event_window_len = np.sum([int((v['event_window'][1]-v['event_window'][0])/1000*sampling_rate) for k,v in extraction_specs.items()])
+    total_padding_len = np.sum([int(v['padding']/1000*sampling_rate) for k,v in extraction_specs.items()])
     total_len = total_padding_len+event_window_len
+    # print(total_padding_len, event_window_len)
 
     if len(trial_data) < total_len:
         raise ValueError(f'There is not enough data for interpolation required: {total_len}, available: {len(trial_data)}')
@@ -88,6 +89,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     
     interp_result = {'interp_'+trigger:True} #the trigger is always found
     
+    # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
 
     # process the other events one by one
     # TODO  Figure out what to do if one event is missing but not the next
@@ -106,12 +108,19 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         # Note: note there will be nan when the animal touch the spout too close to the start of next trial
         # e.g. in aborted trial
         
-        # warp the inter-event period
-        # Raise error if the padding is too long
+        '''
+        Warp the inter-event period
+        Raise error if the padding is too long
+        cur_time is pointing at the timestamp of last event
+        Note: there will be error when animal put its right paw on the holding bar. This will somtimes result
+        in the spout happening before bar_off, thus searching for the last bar_off before the first spout will fail
+        '''
+
         # TODO: handle this gracefully
         if cur_time + padding > t_event+specs['event_window'][0]:
             raise ValueError(f'Padding too long. {evt}  time diff: {cur_time + padding - t_event+specs["event_window"][0]}')
 
+        # warp the signal in the padding_len region
         t[cur_idx:(cur_idx+padding_len)] = np.linspace(cur_time, t_event+specs['event_window'][0], padding_len)
         cur_idx += padding_len
         cur_time = cur_time + padding
@@ -125,9 +134,12 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         cur_time = cur_time + event_window_time
         padding = specs['padding']
         padding_len = int(specs['padding']/1000*sampling_rate)
+        # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
         
     # use linear interpolation to warp them
     data_interp  = trial_data.interp(time=t)
+    
+    assert cur_idx == total_len, 'time array not totally filled'
     data_interp['time'] = np.arange(total_len)/sampling_rate*1000 + trigger_specs['event_window'][0]
 
     return data_interp, interp_result
@@ -159,8 +171,9 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
         df_trial = df_events_cond[df_events_cond.trial_nb==i]
     
         pre_time = extraction_specs[trigger]['event_window'][0]-500
+        post_time = list(extraction_specs.values())[-1]['event_window'][1]
         # extract photometry data around trial
-        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time)
+        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time)
         
         #time wrap it
         try:
@@ -261,8 +274,8 @@ def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected
 
         ylim = ax.get_ylim()
         marker_size = (ylim[1]-ylim[0])*0.05
-        if i != len(extraction_specs.keys())-1:
-            # add_break_mark(ax, cur_time-padding/2, ax.get_ylim()[0], 5, 20, marker_size)
+        if i != len(extraction_specs.keys())-1 and padding>0:
+            # only draw compressed mark when time warping is done
             add_compressed_mark(ax, cur_time-padding/2, ax.get_ylim()[0],ax.get_ylim()[1]/30,10)
 
 
@@ -270,10 +283,13 @@ def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected
 
 def compute_ticks(extraction_specs):
     # Calculate the tick location and labels from the specs
+    # if the last region has no padding, continue counting
 
     ticks = []
     ticks_labels = []
     cur_time = None
+    continue_count = False
+
     for k,v in extraction_specs.items():
         if cur_time is None:
             cur_time = v['event_window'][0]
@@ -281,85 +297,22 @@ def compute_ticks(extraction_specs):
         
         t = [cur_time, cur_time + win_len]
         ticks += t
-
         
         tlab = v['event_window'][0], v['event_window'][1]
-        ticks_labels += tlab
+        if not continue_count:
+            ticks_labels += tlab
+        else:
+            # continue counting from the last region
+            ticks_labels += tlab[0]+last_tlab[1], tlab[1]+last_tlab[1]
     
         cur_time =  cur_time + win_len+ v['padding']
+        continue_count = (v['padding'] == 0) # continue contining if no warping needs to be performed
+        last_tlab = tlab
     
     return ticks, ticks_labels
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, 
-                      ax=None, draw_protected_region=True, hue='trial_outcome'):
-    
-    palette_colors = plt.cm.tab10.colors
 
-    df = xa_cond[[signal_var,hue]].to_dataframe()
-    
-    # work with multiindex from multisession dataset
-    if 'trial_id' in xa_cond.coords:
-        df = df.droplevel([1,2])
-        df['trial_id'] = df['session_id'].astype(str) + '_' + df['trial_nb'].astype(str)
-        df = df.reset_index()    
-
-    else:
-        df = df.reset_index()
-        df['trial_id'] = df['trial_nb']
-    
-    df = df.dropna()
-    
-    if len(df)>0:
-        # sometime when the event time doesn't matter the extraction_specs
-        # no trial can be extracted
-        
-         #add in the trial number information
-        df_outcome = df.groupby('trial_id').first().dropna()
-        df_outcome_count = df_outcome.groupby(hue).count().time
-        labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
-        df[hue] = df[hue].replace(labels)
-        
-        outcomes = sorted(df[hue].unique())[::-1]
-        palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
-
-        sns.lineplot(df, x='time',y=signal_var, 
-                    hue=hue, palette=palette, ax = ax, n_boot=100)
-        
-        sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
-
-        
-        # add a bit of padding for text later
-        ylim = ax.get_ylim()
-        yrange = ylim[1] -ylim[0]
-        ax.set_ylim(ylim[0], ylim[1]+yrange*0.3)
-        
-        # plot the time point in the extraction_specs
-        
-        # only plot the time line if there are at least some trials that contain that event
-        # idx  = df_interp_res.index.intersection(xa_cond.trial_nb)
-        # event2plot = df_interp_res.loc[idx].any() #Find if there is any trial having that event
-        
-        trigger_window = extraction_specs[trigger]['event_window']
-        cur_time = trigger_window[0]
-        colors = (c for c in plt.cm.tab10.colors)
-        
-        for evt, specs in extraction_specs.items():
-            pre_time, post_time = specs['event_window']
-            padding = specs['padding']
-            
-            color = next(colors)
-            
-            if xa_cond['interp_'+evt].any():
-                ax.axvline(cur_time-pre_time,color= color, ls='--')
-                if draw_protected_region:
-                    ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
-                    label = specs.get('label', evt.replace('_', ' '))
-                    ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
-                    
-            cur_time += (post_time-pre_time)+padding
-
-
-def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
                        ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
     
     if palette_colors is None:
@@ -410,7 +363,7 @@ def plot_warpped_data2(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
         add_warp_info(ax, extraction_specs, trigger)
         sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
         ticks, ticks_labels = compute_ticks(extraction_specs)
-        ax.set_xticks(ticks, labels =ticks_labels, rotation=30);
+        ax.set_xticks(ticks, labels =ticks_labels, rotation=30) # duplicated tick will be overrided
 
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)

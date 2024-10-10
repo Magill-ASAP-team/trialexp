@@ -85,6 +85,7 @@ for signal_var in signal2analyze:
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
                            verbose=False)
+                        
     
     xa_list.append(xa)
     
@@ -119,6 +120,10 @@ xa_list.append(xa)
 xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
+#%% check for valid trials
+valid_trials = np.all(~np.isnan(xr_warped['zscored_df_over_f'].data),axis=1)
+print('Ratio of valid trials:', np.sum(valid_trials)/len(valid_trials))
+
 #%% Plot the time wrapped data
 for var in signal2analyze:
     unique_outcome = np.unique(xr_warped.trial_outcome)
@@ -129,7 +134,7 @@ for var in signal2analyze:
         
     for outcome, ax in zip(outcome2plot, axes):
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-        lm.plot_warpped_data2(xr2plot, var, extraction_specs, trigger, ax=ax)
+        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
         
     fig.tight_layout()
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
@@ -145,7 +150,7 @@ if type(axes) is not np.ndarray:
     
 for outcome, ax in zip(outcome2plot, axes):
     xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-    lm.plot_warpped_data2(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking probability',ylim=[0,1])
+    lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking probability',ylim=[0,1])
 
 fig.tight_layout()
 fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
