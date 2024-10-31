@@ -28,6 +28,7 @@ datashader
 dask[dataframe]
 holoviews
 cupy-cuda12x
+torchaudio
 
 '''
 Other installation requirement:
