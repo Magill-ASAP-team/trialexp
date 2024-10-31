@@ -59,7 +59,7 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
 elif task_name in ['reaching_go_spout_bar_VR_April24']:
-    extraction_specs = specs['reaching_go_spout_bar_reward']
+    extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
     outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     
 
