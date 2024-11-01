@@ -102,7 +102,14 @@ xr_interp_res = df_interp_res.to_xarray()
 lick_on = df_events_cond[df_events_cond.content=='lick'].time
 
 lick_rate,_ = np.histogram(lick_on, xr_photometry.time)
-lick_rate = np.clip(lick_rate,0,1)
+# lick_rate = np.clip(lick_rate,0,1)
+
+# calculate the rolling mean lick rate
+lick_bin_size = 0.2 # in seconds
+win_size = int(lick_bin_size*xr_photometry.attrs['sampling_rate'])
+lick_rate = np.convolve(lick_rate, np.ones(win_size)/win_size, mode='same')*(1/lick_bin_size)
+
+
 xa_lick_rate = xr.DataArray(lick_rate, name='lick_rate',
                             coords={'time':xr_photometry.time[:-1]},dims=['time'])
 
@@ -150,7 +157,7 @@ if type(axes) is not np.ndarray:
     
 for outcome, ax in zip(outcome2plot, axes):
     xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-    lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking probability',ylim=[0,1])
+    lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking rate (per sec)')
 
 fig.tight_layout()
 fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
