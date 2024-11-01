@@ -157,10 +157,7 @@ if type(axes) is not np.ndarray:
     
 for outcome, ax in zip(outcome2plot, axes):
     xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
-    lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking rate (per sec)')
+    lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax, ylabel='Licking rate (per sec)', ylim=[0,1.2])
 
 fig.tight_layout()
 fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
-
-
-# %%
