@@ -1425,8 +1425,8 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
         photometry_dict['analog_3_detrended'] = photometry_dict['analog_3_filt'] - isos_baseline
         
         # we need to remove the shadow artifact first
-        photometry_dict['analog_2_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_2_detrended'],8)
-        photometry_dict['analog_3_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_3_detrended'],8)
+        photometry_dict['analog_2_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_2_detrended'],30)
+        photometry_dict['analog_3_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_3_detrended'],30)
 
         
         analog_2_est_motion, analog_2_corrected = window_subtraction(photometry_dict['analog_2_deshadow'],

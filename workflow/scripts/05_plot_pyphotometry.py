@@ -67,10 +67,10 @@ for k in var2plot:
         g.set_xlabels('Time (ms)')
         g.figure.suptitle(xr_session.attrs['mode'], y=1.05,x=0.2)
             
-        g.figure.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=300, bbox_inches='tight')
+        g.figure.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=200, bbox_inches='tight')
     else:
         df2plot = xr_session[k].to_dataframe().reset_index()
-        fig,ax = plt.subplots(1,1,figsize=(4,4), dpi=300)
+        fig,ax = plt.subplots(1,1,figsize=(4,4), dpi=200)
         sns.lineplot(df2plot, x='event_time', y = k, ax=ax, n_boot=100)
         ax.set_ylabel(k)
         ax.set_xlabel('Time (ms)')
@@ -79,12 +79,11 @@ for k in var2plot:
         n = xr_session[k].data.shape[1]
         ax.text(0.8,0.9,f'n={n}', transform=ax.transAxes)
         
-        fig.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=300, bbox_inches='tight')
-        
+        fig.savefig(os.path.join(figure_dir, f'{k}.png'), dpi=200, bbox_inches='tight')
         
     #plot heatmap
     fig = plot_pyphoto_heatmap(xr_session[k])
-    fig.savefig(os.path.join(figure_dir, f'{k}_heatmap.png'), dpi=300, bbox_inches='tight')
+    fig.savefig(os.path.join(figure_dir, f'{k}_heatmap.png'), dpi=200, bbox_inches='tight')
     
     plt.close()
 
