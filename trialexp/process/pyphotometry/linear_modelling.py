@@ -12,6 +12,7 @@ from matplotlib.patches import Polygon
 from matplotlib.path import Path
 import matplotlib.patches as patches
 from sklearn import preprocessing
+import json
 
 def extract_event(df_events, event, order, dependent_event=None, alternative=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
@@ -367,6 +368,63 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
 
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
+
+
+def plot_spike_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
+                       ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
+    
+    if palette_colors is None:
+        palette_colors = plt.cm.tab10.colors
+
+    df = xa_cond[[signal_var,hue]].to_dataframe()
+    
+    # work with multiindex from multisession dataset
+    if 'trial_id' in xa_cond.coords:
+        df = df.droplevel([1,2])
+        df['trial_id'] = df['session_id'].astype(str) + '_' + df['trial_nb'].astype(str)
+        df = df.reset_index()    
+
+    else:
+        df = df.reset_index()
+        df['trial_id'] = df['trial_nb']
+    
+    df = df.dropna()
+    
+    if len(df)>0:
+        # sometime when the event time doesn't matter the extraction_specs
+        # no trial can be extracted
+        
+         #add in the trial number information
+        df_outcome = df.groupby('trial_id').first().dropna()
+        df_outcome_count = df_outcome.groupby(hue).count().time
+        labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
+        df[hue] = df[hue].replace(labels)
+        
+        outcomes = sorted(df[hue].unique())[::-1]
+        
+        palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
+        
+
+        sns.lineplot(df, x='time',y=signal_var, 
+                    hue=hue, palette=palette, ax = ax, n_boot=100)
+        
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        
+        if ylabel is None:
+            ylabel = 'z-scored dF/F'
+        sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
+        ax.set(xlabel='Time around events (ms)', ylabel = ylabel, xlim=[-500,2300])
+        
+        # add in the warp information
+        
+        add_warp_info(ax, extraction_specs, trigger)
+        sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
+        ticks, ticks_labels = compute_ticks(extraction_specs)
+        ax.set_xticks(ticks, labels =ticks_labels, rotation=30) # duplicated tick will be overrided
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         
 def flatten_level(df):
     if 'trial_id' in df.index.names or 'trial_nb' in df.index.names:
@@ -640,3 +698,47 @@ def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False)
 
     if display_pvalue:
         highlight_pvalues_consec_win(df2plot, ax, threshold=0.01, consec_win=3)
+
+
+def get_warping_specs(df_events_cond, df_conditions, specs_path):
+
+    with open(specs_path) as f:
+        specs = json.load(f)
+
+    if 'task_name' in df_events_cond.attrs:
+        task_name = df_events_cond.attrs['task_name']
+    else:
+        task_name = df_events_cond.attrs['Task name']
+    
+    trigger = df_events_cond.attrs['triggers'][0]
+
+    if task_name in ['pavlovian_spontanous_reaching_oct23',
+                 'pavlovian_reaching_Oct26',
+                 'pavlovian_spontanous_reaching_march23',
+                 'pavlovian_spontanous_reaching_oct23',
+                 'pavlovian_spontanous_reaching_April24']:
+        extraction_specs = specs['spontanous_reaching']
+        outcome2plot = df_conditions.trial_outcome.unique()
+    
+    elif task_name in ['reaching_go_spout_bar_VR_Dec23',
+                   'reaching_go_spout_bar_apr23',
+                   'reaching_go_spout_bar_mar23',
+                   'reaching_go_spout_bar_june05',
+                   'reaching_go_spout_bar_nov22']:
+        extraction_specs = specs['reaching_go_spout_bar_reward']
+        outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+    
+    elif task_name in ['reaching_go_spout_bar_VR_April24']:
+        extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
+        outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
+    
+
+    elif task_name in ['reaching_go_spout_incr_break2_nov22']:
+        extraction_specs = specs['break2']
+        outcome2plot = df_conditions.trial_outcome.unique()
+    else:
+        extraction_specs = specs['default']
+    #update the trigger
+        extraction_specs[trigger] = extraction_specs.pop('trigger')
+        outcome2plot = df_conditions.trial_outcome.unique()
+    return trigger,extraction_specs,outcome2plot

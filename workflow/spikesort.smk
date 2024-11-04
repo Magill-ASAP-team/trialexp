@@ -129,6 +129,20 @@ rule session_correlations:
     script:
         "scripts/spike_sorting/s12_session_correlations.py"
 
+
+rule spike_timewarp:
+    input:
+        xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc',
+        xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
+        condition_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_conditions.pkl',
+        event_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_events_cond.pkl',
+        xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
+    output:
+        xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
+        figure_dir= directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/timewarp'),
+    script:
+        "scripts/spike_sorting/s13_time_warping.py"
+
 rule spikesort_done:
     input:
         corr_plot = session_correlations_input, 
