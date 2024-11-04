@@ -94,8 +94,8 @@ def plot_extrem_corr_timewarp(xr_corr, xr_spike_timewarp, xr_photom_timewarp,
     '''
 
     # find the largest correlation
-    photom_data = np.squeeze(xr_photom_timewarp[photom_signal_name].data)
-    fr = xr_spike_timewarp[spike_signal_name].data
+    photom_data = xr_photom_timewarp[photom_signal_name]
+    fr = xr_spike_timewarp[spike_signal_name]
 
 
     c = xr_corr[event_name+'_'+photom_signal_name].sel(trial_outcome=trial_outcome).data # event x 
@@ -129,10 +129,25 @@ def plot_extrem_corr_timewarp(xr_corr, xr_spike_timewarp, xr_photom_timewarp,
             label1='unit firing'
             label2='photmetry'
         
-        x = np.nanmean(fr[:,:,sorted_idx[i]], axis=0)
-        y = np.nanmean(photom_data,axis=0)
+        df_fr = fr[:,:,sorted_idx[i]].to_dataframe()
+        df_photom = photom_data.to_dataframe()
 
-        lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
+        sns.lineplot(data=df_fr, x='time', y=spike_signal_name, ax=ax, label=label1, n_boot=10)
+        sns.lineplot(data=df_photom, x='time', y=photom_signal_name, ax=ax2, color='r', label=label2,n_boot=10)
+
+
+                # add in the warp information
+        
+        lm.add_warp_info(ax, extraction_specs, trigger)
+        # sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
+        ticks, ticks_labels = lm.compute_ticks(extraction_specs)
+        ax.set_xticks(ticks, labels =ticks_labels, rotation=30) # duplicated tick will be overrided
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+
+        # lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
 
         # shift = int(max_corr_loc[sorted_idx[i]]/(1000/50))
         # ax.plot(xr_spike_timewarp.time, x, label=label1)

@@ -370,61 +370,6 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
         ax.spines['right'].set_visible(False)
 
 
-def plot_spike_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
-                       ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
-    
-    if palette_colors is None:
-        palette_colors = plt.cm.tab10.colors
-
-    df = xa_cond[[signal_var,hue]].to_dataframe()
-    
-    # work with multiindex from multisession dataset
-    if 'trial_id' in xa_cond.coords:
-        df = df.droplevel([1,2])
-        df['trial_id'] = df['session_id'].astype(str) + '_' + df['trial_nb'].astype(str)
-        df = df.reset_index()    
-
-    else:
-        df = df.reset_index()
-        df['trial_id'] = df['trial_nb']
-    
-    df = df.dropna()
-    
-    if len(df)>0:
-        # sometime when the event time doesn't matter the extraction_specs
-        # no trial can be extracted
-        
-         #add in the trial number information
-        df_outcome = df.groupby('trial_id').first().dropna()
-        df_outcome_count = df_outcome.groupby(hue).count().time
-        labels = {k:f'{k} ({df_outcome_count.loc[k]})' for k in df_outcome_count.index}
-        df[hue] = df[hue].replace(labels)
-        
-        outcomes = sorted(df[hue].unique())[::-1]
-        
-        palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
-        
-
-        sns.lineplot(df, x='time',y=signal_var, 
-                    hue=hue, palette=palette, ax = ax, n_boot=100)
-        
-        if ylim is not None:
-            ax.set_ylim(ylim)
-        
-        if ylabel is None:
-            ylabel = 'z-scored dF/F'
-        sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
-        ax.set(xlabel='Time around events (ms)', ylabel = ylabel, xlim=[-500,2300])
-        
-        # add in the warp information
-        
-        add_warp_info(ax, extraction_specs, trigger)
-        sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
-        ticks, ticks_labels = compute_ticks(extraction_specs)
-        ax.set_xticks(ticks, labels =ticks_labels, rotation=30) # duplicated tick will be overrided
-
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
         
 def flatten_level(df):
     if 'trial_id' in df.index.names or 'trial_nb' in df.index.names:
