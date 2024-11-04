@@ -15,6 +15,7 @@ app_ui = ui.page_sidebar(
         ui.input_select("cohort", "Select cohort", choices=[]),
         ui.input_checkbox_group('animal_id', 'Animals', choices=[]),
         ui.input_checkbox_group('task_name', 'Task', choices=[]),
+        ui.input_radio_buttons('modality', 'Modality', choices =['Photometry', 'Neuropixels']),
         ui.input_radio_buttons('figure_list', 'Figures', choices=[0,1]),
         ui.input_action_button('plot_btn', 'Plot figures'),
         width=600        
@@ -58,13 +59,18 @@ def server(input, output, session):
         ui.update_checkbox_group('task_name', choices=df.task_name.unique().tolist())
         
     @reactive.effect
-    @reactive.event(input.task_name)
+    @reactive.event(input.task_name, input.modality)
     def update_figure_list():
         df = session_info()
         figure_names=[]
-        for p in df.path:
-            figure_names += list((p/'processed'/'figures'/'photometry').glob('*.png'))
-            figure_names += list((p/'processed'/'figures'/'timewarp').glob('*.png'))
+        
+        if input.modality() == 'Photometry':
+            for p in df.path:
+                figure_names += list((p/'processed'/'figures'/'photometry').glob('*.png'))
+                figure_names += list((p/'processed'/'figures'/'timewarp').glob('*.png'))
+        else:
+            for p in df.path:
+                figure_names += list((p/'processed'/'figures'/'ephys').rglob('*.png'))
 
         
         figure_names = [f.name for f in figure_names]
@@ -83,12 +89,10 @@ def server(input, output, session):
             
         # search for images in each of the session
         for _, row in df.iterrows():
-            if 'timewarp' in fig_name:
-                src = row.path/'processed'/'figures'/'timewarp'/fig_name
-            else:
-                src = row.path/'processed'/'figures'/'photometry'/fig_name
-                
-            if src.exists():
+            # search for the files
+            file_list = list((row.path/'processed'/'figures').rglob(fig_name))
+            if len(file_list) > 0:
+                src = file_list[0]
                 img_info.append({'animal_id': row.animal_id,
                                 'task_name': row.task_name,
                                 'expt_datetime': row.expt_datetime,
