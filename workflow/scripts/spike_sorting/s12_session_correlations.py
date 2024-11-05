@@ -24,7 +24,7 @@ import itertools
 from tqdm.auto import tqdm
 from loguru import logger
 import seaborn as sns
-from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr_spatial_distribution, analyze_correlation
+from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr_spatial_distribution, analyze_correlation, plot_extrem_corr_timewarp
 
 #%% Load inputs
 
@@ -56,7 +56,7 @@ evt_time_step = np.mean(np.diff(evt_time))
 #%% Calculate the time step for each unit of lag
 evt_time = xr_spike_fr_interp.spk_event_time
 evt_time_step = np.mean(np.diff(evt_time))
-#TODO investigate smoothing the photometry signal first
+# by default both the firing rate and photom data are averaged before calculating the correlation
 results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_fr_interp,
                                                            xr_session,
                                                            evt_name,
@@ -71,7 +71,7 @@ results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_f
 xr_corr = xr.merge(results)
 xr_corr.to_netcdf(soutput.xr_corr, engine='h5netcdf')
 xr_spike_trial.close()
-
+xr_session.close()
 
 #%% Plot the correlation figures
 for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success','aborted']):

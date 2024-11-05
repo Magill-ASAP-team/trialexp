@@ -137,6 +137,7 @@ rule spike_timewarp:
         condition_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_conditions.pkl',
         event_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_events_cond.pkl',
         xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
+        xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',       
     output:
         xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
         figure_dir= directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/timewarp'),

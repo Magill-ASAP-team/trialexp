@@ -504,8 +504,8 @@ def calculate_pearson_lags(x, y, max_lag, lag_step=1, trial_average=True):
         # remove NAN data
         valid_idx = ~np.isnan(shifted_y.mean(axis=1))
         if trial_average:
-            shifted_x = shifted_x[valid_idx,:].mean(axis=0)
-            shifted_y = shifted_y[valid_idx,:].mean(axis=0) 
+            shifted_x = np.nanmean(shifted_x[valid_idx,:], axis=0)
+            shifted_y = np.nanmean(shifted_y[valid_idx,:], axis=0)
         else:
             shifted_x = shifted_x[valid_idx,:].ravel()
             shifted_y = shifted_y[valid_idx,:].ravel() 

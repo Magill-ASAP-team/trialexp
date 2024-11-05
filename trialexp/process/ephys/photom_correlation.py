@@ -3,6 +3,9 @@ import matplotlib.pylab as plt
 import pandas as pd
 from trialexp.process.ephys.utils import calculate_pearson_lags
 import xarray as xr
+import seaborn as sns
+import trialexp.process.pyphotometry.linear_modelling as lm
+
 
 def plot_extrem_corr(xr_corr, xr_spike_fr_interp, xr_session, evt_name, sig_name, mode='abs'):
     '''
@@ -62,7 +65,7 @@ def plot_extrem_corr(xr_corr, xr_spike_fr_interp, xr_session, evt_name, sig_name
         ax.set_ylabel('Firing rate (Hz)')
         ax2.plot(xr_spike_fr_interp.event_time, y,'r', label=label2)
         ax2.set_ylabel('dF/F')
-        ax.set_title(f'Largest corr = {extrema_corr[sorted_idx[i]]:.2f} at {max_corr_loc[sorted_idx[i]]:.1f}ms')
+        ax.set_title(f'Largest corr = {extrema_corr[sorted_idx[i]]:.2f} at {max_corr_loc[sorted_idx[i]]:.1f}ms\n {xr_corr.cluID.data[sorted_idx[i]]}')
     
     fig.tight_layout()
     fig.legend()
@@ -125,3 +128,81 @@ def analyze_correlation(xr_spike_fr_interp, xr_session, evt_name, sig_name, evt_
     
     xr_data = xr_data.expand_dims({'trial_outcome':[trial_outcome]})
     return xr_data
+
+
+def plot_extrem_corr_timewarp(extraction_specs, trigger, xr_corr, xr_spike_timewarp, xr_photom_timewarp, 
+                              photom_signal_name,  spike_signal_name,
+                                event_name,trial_outcome='success', mode='abs'):
+    '''
+    Plot the average photometry signal together with the average firing rate for the largest correlations.
+
+    Parameters:
+    - xr_corr (xarray.DataArray): Xarray data array containing the correlation coefficients.
+    - xr_spike_fr_interp (xarray.Dataset): Xarray dataset containing the interpolated spike firing rate data.
+    - xr_session (xarray.Dataset): Xarray dataset containing the session data.
+    - evt_name (str): Name of the event.
+    - sig_name (str): Name of the signal.
+    - mode (str, optional): How to sort the coefficient. Can be 'desc', 'asc', or 'abs'. Defaults to 'abs'.
+        for 'abs', the absolute value will be sorted descendingly
+
+    Returns:
+    - None
+
+    '''
+
+    # find the largest correlation
+    photom_data = xr_photom_timewarp[photom_signal_name]
+    fr = xr_spike_timewarp[spike_signal_name]
+
+    # only select a specific trial outcome
+    sel_idx = (xr_photom_timewarp.trial_outcome.data == trial_outcome)
+    photom_data = photom_data.sel(trial_nb=sel_idx)
+    fr = fr.sel(trial_nb=sel_idx)
+
+    c = xr_corr[event_name+'_'+photom_signal_name].sel(trial_outcome=trial_outcome).data # event x 
+
+    if mode == 'abs':
+        idx = np.argmax(np.abs(c).data,axis=1) # the lag with the large correlation
+        extrema_corr = c[np.arange(c.shape[0]),idx] #advance indexing do not work on xarray directly
+        sorted_idx = np.argsort(np.abs(extrema_corr))[::-1]
+    elif mode == 'asc':
+        idx = np.argmin(c.data,axis=1)
+        extrema_corr = c[np.arange(c.shape[0]),idx] 
+        sorted_idx = np.argsort(extrema_corr)
+    else:
+        idx = np.argmax(c.data,axis=1)
+        extrema_corr = c[np.arange(c.shape[0]),idx] 
+        sorted_idx = np.argsort(extrema_corr)[::-1]
+        
+    lag = xr_corr.lag.data
+    max_corr_loc = lag[idx]
+
+    # plot average photometry signal together with time warped firing rate
+    fig, axes = plt.subplots(5,1,figsize=(8,5*3))
+    label1 = None
+    label2 = None
+    for i,ax in enumerate(axes.flat):
+        ax2 = ax.twinx()
+    
+        if i == len(axes.flat)-1:
+            label1='unit firing'
+            label2='photmetry'
+        
+        df_fr = fr[:,:,sorted_idx[i]].to_dataframe()
+        df_photom = photom_data.to_dataframe()
+
+        sns.lineplot(data=df_fr, x='time', y=spike_signal_name, ax=ax, label=label1, n_boot=10)
+        sns.lineplot(data=df_photom, x='time', y=photom_signal_name, ax=ax2, color='r', label=label2,n_boot=10)
+
+        # add in the warp information
+        lm.add_warp_info(ax, extraction_specs, trigger)
+        # sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
+        ticks, ticks_labels = lm.compute_ticks(extraction_specs)
+        ax.set_xticks(ticks, labels =ticks_labels, rotation=30) # duplicated tick will be overrided
+        ax.set_title(f'{extrema_corr[sorted_idx[i]]:.2f} at {max_corr_loc[sorted_idx[i]]:.2f} \n {fr.cluID.data[sorted_idx[i]]}')
+        ax.spines['top'].set_visible(False)
+
+    fig.tight_layout()
+    fig.legend()
+    
+    return fig
