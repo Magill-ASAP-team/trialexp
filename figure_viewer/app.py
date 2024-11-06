@@ -97,6 +97,7 @@ def server(input, output, session):
                                 'task_name': row.task_name,
                                 'expt_datetime': row.expt_datetime,
                                 'session_id': row.session_id,
+                                'session_root': row.path,
                                 'src': src})
                 
         df_img2plot.set(pd.DataFrame(img_info)) # need to assign a new object so that shiny know it has been changed
