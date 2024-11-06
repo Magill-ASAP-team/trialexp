@@ -1482,7 +1482,8 @@ def preprocess_photometry(data_photometry, df_pycontrol):
         
     if animal_id in animal_info.index:
         injection = animal_info.loc[animal_id].injection.split(';')
-        if 'Rdlight' in injection or 'rDA' in injection:
+        if set(['Rdlight', 'rDA','tdTomato']) & set(injection):
+            logger.debug('Processing multicolor photometry')
             if not 'analog_3' in data_photometry:
                 baseline_correction_multicolor(data_photometry)
                 data_photometry['motion_corrected'] = 1

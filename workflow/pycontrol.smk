@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from trialexp.process.pycontrol.utils import auto_load_dotenv
 
 auto_load_dotenv()
-def session2analyze(tasks:list=None, cohort:list = None):
+def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []
 
@@ -15,14 +15,22 @@ def session2analyze(tasks:list=None, cohort:list = None):
     if cohort is None:
         cohort = ['*']
 
+    if animals is None:
+        animals = ['*']
+    else:
+        animals = [f'{a}*' for a in animals]
+    
+
     for c in cohort:
-        for t in tasks:
-            total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
+        for a in animals:
+            for t in tasks:
+                total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', 
+                    sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/{a}'))        
 
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2024_April_cohort','2024_August_cohort'])
+    input: session2analyze(cohort=['2024_August_cohort','2024_October_cohort'])
 
 rule process_pycontrol:
     input:
