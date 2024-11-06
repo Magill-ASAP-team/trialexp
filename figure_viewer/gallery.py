@@ -55,7 +55,7 @@ def figure_server(input, output, session, figure_info):
             return  ui.card(
                             ui.card_header(ui.input_action_link('show_figure',  label=figure_info.task_name + '/' + figure_info.session_id)),
                             ui.img(src=f"data:{mime_type};base64,{b64_str}"), # create html tag directly,
-                            ui.input_action_link('show_session_info',  label='Session info')
+                            ui.input_action_button('show_session_info',  label='Show session info')
                         )
             
     
