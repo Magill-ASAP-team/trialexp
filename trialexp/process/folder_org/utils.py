@@ -304,7 +304,9 @@ def get_session_config_info(df_pycontrol, df_conditions):
     df_conditions.trial_outcome.value_counts()/len(df_conditions)
     df_trial_outcome_counts = df_conditions.trial_outcome.value_counts(normalize=True).reset_index()
     df_trial_outcome_counts.columns = ['trial_outcome', 'proportion']
-    df_trial_outcome_counts
+    df_trial_outcome_counts['proportion'] = df_trial_outcome_counts['proportion'].round(2)
+    df_trial_outcome_counts['count'] = df_conditions.trial_outcome.value_counts().values
+    df_trial_outcome_counts = df_trial_outcome_counts.sort_values('trial_outcome', ascending=False)
     
     return df_info, df_start_params, df_user_param, df_trial_outcome_counts
 

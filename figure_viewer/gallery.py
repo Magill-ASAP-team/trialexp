@@ -40,8 +40,15 @@ def figure_ui():
 
 @module.server
 def figure_server(input, output, session, figure_info):
-    
-    
+    try:
+        df_pycontrol = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_pycontrol.pkl')
+        df_conditions = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_conditions.pkl')
+        df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_config_info(df_pycontrol, df_conditions)
+    except:
+        df_pycontrol = pd.DataFrame()
+        df_conditions = pd.DataFrame()
+        df_info = pd.DataFrame()
+        
     #Each figure_server is a separate module, so function inside can access its own figure_info
     # basically it generate a different show_figure function and attached it to the card
     @output
@@ -78,34 +85,22 @@ def figure_server(input, output, session, figure_info):
             
     @output
     @render.data_frame
-    def df_info():
-        df_pycontrol = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_pycontrol.pkl')
-        df_conditions = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_conditions.pkl')
-        df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_config_info(df_pycontrol, df_conditions)
+    def df_info_show():
         return render.DataTable(df_info, height=None)
     
     @output
     @render.data_frame
-    def df_start_params():
-        df_pycontrol = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_pycontrol.pkl')
-        df_conditions = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_conditions.pkl')
-        df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_config_info(df_pycontrol, df_conditions)
+    def df_start_params_show():
         return render.DataTable(df_start_params, height=None)       
     
     @output
     @render.data_frame
-    def df_user_param():
-        df_pycontrol = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_pycontrol.pkl')
-        df_conditions = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_conditions.pkl')
-        df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_config_info(df_pycontrol, df_conditions)
+    def df_user_param_show():
         return render.DataTable(df_user_param, height=None)
 
     @output
     @render.data_frame
-    def df_trial_outcome_counts():
-        df_pycontrol = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_pycontrol.pkl')
-        df_conditions = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_conditions.pkl')
-        df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_config_info(df_pycontrol, df_conditions)
+    def df_trial_outcome_counts_show():
         return render.DataTable(df_trial_outcome_counts, height=None)
     
         
@@ -116,20 +111,20 @@ def figure_server(input, output, session, figure_info):
         info =  ui.layout_column_wrap(
                     ui.card(
                         ui.card_header('Session Info'),
-                        ui.output_data_frame('df_info')
+                        ui.output_data_frame('df_info_show')
                         
                     ),
                     ui.card(
                         ui.card_header('Start Parameters'),
-                        ui.output_data_frame('df_start_params')
+                        ui.output_data_frame('df_start_params_show')
                     ),
                     ui.card(
                         ui.card_header('User Parameters'),
-                        ui.output_data_frame('df_user_param')
+                        ui.output_data_frame('df_user_param_show')
                     ),
                     ui.card(
                         ui.card_header('Trial Outcome Counts'),
-                        ui.output_data_frame('df_trial_outcome_counts')
+                        ui.output_data_frame('df_trial_outcome_counts_show')
                     ),
                     width=1/2,
                     height= 800,
