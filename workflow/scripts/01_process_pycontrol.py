@@ -102,3 +102,25 @@ df_events_cond.to_pickle(soutput.event_dataframe)
 df_conditions.to_pickle(soutput.condition_dataframe)
 df_events_trials.to_pickle(soutput.trial_dataframe)
 
+
+# %%
+
+def get_session_info(df_pycontrol, df_conditions):
+    df_info = pd.DataFrame(df_pycontrol.attrs.items(), columns=['info', 'value'])
+    
+    start_params = df_pycontrol[df_pycontrol.subtype=='run_start'].iloc[0].content
+    start_params = {k:v for k,v in start_params.items() if not k.endswith('___')}
+    df_start_params = pd.DataFrame(start_params.items(), columns=['info', 'value'])
+
+    user_param = df_pycontrol[df_pycontrol.subtype=='user_set'].content
+    user_param = [item for row in user_param for item in row.items()]
+    df_user_param = pd.DataFrame(user_param, columns=['variable','value'])
+
+    df_conditions.trial_outcome.value_counts()/len(df_conditions)
+    df_trial_outcome_counts = df_conditions.trial_outcome.value_counts(normalize=True).reset_index()
+    df_trial_outcome_counts.columns = ['trial_outcome', 'proportion']
+    df_trial_outcome_counts
+    
+    return df_info, df_start_params, df_user_param, df_trial_outcome_counts
+
+df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_info(df_pycontrol, df_conditions)

@@ -310,3 +310,20 @@ def get_session_config_info(df_pycontrol, df_conditions):
     
     return df_info, df_start_params, df_user_param, df_trial_outcome_counts
 
+def get_photom_config_info(xr_photometry):
+
+    fs = xr_photometry.attrs['sampling_rate']
+    df_photom_info = []
+    for i,v in enumerate(['analog_1','analog_3', 'analog_2']):
+        df_photom_info.append(
+            {
+            'Channel': v,
+            '1st min. baseline': xr_photometry[v].data[:fs*60].mean(),
+            'LED_power': xr_photometry.attrs['LED_current'] [i]
+            }
+        )
+        
+    df_photom_info = pd.DataFrame(df_photom_info)
+    df_photom_info['1st min. baseline'] = df_photom_info['1st min. baseline'].round(2)
+    return df_photom_info
+   

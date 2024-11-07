@@ -3,7 +3,8 @@ from pathlib import Path
 import base64
 import uuid
 import pandas as pd
-from trialexp.process.folder_org.utils import get_session_config_info
+from trialexp.process.folder_org.utils import get_session_config_info, get_photom_config_info
+import xarray as xr
 
 @module.ui
 def gallery_ui(animal_id):
@@ -44,10 +45,12 @@ def figure_server(input, output, session, figure_info):
         df_pycontrol = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_pycontrol.pkl')
         df_conditions = pd.read_pickle(Path(figure_info.session_root)/'processed'/'df_conditions.pkl')
         df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_config_info(df_pycontrol, df_conditions)
+
     except:
         df_pycontrol = pd.DataFrame()
         df_conditions = pd.DataFrame()
         df_info = pd.DataFrame()
+        df_start_params = pd.DataFrame()
         
     #Each figure_server is a separate module, so function inside can access its own figure_info
     # basically it generate a different show_figure function and attached it to the card
@@ -103,6 +106,18 @@ def figure_server(input, output, session, figure_info):
     def df_trial_outcome_counts_show():
         return render.DataTable(df_trial_outcome_counts, height=None)
     
+    @output
+    @render.data_frame
+    def df_photom_info_show():
+        try:
+            xr_photometry = xr.open_dataset(Path(figure_info.session_root)/'processed'/'xr_photometry.nc')
+            df_photom_info = get_photom_config_info(xr_photometry)
+            xr_photometry.close()
+        except:
+            df_photom_info = pd.DataFrame()
+        
+        return render.DataTable(df_photom_info, height=None)
+    
         
     @reactive.Effect
     @reactive.event(input.show_session_info)
@@ -126,7 +141,11 @@ def figure_server(input, output, session, figure_info):
                         ui.card_header('Trial Outcome Counts'),
                         ui.output_data_frame('df_trial_outcome_counts_show')
                     ),
-                    width=1/2,
+                      ui.card(
+                        ui.card_header('Photometry signals'),
+                        ui.output_data_frame('df_photom_info_show')
+                    ),
+                    width=1/3,
                     height= 800,
                 )
                 
@@ -135,4 +154,5 @@ def figure_server(input, output, session, figure_info):
 
 
         
-    
+#%%
+
