@@ -1343,15 +1343,12 @@ def add_event_data(df_event, filter_func, trial_window,
 #%% 
 
 
-# Fit curve to dLight signal.
-
-
 def fit_double_exp(curve, sampling_rate):
-    # adapt from Thomas Atkam
+    # adopted from Thomas Atkam
     # https://github.com/ThomasAkam/photometry_preprocessing/blob/master/Photometry%20data%20preprocessing.ipynb
 
-    def double_exponential(t, const, amp_fast, amp_slow, tau_slow, tau_multiplier):
 
+    def double_exponential(t, const, amp_fast, amp_slow, tau_slow, tau_multiplier):
         '''Compute a double exponential function with constant offset.
         Parameters:
         t       : Time vector in seconds.
