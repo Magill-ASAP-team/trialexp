@@ -479,11 +479,29 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
     else:  # Pre version 1.0 data file.
         n_analog_signals = 2
         n_digital_signals = 2
-    analog_1 = analog[::n_analog_signals] * volts_per_division[0]
-    analog_2 = analog[1::n_analog_signals] * volts_per_division[1]
-    analog_3 = analog[2::n_analog_signals] * volts_per_division[0] if n_analog_signals == 3 else None
-    digital_1 = digital[::n_analog_signals]
-    digital_2 = digital[1::n_analog_signals] if n_digital_signals == 2 else None
+    
+    
+    if not n_analog_signals == 6:
+        analog_1 = analog[::n_analog_signals] * volts_per_division[0]
+        analog_2 = analog[1::n_analog_signals] * volts_per_division[1]
+        analog_3 = analog[2::n_analog_signals] * volts_per_division[0] if n_analog_signals == 3 else None
+
+
+        digital_1 = digital[::n_analog_signals]
+        digital_2 = digital[1::n_analog_signals] if n_digital_signals == 2 else None
+    else:
+        # work with the bleedthrough channel
+        analog_1 = analog[::n_analog_signals] * volts_per_division[0]
+        analog_2 = analog[2::n_analog_signals] * volts_per_division[1]
+        analog_3 = analog[4::n_analog_signals] * volts_per_division[0] 
+
+        bleedthrough_ch2 = analog[1::n_analog_signals] * volts_per_division[0]
+        bleedthrough_ch1 = analog[3::n_analog_signals] * volts_per_division[1]
+        bleedthrough_isos = analog[5::n_analog_signals] * volts_per_division[0]
+
+        digital_1 = digital[::n_analog_signals]
+        digital_2 = digital[2::n_analog_signals]
+
     time = np.arange(analog_1.shape[0]) * 1000 / sampling_rate  # Time relative to start of recording (ms).
     # Filter signals with specified high and low pass frequencies (Hz).
     if low_pass and high_pass:
@@ -518,13 +536,24 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
         "pulse_times_2": pulse_times_2,
         "time": time,
     }
-    if n_analog_signals == 3:
+
+    if n_analog_signals == 3 or n_analog_signals == 6:
         data_dict.update(
             {
                 "analog_3": analog_3,
                 "analog_3_filt": analog_3_filt,
             }
         )
+    
+    if n_analog_signals ==6:
+        data_dict.update(
+            {
+                'bleedthrough_ch1': bleedthrough_ch1,
+                'bleedthrough_ch2': bleedthrough_ch2,
+                'bleedthrough_isos': bleedthrough_isos
+            }
+        )
+
     data_dict.update(header_dict)
     return data_dict
 
