@@ -403,98 +403,102 @@ def copy_if_not_exist(src, dest):
     
 def move_folders(df_pycontrol, export_base_path, ephys_base_path):
     for i in tqdm(range(len(df_pycontrol))):
-        row = df_pycontrol.iloc[i]
-        session_id = row.session_id
-        subject_id = row.subject_id
-        task_name = row.task_name
-        
-        if '\\' in task_name:
-            #skip copying for incorrect task name
-            print(f'{task_name} is not a proper task name. Skipping')
-            continue
-        
-        target_pycontrol_folder = Path(export_base_path,task_name, session_id, 'pycontrol')
-        target_pyphoto_folder = Path(export_base_path, task_name, session_id, 'pyphotometry')
-        target_ephys_folder = Path(export_base_path,  task_name, session_id, 'ephys')
-        target_video_folder = Path(export_base_path, task_name, session_id, 'video')
-        
-        if not target_pycontrol_folder.exists():
-            # create the base folder
-            target_pycontrol_folder.mkdir(parents=True)
+        try:
+            row = df_pycontrol.iloc[i]
+            session_id = row.session_id
+            subject_id = row.subject_id
+            task_name = row.task_name
             
-        if not target_pyphoto_folder.exists():
-            target_pyphoto_folder.mkdir(parents=True)
-
-        if not target_ephys_folder.exists():
-            target_ephys_folder.mkdir(parents=True)
+            if '\\' in task_name:
+                #skip copying for incorrect task name
+                print(f'{task_name} is not a proper task name. Skipping')
+                continue
             
-        if not target_video_folder.exists():
-            target_video_folder.mkdir(parents=True)
+            target_pycontrol_folder = Path(export_base_path,task_name, session_id, 'pycontrol')
+            target_pyphoto_folder = Path(export_base_path, task_name, session_id, 'pyphotometry')
+            target_ephys_folder = Path(export_base_path,  task_name, session_id, 'ephys')
+            target_video_folder = Path(export_base_path, task_name, session_id, 'video')
             
-        pycontrol_file = row.path
-        pyphotometry_file = row.pyphoto_path
-        video_files = row.video_names
-
-        #copy the pycontrol files
-        # print(pycontrol_file, target_pycontrol_folder)
-        copy_if_not_exist(pycontrol_file, target_pycontrol_folder)
-        
-        #copy all the analog data
-        analog_files = list(pycontrol_file.parent.glob(f'{session_id}*.pca')) + list(pycontrol_file.parent.glob(f'{session_id}*.npy'))
-        for f in analog_files:
-            copy_if_not_exist(f, target_pycontrol_folder) 
-            
-        #Copy pyphotometry file if they match
-        if pyphotometry_file is not None:
-            data_pycontrol = session_dataframe(pycontrol_file)
-            data_pyphotmetry = import_ppd_auto(pyphotometry_file)
-            if create_photo_sync(data_pycontrol, data_pyphotmetry) is not None:
-                copy_if_not_exist(pyphotometry_file, target_pyphoto_folder)
-            else:
-                logger.debug(f'Cannot sync photometry data for {pyphotometry_file.name}')
-
+            if not target_pycontrol_folder.exists():
+                # create the base folder
+                target_pycontrol_folder.mkdir(parents=True)
                 
-        # write down the filename of the video file
-        video_list_file = target_video_folder/'video_list.txt'
-        if row.video_names is not None and not video_list_file.exists():
-            np.savetxt(video_list_file, row.video_names, '%s')
+            if not target_pyphoto_folder.exists():
+                target_pyphoto_folder.mkdir(parents=True)
 
-
-        #write information about ephys recrodings in the ephys folder
-        if row.ephys_folder_name:
-
-            recordings_properties = get_recordings_properties(ephys_base_path, row.ephys_folder_name)
-            # try to sync ephys recordings
-            recordings_properties['syncable'] = False
-            recordings_properties['longest'] = False
-            sync_paths = recordings_properties.sync_path.unique()
-            sync_file_found = False
-            for sync_path in sync_paths:
-                # copy syncing files in 
-                if create_ephys_rsync(str(pycontrol_file), sync_path) is not None:
-                    recordings_properties.loc[recordings_properties.sync_path == sync_path, 'syncable'] = True
-                    sync_file_found = True
-            
-            if not sync_file_found:    
-                print(f'Cannot find ephys data for {row.ephys_folder_name}')
+            if not target_ephys_folder.exists():
+                target_ephys_folder.mkdir(parents=True)
                 
-            longest_syncable = recordings_properties.loc[recordings_properties.syncable == True, 'duration'].max()
-            recordings_properties.loc[(recordings_properties.duration == longest_syncable) & (recordings_properties.syncable == True), 'longest'] = True
+            if not target_video_folder.exists():
+                target_video_folder.mkdir(parents=True)
+                
+            pycontrol_file = row.path
+            pyphotometry_file = row.pyphoto_path
+            video_files = row.video_names
 
-            sync_path = recordings_properties.loc[recordings_properties.longest == True, 'sync_path'].unique()
+            #copy the pycontrol files
+            # print(pycontrol_file, target_pycontrol_folder)
+            copy_if_not_exist(pycontrol_file, target_pycontrol_folder)
             
-            if len(sync_path) > 1:
-                raise NotImplementedError(f'multiple valids sync_path for the session, something went wrong: {row.ephys_folder_name}')
-            
-            # copy sync files from the longest syncable recording
-            elif len(sync_path) == 1:
+            #copy all the analog data
+            analog_files = list(pycontrol_file.parent.glob(f'{session_id}*.pca')) + list(pycontrol_file.parent.glob(f'{session_id}*.npy'))
+            for f in analog_files:
+                copy_if_not_exist(f, target_pycontrol_folder) 
+                
+            #Copy pyphotometry file if they match
+            if pyphotometry_file is not None:
+                data_pycontrol = session_dataframe(pycontrol_file)
+                data_pyphotmetry = import_ppd_auto(pyphotometry_file)
+                if create_photo_sync(data_pycontrol, data_pyphotmetry) is not None:
+                    copy_if_not_exist(pyphotometry_file, target_pyphoto_folder)
+                else:
+                    logger.debug(f'Cannot sync photometry data for {pyphotometry_file.name}')
 
-                copy_if_not_exist(sync_path[0] / 'states.npy', target_ephys_folder)
-                copy_if_not_exist(sync_path[0] / 'timestamps.npy', target_ephys_folder)
+                    
+            # write down the filename of the video file
+            video_list_file = target_video_folder/'video_list.txt'
+            if row.video_names is not None and not video_list_file.exists():
+                np.savetxt(video_list_file, row.video_names, '%s')
 
-            else:
-                # no syncable recordings
-                ...
+
+            #write information about ephys recrodings in the ephys folder
+            if row.ephys_folder_name:
+
+                recordings_properties = get_recordings_properties(ephys_base_path, row.ephys_folder_name)
+                # try to sync ephys recordings
+                recordings_properties['syncable'] = False
+                recordings_properties['longest'] = False
+                sync_paths = recordings_properties.sync_path.unique()
+                sync_file_found = False
+                for sync_path in sync_paths:
+                    # copy syncing files in 
+                    if create_ephys_rsync(str(pycontrol_file), sync_path) is not None:
+                        recordings_properties.loc[recordings_properties.sync_path == sync_path, 'syncable'] = True
+                        sync_file_found = True
+                
+                if not sync_file_found:    
+                    print(f'Cannot find ephys data for {row.ephys_folder_name}')
+                    
+                longest_syncable = recordings_properties.loc[recordings_properties.syncable == True, 'duration'].max()
+                recordings_properties.loc[(recordings_properties.duration == longest_syncable) & (recordings_properties.syncable == True), 'longest'] = True
+
+                sync_path = recordings_properties.loc[recordings_properties.longest == True, 'sync_path'].unique()
+                
+                if len(sync_path) > 1:
+                    raise NotImplementedError(f'multiple valids sync_path for the session, something went wrong: {row.ephys_folder_name}')
+                
+                # copy sync files from the longest syncable recording
+                elif len(sync_path) == 1:
+
+                    copy_if_not_exist(sync_path[0] / 'states.npy', target_ephys_folder)
+                    copy_if_not_exist(sync_path[0] / 'timestamps.npy', target_ephys_folder)
+
+                else:
+                    # no syncable recordings
+                    ...
 
 
-            recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
+                recordings_properties.to_csv(target_ephys_folder / 'rec_properties.csv')
+        except Exception as e:
+            print(f'Error copying files for {row.session_id}')
+            print(e)
