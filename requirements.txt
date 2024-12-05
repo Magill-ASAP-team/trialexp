@@ -29,6 +29,7 @@ dask[dataframe]
 holoviews
 cupy-cuda12x
 torchaudio
+reflex
 
 '''
 Other installation requirement:
