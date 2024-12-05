@@ -40,7 +40,7 @@ else:
     pycontrol_time = get_sync_time(df_pycontrol)
     photometry_aligner = Rsync_aligner(pycontrol_time, data_photometry['pulse_times_2'])
     photometry_times_pyc = photometry_aligner.B_to_A(data_photometry['time'])
-    photometry_keys =  [k for k in data_photometry.keys() if k.startswith('analog')]
+    photometry_keys =  [k for k in data_photometry.keys() if k.startswith('analog') or k.startswith('bleedthrough')]
 
 #%%
 #remove all state change event
