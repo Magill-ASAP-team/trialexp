@@ -25,7 +25,6 @@ def plot_session(signal2plot):
     xr_photometry = xr.open_dataset(Path(df_session_info.iloc[0].path)/'processed'/'xr_photometry.nc', engine='h5netcdf')
     df_pycontrol = pd.read_pickle(Path(df_session_info.iloc[0].path)/'processed'/'df_pycontrol.pkl')
     
-    fig = FigureResampler(go.Figure())
 
     def find_states(state_def_dict: dict):
         """
@@ -105,9 +104,9 @@ def plot_session(signal2plot):
     
     signal2plot = [k for k in xr_photometry.data_vars.keys() if k.startswith('analog')]
 
-    fig = go.Figure()
-    fig = make_subplots(rows=len(signal2plot), cols=1, shared_xaxes=True,
-                        vertical_spacing=0.02)  # Reduced vertical spacing
+    # Doesn't work in Reflex, need to figure out how to make it work
+    fig = FigureResampler(make_subplots(rows=len(signal2plot), cols=1, shared_xaxes=True,
+                        vertical_spacing=0.02))  # Reduced vertical spacing
 
     for idx, k in enumerate(signal2plot, start=1):
         line1 = go.Scattergl(x=xr_photometry['time']/1000, 
