@@ -113,21 +113,21 @@ torch.cuda.empty_cache()
 Path(soutput.sorting_complete).touch() # for use during manual pipeline run
 
 # %% Manual clean up of unsorted sessions
-base_search_folder = os.path.join(os.environ['SESSION_ROOT_DIR'], 
-                            '2024_August_cohort',
-                            'by_sessions',
-                            'reaching_go_spout_bar_VR_April24')
+# base_search_folder = os.path.join(os.environ['SESSION_ROOT_DIR'], 
+#                             '2024_August_cohort',
+#                             'by_sessions',
+#                             'reaching_go_spout_bar_VR_April24')
 
-# search to see if processed/kilosort4/ProbeA exists in the session folder
-session_folders = Path(base_search_folder).glob('*')
-for s in session_folders:
-    if (s/'processed'/'kilosort4').exists() and not (s/'processed'/'kilosort4'/'ProbeA').exists():
-        print(f'{s.stem} is not yet sorted. cleaning up')
-        if (s/'processed'/'spike_sorting.done').exists():
-            # remove the spike_sorting.done file
-            (s/'processed'/'spike_sorting.done').unlink()
+# # search to see if processed/kilosort4/ProbeA exists in the session folder
+# session_folders = Path(base_search_folder).glob('*')
+# for s in session_folders:
+#     if (s/'processed'/'kilosort4').exists() and not (s/'processed'/'kilosort4'/'ProbeA').exists():
+#         print(f'{s.stem} is not yet sorted. cleaning up')
+#         if (s/'processed'/'spike_sorting.done').exists():
+#             # remove the spike_sorting.done file
+#             (s/'processed'/'spike_sorting.done').unlink()
         
-        if (s/'processed'/'spike_workflow.done').exists():
-            (s/'processed'/'spike_workflow.done').unlink()
+#         if (s/'processed'/'spike_workflow.done').exists():
+#             (s/'processed'/'spike_workflow.done').unlink()
         
 # %%
