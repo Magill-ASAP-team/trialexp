@@ -89,6 +89,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
     # df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'TT008']
     # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-06-10-153517']
+    # df_pycontrol= df_pycontrol[df_pycontrol.session_id.str.startswith('TT008')]
     
     # match photometry signals
     match_photometry(df_pycontrol, df_pyphoto)
