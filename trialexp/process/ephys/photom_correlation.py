@@ -28,7 +28,7 @@ def plot_extrem_corr(xr_corr, xr_spike_fr_interp, xr_session, evt_name, sig_name
     var_name = evt_name+sig_name
 
     # find the largest correlation
-    photom_data = np.squeeze(xr_session[var_name].values)
+    photom_data = xr_session[var_name].values
     fr = xr_spike_fr_interp[f'spikes_FR.{evt_name}'].data
     c = xr_corr[var_name].data
     if mode == 'abs':
@@ -103,11 +103,12 @@ def analyze_correlation(xr_spike_fr_interp, xr_session, evt_name, sig_name, evt_
     photom_data=xr_session[f'{evt_name}{sig_name}']
     
     if trial_outcome is not None and 'trial_nb' in photom_data.coords:
-        photom_data = np.squeeze(photom_data.sel(trial_nb = (xr_session.trial_outcome==trial_outcome)).data)
+        photom_data = photom_data.sel(trial_nb = (xr_session.trial_outcome==trial_outcome)).data
         fr_data = fr_data.sel(trial_nb = (xr_spike_fr_interp.trial_outcome == trial_outcome)).data
     else:
         # Calculate the correlation of each units with the photometry signal
-        photom_data = np.squeeze(photom_data)
+        # for all trials
+        photom_data = photom_data
         fr_data = fr_data.data
         trial_outcome = 'success'
     
