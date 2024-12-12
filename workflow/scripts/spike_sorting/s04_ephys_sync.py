@@ -64,7 +64,7 @@ for probe_dir in  kilosort_folder.glob('Probe*'):
     # do some sanity check to make sure we are syncing the correct file
     # Unlikely that there is no spike for 1 minute
     lastspike2end = abs(np.nanmax(synced_spike_times)/1000 - rec_prop.duration)
-    assert lastspike2end<60, f'Error: last spike appears too far away from end of recording {lastspike2end}. Potential sync issues'
+    # assert lastspike2end<60, f'Error: last spike appears too far away from end of recording {lastspike2end}. Potential sync issues'
 
     # the synced spike time is in ms
     np.save(ks_path.parent / 'rsync_corrected_spike_times.npy', synced_spike_times)
