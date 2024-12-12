@@ -36,7 +36,7 @@ var2plot = [x for x in xr_spikes_trials if x.startswith('spikes_FR')]
 bin_duration = xr_fr.attrs['bin_duration']
 trial_window = xr_spikes_trials.attrs['trial_window']
 
-#%%Compare with random response
+#%% Compare with random response
 
 style_plot()
 
@@ -54,6 +54,9 @@ if np.sum(success_trial)>0:
         
         da_rand = get_random_evt_data(xr_fr, da, trial_window)
 
+        # Note: it is possible that some recording stopped earlier than the pycontrol,
+        # in that case, the firing rate of the reminding trials will be NaN
+
         def compare_random(id):
             # do a mix anova test with the randomized data
             warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -61,7 +64,7 @@ if np.sum(success_trial)>0:
             data2test = create_comparison_dataframe(da_rand,da, id, varname)
             data2test = data2test[(data2test.spk_event_time>-500 ) & (data2test.spk_event_time<500)]
             comparison_result = do_mix_anova_analysis(data2test)
-            
+        
             # also plot the response curve, depending on a probability
             # because there is no need to plot all the curves
             if comparison_result['interaction_p']<0.05 and np.random.rand()<0.2:
@@ -77,7 +80,7 @@ if np.sum(success_trial)>0:
                 ax.plot(sig_time,[yloc]*len(sig_time),'ro')
             else:
                 fig = None
-                
+            
             return comparison_result, fig
 
         results = Parallel(n_jobs=20, verbose=10)(delayed(compare_random)(id) for id in da.cluID)

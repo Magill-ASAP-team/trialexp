@@ -886,6 +886,20 @@ def create_comparison_dataframe(da_rand, da, cluID, dpvar_name, coarsen_factor=5
 def do_mix_anova_analysis(data2test):
 
     # First do mixed anova test
+    if data2test['group'].nunique()<2:
+        # error, early return
+        comparison_result = {
+            'cluID': data2test.iloc[0].cluID,
+            'group_p': np.NaN,
+            'spk_event_time_p': np.NaN,
+            'interaction_p': np.NaN,
+            'sig_interaction_time': np.NaN,
+            'sig_interaction_time_p': np.NaN,
+            'interaction_padjust': np.NaN
+        }
+
+        return comparison_result
+
     anova_result = pg.mixed_anova(dv='dv', within='spk_event_time',between='group', 
                    subject='trial_nb', 
                    data=data2test)
@@ -900,8 +914,9 @@ def do_mix_anova_analysis(data2test):
 
     # then do postdoc test with multiple comparison correction
     paired_test_result = pg.pairwise_tests(data2test, dv='dv', 
-                  within='spk_event_time',between='group', 
-               subject='trial_nb', padjust='bonf')
+                within='spk_event_time',between='group', 
+            subject='trial_nb', padjust='bonf')
+
 
     #only focus on the time period where there is siginficant interaction between group and time
     time_sig = paired_test_result[(paired_test_result['p-corr']<0.05) & (paired_test_result.Paired==False)]
