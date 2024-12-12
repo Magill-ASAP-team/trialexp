@@ -14,116 +14,121 @@ import xarray as xr
 from pathlib import Path
 from plotly.subplots import make_subplots
 from plotly_resampler import FigureResampler
+import numpy as np 
 
-def plot_session(signal2plot):
+
+
+def min_max_downsample(data, downsample_factor):
+    """
+    Downsamples the input data by the given downsample factor using min-max downsampling.
+
+    Parameters:
+    data (numpy.ndarray): The input data array to be downsampled. Should be in the form (channel x time)
+    downsample_factor (int): The factor by which to downsample the data. Each segment of length `downsample_factor` will be reduced to its minimum and maximum values.
+
+    Returns:
+    numpy.ndarray: A 2D array containing the downsampled data. The shape of the returned array will be (number of signals, 2 * (number of time points // downsample_factor)).
+    """
+    data_cropped = data[:, :data.shape[1]//downsample_factor*downsample_factor]
+    min_downsampled = data_cropped.reshape(data.shape[0], -1, downsample_factor).min(axis=-1)
+    max_downsampled = data_cropped.reshape(data.shape[0], -1, downsample_factor).max(axis=-1)
+    downsampled_data = np.stack((min_downsampled, max_downsampled), axis=-1)
+    downsampled_data = downsampled_data.reshape(data.shape[0], -1) #interleave samples
+    return downsampled_data
+
     
-    
-    root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
-    df_session_info = build_session_info_cohort(root_path)
-    df_session_info = df_session_info.query("animal_id=='TT013'")
-    
-    xr_photometry = xr.open_dataset(Path(df_session_info.iloc[0].path)/'processed'/'xr_photometry.nc', engine='h5netcdf')
+root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
+df_session_info = build_session_info_cohort(root_path)
+df_session_info = df_session_info.query("animal_id=='TT013'")
+xr_photometry = xr.open_dataset(Path(df_session_info.iloc[0].path)/'processed'/'xr_photometry.nc', engine='h5netcdf')
+
+
+
+def plot_session(signal2plot, xr_photometry_cropped, figure_width):
+            
     df_pycontrol = pd.read_pickle(Path(df_session_info.iloc[0].path)/'processed'/'df_pycontrol.pkl')
     
-
-    def find_states(state_def_dict: dict):
-        """
-        state_def: dict, list, or None = None
-        must be None (default)
-        or dictionary of 
-            'name' : str 
-                Channel name
-            'onset' : str | list of str 
-                key for onset 
-            'offset' : str | list of str 
-                key for offset
-        or list of such dictionaries
-
-        eg. dict(name='trial', onset='CS_Go', offset='refrac_period')
-        eg. {'name':'trial', 'onset':'CS_Go', 'offset':'refrac_period'}
-        eg. {'name':'trial', 'onset':'CS_Go', 'offset': ['refrac_period', 'break_after_abortion']}
-
-        For each onset, find the first offset event before the next onset 
-        You can use multiple definitions with OR operation, eg. 'offset' determined by 'abort' or 'success', whichever comes first            
-        """
-        if state_def_dict is None:
-            return None
-
-        if isinstance(state_def_dict['onset'], str):
-            all_on_ms = self.times[state_def_dict['onset']]
-        elif isinstance(state_def_dict['onset'], list):
-            # OR operation
-            all_on_ms = []
-            for li in state_def_dict['onset']:
-                assert isinstance(li, str), 'onset must be str or list of str'
-                all_on_ms.extend(self.times[li])
-            all_on_ms = sorted(all_on_ms)
-            
-        else:
-            raise Exception("onset is in a wrong type") 
-
-        if isinstance(state_def_dict['offset'], str):
-            all_off_ms = self.times[state_def_dict['offset']]
-        elif isinstance(state_def_dict['offset'], list):
-            # OR operation
-            all_off_ms = []
-            for li in state_def_dict['offset']:
-                assert isinstance(li, str), 'offset must be str or list of str'                    
-                all_off_ms.extend(self.times[li])
-            all_off_ms = sorted(all_off_ms)
-        else:
-            raise Exception("offset is in a wrong type") 
-
-        onsets_ms = [np.nan] * len(all_on_ms)
-        offsets_ms = [np.nan] * len(all_on_ms)
-
-        for i, this_onset in enumerate(all_on_ms):  # slow
-            good_offset_list_ms = []
-            for j, _ in enumerate(all_off_ms):
-                if i < len(all_on_ms)-1:
-                    if all_on_ms[i] < all_off_ms[j] and all_off_ms[j] < all_on_ms[i+1]:
-                        good_offset_list_ms.append(all_off_ms[j])
-                else:
-                    if all_on_ms[i] < all_off_ms[j]:
-                        good_offset_list_ms.append(all_off_ms[j])
-
-            if len(good_offset_list_ms) > 0:
-                onsets_ms[i] = this_onset
-                offsets_ms[i] = good_offset_list_ms[0]
-            else:
-                ...  # keep them as nan
-
-        onsets_ms = [x for x in onsets_ms if not np.isnan(x)]  # remove nan
-        offsets_ms = [x for x in offsets_ms if not np.isnan(x)]
-
-        state_ms = map(list, zip(onsets_ms, offsets_ms,
-                        [np.nan] * len(onsets_ms)))
-        # [onset1, offset1, NaN, onset2, offset2, NaN, ....]
-        state_ms = [item for sublist in state_ms for item in sublist]
-        return state_ms
-    
-    signal2plot = [k for k in xr_photometry.data_vars.keys() if k.startswith('analog')]
+    # Downsample the data to fit the figure width
+    ds_factor = len(xr_photometry_cropped.time)//figure_width
+    print(f'ds_factor: {ds_factor}')
+    data = np.stack([xr_photometry_cropped[s] for s in signal2plot])
+    data_ds = min_max_downsample(data, ds_factor)
+    time_ds = xr_photometry_cropped.time.data[::ds_factor].repeat(2) # min and max suppose belong to the same time
 
     # Doesn't work in Reflex, need to figure out how to make it work
-    fig = FigureResampler(make_subplots(rows=len(signal2plot), cols=1, shared_xaxes=True,
-                        vertical_spacing=0.02))  # Reduced vertical spacing
+    fig = make_subplots(rows=len(signal2plot), cols=1, shared_xaxes=True,
+                        vertical_spacing=0.02)  # Reduced vertical spacing
 
-    for idx, k in enumerate(signal2plot, start=1):
-        line1 = go.Scattergl(x=xr_photometry['time']/1000, 
-                          y=xr_photometry[k], 
-                          name=f"{k} signal", 
-                          mode='lines')
-        fig.add_trace(line1, row=idx, col=1)
+    for idx, k in enumerate(signal2plot):
+        line1 = go.Scattergl(x=time_ds/1000, 
+                        y=data_ds[idx], 
+                        name=f"{k} signal", 
+                        mode='lines')
+        fig.add_trace(line1, row=idx+1, col=1)
 
     fig.update_layout(
         height=200*len(signal2plot),
-        plot_bgcolor='white'  # White background
+        width = figure_width,
+        plot_bgcolor='white',  # White background
+        xaxis_range = [0, time_ds[-1]/1000],
     )
     
     # Remove grid from all x and y axes
     fig.update_xaxes(showgrid=False)
     
-    return fig
+    return fig.full_figure_for_development()
+
+
+class GraphState(rx.State):
+    """The state for the graph component."""
+
+    session_id: str = ""
+    figure_width:int = 1024
+
+
+    fig = plot_session(['analog_1','analog_2'], xr_photometry, figure_width)
+    
+    @rx.event
+    def refresh_graph(self):
+        cohort = SessionSelectState.cohort
+        session_id = SessionSelectState.session_id
+        animal_id = SessionSelectState.animal_id
+        
+        session2plot = SessionSelectState.df_session_info.query(f"cohort=='{cohort}' & animal_id=='{animal_id}' & session_id=='{session_id}'")
+        if len(session2plot)>0:
+            session2plot = session2plot.iloc[0]
+            
+
+    @rx.event
+    def on_relayout(self):
+        #TODO: the axis range we get never got updated
+        xaxis_range = self.fig.full_figure_for_development().layout.xaxis.range
+        yaxis_range = self.fig.layout.yaxis.range
+        print(xaxis_range)
+        # Adjust the downsampling and signal range to plot based on the xaxis range
+        # xr_photometry_cropped = xr_photometry.sel(time=slice(xaxis_range[0]*1000, xaxis_range[1]*1000))
+        # self.fig = plot_session(['analog_1','analog_2'], xr_photometry_cropped, self.figure_width)
+        
+        # set the range of the figure to the previous range
+        # self.fig.update_layout(xaxis_range=xaxis_range)
+        # print(f'xaxis_range: {xaxis_range}')
+
+
+
+def graph() -> rx.Component:
+    return rx.plotly(data=GraphState.fig, width="80%", height="0vh", on_relayout=GraphState.on_relayout)
+
+
+@template(route="/", title="Home")
+def index() -> rx.Component:
+    """The home page.
+
+    Returns:
+        The UI for the home page.
+    """
+    return graph()
+
+
 
     # if print_expr is not None: #TODO
     #     if isinstance(print_expr, dict):
@@ -224,38 +229,3 @@ def plot_session(signal2plot):
     # )
 
     # fig.show()
-
-
-class GraphState(rx.State):
-    """The state for the graph component."""
-
-    session_id: str = ""
-
-
-    fig = plot_session(['analog_1','analog_2'])
-    
-    @rx.event
-    def refresh_graph(self):
-        cohort = SessionSelectState.cohort
-        session_id = SessionSelectState.session_id
-        animal_id = SessionSelectState.animal_id
-        
-        session2plot = SessionSelectState.df_session_info.query(f"cohort=='{cohort}' & animal_id=='{animal_id}' & session_id=='{session_id}'")
-        if len(session2plot)>0:
-            session2plot = session2plot.iloc[0]
-            
-        
-            
-
-def graph() -> rx.Component:
-    return rx.plotly(data=GraphState.fig, width="80%", height="0vh")
-
-
-@template(route="/", title="Home")
-def index() -> rx.Component:
-    """The home page.
-
-    Returns:
-        The UI for the home page.
-    """
-    return graph()
