@@ -84,7 +84,8 @@ class GraphState(rx.State):
 
     session_id: str = ""
     figure_width:int = 1024
-
+    xrange_start: int
+    xrange_end : int 
 
     fig = plot_session(['analog_1','analog_2'], xr_photometry, figure_width)
     
@@ -100,14 +101,13 @@ class GraphState(rx.State):
             
 
     @rx.event
-    def on_relayout(self):
-        #TODO: the axis range we get never got updated
-        xaxis_range = self.fig.full_figure_for_development().layout.xaxis.range
-        yaxis_range = self.fig.layout.yaxis.range
-        print(xaxis_range)
+    def on_range_update(self, value: list[int]):
         # Adjust the downsampling and signal range to plot based on the xaxis range
-        # xr_photometry_cropped = xr_photometry.sel(time=slice(xaxis_range[0]*1000, xaxis_range[1]*1000))
-        # self.fig = plot_session(['analog_1','analog_2'], xr_photometry_cropped, self.figure_width)
+        self.xrange_start = value[0]
+        self.xrange_end = value[1]
+        xr_photometry_cropped = xr_photometry.sel(time=slice(self.xrange_start*1000, self.xrange_end*1000))
+        # print(xrange_start*1000)
+        self.fig = plot_session(['analog_1','analog_2'], xr_photometry_cropped, self.figure_width)
         
         # set the range of the figure to the previous range
         # self.fig.update_layout(xaxis_range=xaxis_range)
@@ -116,7 +116,7 @@ class GraphState(rx.State):
 
 
 def graph() -> rx.Component:
-    return rx.plotly(data=GraphState.fig, width="80%", height="0vh", on_relayout=GraphState.on_relayout)
+    return rx.plotly(data=GraphState.fig, width="80%", height="0vh")
 
 
 @template(route="/", title="Home")
@@ -126,7 +126,20 @@ def index() -> rx.Component:
     Returns:
         The UI for the home page.
     """
-    return graph()
+    return rx.vstack(
+            rx.hstack(
+                rx.heading(GraphState.xrange_start),
+                rx.heading(GraphState.xrange_end),
+            ),
+            rx.slider(
+                default_value=[xr_photometry.time.data[0]/1000, xr_photometry.time.data[-1]/1000],
+                min= xr_photometry.time.data[0]/1000,
+                max= xr_photometry.time.data[-1]/1000,
+                size="1",
+                on_value_commit=GraphState.on_range_update,
+            ),
+            graph()
+        ) 
 
 
 
