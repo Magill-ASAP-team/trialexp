@@ -2,6 +2,7 @@
 # Script to extract waveforms and quality metrics
 # for details about the metrics used, see https://spikeinterface.readthedocs.io/en/latest/modules/qualitymetrics.html
 #%%
+from loguru import logger
 import os
 from pathlib import Path
 
@@ -124,7 +125,8 @@ for probe_folder in kilosort_folder.glob('Probe*'):
 
 
 #%% save output
-df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
-df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
-
-# %%
+if len(df_quality_metrics):
+    df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
+    df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
+else:
+    logger.warning('Cannot find any sorting results to process')
