@@ -15,9 +15,21 @@ const Dashboard: React.FC = () => {
         socketRef.current = new WebSocket('ws://localhost:8000/ws');
 
         if (socketRef.current) {
+            socketRef.current.onopen = () => {
+                console.log('WebSocket connection opened');
+            };
+
             socketRef.current.onmessage = (event: MessageEvent) => {
                 const updatedData: Data = JSON.parse(event.data);
                 setData(updatedData);
+            };
+
+            socketRef.current.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            socketRef.current.onclose = () => {
+                console.log('WebSocket connection closed');
             };
         }
 
