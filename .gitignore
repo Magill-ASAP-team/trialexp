@@ -123,3 +123,5 @@ reports
 *.gif
 *.png
 *.nc
+
+node_modules
