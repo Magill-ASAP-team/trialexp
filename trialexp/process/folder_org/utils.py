@@ -104,12 +104,14 @@ def build_session_info_cohort(root_path, load_pycontrol=False,
             animal_id = m.group(1)
             date_string = m.group(2)
             expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
+            neuropixel_sorted = (session_path/'processed'/'xr_spikes_fr.nc').exists()
 
             return {'animal_id':animal_id, 
                     'expt_datetime': expt_datetime,
                     'session_id':session_id,
                     'task_name':task_name,
                     'cohort': cohort,
+                    'neuropixels_sorted':neuropixel_sorted,
                     'path':session_path}
 
     session_info = [parse_session_path(p) for p in paths]

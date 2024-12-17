@@ -34,7 +34,8 @@ async def get_sessions(cohort: Optional[str] = None, animal_id: Optional[str] = 
     if len(query_str) > 0:
         df = df.query(query_str)
         
-    print(type(df.session_id.unique().tolist()))
+    # only return session with sorted neuropixel data
+    df = df.query('neuropixels_sorted==True')
         
     return {"session_id": df.session_id.unique().tolist()}
 
@@ -50,3 +51,6 @@ async def get_animal_id(cohort: Optional[str] = None):
     if cohort:
         df = df.query(f"cohort=='{cohort}'")
     return {"animal_id": df.animal_id.unique().tolist()}
+
+
+#%%

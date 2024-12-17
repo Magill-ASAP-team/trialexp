@@ -72,7 +72,7 @@ function App() {
   return (
     <>
       <MantineProvider>
-        <Flex justify="center" align="center" gap="md">
+        <Flex justify="center" align="flex-end" gap="md">
           <Select data={cohortList} placeholder="Cohort"
             label='Cohort'
             value={cohort} onChange={setCohort} searchable />
@@ -80,7 +80,7 @@ function App() {
             value={animalID} onChange={setAnimalID} searchable/>
           <Select data={sessionIDList} placeholder="Session" label='Session'
             value={sessionID} onChange={setSessionID} searchable />
-
+          <Button> Align probe locations</Button>
         </Flex>
       </MantineProvider>
 
