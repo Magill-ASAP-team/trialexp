@@ -89,7 +89,9 @@ function App() {
     x: ['Brain Regions'],
     y: [region.depth_end - region.depth_start],
     name: region.acronym,
-    type: 'bar'
+    type: 'bar',
+    text: region.acronym,
+    textposition: 'inside'
   }));
 
   return (
