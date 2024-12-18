@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 
 import '@mantine/core/styles.css'
-import { createTheme, MantineProvider } from '@mantine/core'
+import { MantineProvider } from '@mantine/core'
 import { Button, Select } from '@mantine/core'
 import { Flex } from '@mantine/core'
 import axios from 'axios'
+import Plot from 'react-plotly.js'
 
 function App() {
-  const [count, setCount] = useState(0)
   const [cohortList, setCohortList] = useState(['August', 'April'])
   const [animalIDList, setAnimalIDList] = useState(['A', 'B', 'C'])
   const [sessionIDList, setSessionIDList] = useState(['1', '2', '3'])
   const [cohort, setCohort] = useState<string | null>(null)
   const [animalID, setAnimalID] = useState<string | null>(null)
   const [sessionID, setSessionID] = useState<string | null>(null)
+  const [plotData, setPlotData] = useState([])
 
   useEffect(() => {
     // a async function to fetch data
@@ -67,24 +68,56 @@ function App() {
       
   }, [cohort, animalID]);
 
+  const fetchPlotData = () => {
+    if (sessionID) {
+      axios.get('http://localhost:8000/trajectory', 
+        { params: { session_id: sessionID } })
+        .then((response) => {
+          setPlotData(response.data);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    }
+  };
 
+  useEffect(() => {
+    fetchPlotData();
+  }, [sessionID]);
+
+  const plotTraces = plotData.map((region: any) => ({
+    x: ['Brain Regions'],
+    y: [region.depth_end - region.depth_start],
+    name: region.acronym,
+    type: 'bar'
+  }));
 
   return (
     <>
       <MantineProvider>
         <Flex justify="center" align="flex-end" gap="md">
           <Select data={cohortList} placeholder="Cohort"
-            label='Cohort'
-            value={cohort} onChange={setCohort} searchable />
+        label='Cohort'
+        value={cohort} onChange={setCohort} searchable />
           <Select data={animalIDList} placeholder="Animal" label='Animal'
-            value={animalID} onChange={setAnimalID} searchable/>
+        value={animalID} onChange={setAnimalID} searchable/>
           <Select data={sessionIDList} placeholder="Session" label='Session'
-            value={sessionID} onChange={setSessionID} searchable />
-          <Button> Align probe locations</Button>
+        value={sessionID} onChange={setSessionID} searchable />
+          <Button onClick={fetchPlotData}> Align probe locations</Button>
         </Flex>
+        <Plot
+          data={plotTraces}
+          layout={{ 
+        title: 'Mapped trajectory', 
+        barmode: 'stack', 
+        xaxis: { title: 'Brain Regions' }, 
+        yaxis: { title: 'Depth', autorange: 'reversed' },
+        legend: { traceorder: 'normal' }, // Normal order of the legend
+        height: 1000, // Set the height of the plot here
+        width: 400 // Set the width of the plot here
+          }}
+        />
       </MantineProvider>
-
-
     </>
   )
 }
