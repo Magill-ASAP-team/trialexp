@@ -75,7 +75,22 @@ async def get_trajectory(session_id: str, shift:int = 0):
     
     shifted_coords = shift_trajectory_depth(coords, shift, max_depth)
     trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
+    trajectory_areas = trajectory_areas.sort_values('depth_start')
     return trajectory_areas[['acronym','depth_start','depth_end']].to_dict(orient='records')
+
+
+@app.get('/firing_rate')
+async def get_firing_rate(session_id:str):
+    df = app.state.df_session_info
+    df = df.query(f"session_id=='{session_id}'")
+    df = df.query('neuropixels_sorted==True')
+    
+    if len(df)>0:
+        df = df.iloc[0]
+        df_quality_metrics = pd.read_pickle(df.path/'processed/df_quality_metrics.pkl')
+        df_fr = df_quality_metrics.groupby('ks_chan_pos_y')['firing_rate'].mean().reset_index()
+        return df_fr.to_dict(orient='list')
+
 # #%%
 
 # root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'

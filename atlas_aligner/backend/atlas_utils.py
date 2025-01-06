@@ -40,8 +40,17 @@ atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software
 channel_position =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_positions.npy')
 max_depth = channel_position.max(axis=0)[1]
 # %%
-shifted_coords1 = shift_trajectory_depth(coords, 0, length=max_depth)
+shifted_coords1 = shift_trajectory_depth(coords, 100, length=max_depth)
 trajectory_areas = get_region_boundaries(shifted_coords1, atlas, structure_tree)
+trajectory_areas = trajectory_areas.sort_values('depth_start')
 trajectory_areas[['acronym','depth_start','depth_end']]
-# %%
+# %% Plot the fiing rate map
 
+df_quality_metrics = pd.read_pickle(df_sel.path/'processed/df_quality_metrics.pkl')
+
+#%%
+df_fr = df_quality_metrics.groupby('ks_chan_pos_y')[['firing_rate']].mean().reset_index()
+
+df_fr.to_dict(orient='list')
+# %%
+#TODO: we need to identify the rought location of the tip using the last point from the alignment

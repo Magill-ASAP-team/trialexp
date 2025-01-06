@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import '@mantine/core/styles.css'
 import { Center, MantineProvider } from '@mantine/core'
-import { Button, Select, Flex, Slider, Text, Stack } from '@mantine/core'
+import { Button, Select, Flex, Slider, Text, Stack, Group } from '@mantine/core'
 import axios from 'axios'
 import Plot from 'react-plotly.js'
 
@@ -15,6 +15,7 @@ function App() {
   const [animalID, setAnimalID] = useState<string | null>(null)
   const [sessionID, setSessionID] = useState<string | null>(null)
   const [plotData, setPlotData] = useState([])
+  const [firingRateData, setFiringRateData] = useState([])
 
   useEffect(() => {
     // a async function to fetch data
@@ -81,18 +82,43 @@ function App() {
     }
   };
 
+
+
   useEffect(() => {
     fetchPlotData();
   }, [sessionID, depthShift]);
 
+  //Get firing rate data
+  useEffect(() => {
+    if (sessionID) {
+      axios.get('http://localhost:8000/firing_rate',
+        { params: { session_id: sessionID } })
+        .then((response) => {
+          setFiringRateData(response.data);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+    }
+  }, [sessionID])
+
   const plotTraces = plotData.map((region: any) => ({
+    //coordinates starts counting from the tip
     x: ['Brain Regions'],
     y: [region.depth_start - region.depth_end],
+    base: [region.depth_end],
     name: region.acronym,
     type: 'bar',
     text: region.acronym,
     textposition: 'inside'
   }));
+
+  const frPlotTraces = firingRateData && Object.keys(firingRateData).length > 0 ? [{
+    x: firingRateData['firing_rate'],
+    y: firingRateData['ks_chan_pos_y'],
+    type: 'bar',
+    orientation: 'h'
+  }] : [];
 
   return (
     <>
@@ -126,19 +152,34 @@ function App() {
         </Stack>
 
 
+        <Group>
+          <Plot
+            data={plotTraces}
+            layout={{
+              title: 'Mapped trajectory',
+              barmode: 'stack',
+              xaxis: { title: 'Brain Regions' },
+              yaxis: { title: 'Depth', range: [0, 4000] },
+              legend: { traceorder: 'normal' },
+              width: 400,
+              height: 1000,
+              base: 1000,
+            }}
+          />
 
-        <Plot
-          data={plotTraces}
-          layout={{
-            title: 'Mapped trajectory',
-            barmode: 'stack',
-            xaxis: { title: 'Brain Regions' },
-            yaxis: { title: 'Depth', autorange: 'reversed' },
-            legend: { traceorder: 'normal' }, // Normal order of the legend
-            width: 400, // Set the width of the plot here
-            height: 1000, // Set the height of the plot here
-          }}
-        />
+          <Plot
+            data={frPlotTraces}
+            layout={{
+              title: 'Firing Rate by Position',
+              xaxis: { title: 'Firing Rate (Hz)' },
+              yaxis: { title: 'Position (µm)', range: [0, 4000] },
+              width: 400,
+              height: 1000,
+              orientation: 'h'
+            }}
+          />
+        </Group>
+
 
       </MantineProvider>
     </>

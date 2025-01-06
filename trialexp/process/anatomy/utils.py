@@ -294,13 +294,13 @@ def shift_trajectory_depth(coords, shift_depth, length=np.inf, axis_resolution=1
     
     # Normalize the direction vector
     direction_vector_normalized = direction_vector / np.linalg.norm(direction_vector)
-    print(np.linalg.norm(coords[1]-coords[0])*axis_resolution)
+    # print(np.linalg.norm(coords[1]-coords[0])*axis_resolution)
     # if length is set, compute the correct starting point of the probe 
     if length !=np.inf:
         #calculate the starting point of the coordinate, and then shift by the shift_depth
         coords[0] = coords[1] - direction_vector_normalized * length/axis_resolution
     
-    print(coords)
+    # print(coords)
     # Apply the shift
     coords_shifted = np.zeros_like(coords)
 
