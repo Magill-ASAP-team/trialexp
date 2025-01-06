@@ -60,7 +60,7 @@ async def get_animal_id(cohort: Optional[str] = None):
 
 
 @app.get('/trajectory')
-async def get_trajectory(session_id: str):
+async def get_trajectory(session_id: str, shift:int = 0):
     df = app.state.df_session_info
     df = df.query(f"session_id=='{session_id}'")
     df = df.query('neuropixels_sorted==True')
@@ -69,8 +69,12 @@ async def get_trajectory(session_id: str):
     probe_ccf = sio.loadmat(str(local_results/'probe_ccf.mat'), simplify_cells=True)['probe_ccf']
     coords = probe_ccf[0]['trajectory_coords'].astype(float)
     atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
-    # shifted_coords = shift_trajectory_depth(coords, -1000)
-    trajectory_areas = get_region_boundaries(coords, atlas, structure_tree)
+    
+    channel_position =np.load(df.path/'processed/kilosort4/ProbeA/channel_positions.npy')
+    max_depth = channel_position.max(axis=0)[1]
+    
+    shifted_coords = shift_trajectory_depth(coords, shift, max_depth)
+    trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
     return trajectory_areas[['acronym','depth_start','depth_end']].to_dict(orient='records')
 # #%%
 

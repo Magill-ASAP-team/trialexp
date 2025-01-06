@@ -253,12 +253,12 @@ def load_ccf_data(base_directory):
     return atlas, structure_tree
 
 
-def get_region_boundaries(coords, atlas, structure_tree):
-    # the trajectory is from the surface fo the brain to the base of the brain
+def get_region_boundaries(coords,  atlas, structure_tree):
+    # the trajectory is between the starting and end point of the coords
     # the end point is not the ending of the probe. Neuropixel probe is about 4000um long if only the tip is used
     trajectory_depth = np.linalg.norm(np.diff(coords, axis=0)) * 10 # axis unit is in 10um, so we convert it back to 1um
     n_coords = int(trajectory_depth) # sample every 1um
-    trajector_depth_list = np.linspace(0, trajectory_depth, n_coords)
+    trajector_depth_list = np.linspace(trajectory_depth,0, n_coords)
 
     coords_sampled = np.zeros((n_coords, 3)).astype(int)
     for i in range(3):
@@ -282,18 +282,29 @@ def get_region_boundaries(coords, atlas, structure_tree):
     
     return trajectory_areas
 
-def shift_trajectory_depth(coords, shift_depth,axis_resolution=10):
+def shift_trajectory_depth(coords, shift_depth, length=np.inf, axis_resolution=10):
     # Calculate the direction vector
     # coords is [start, end] in axis coordinate
     # shift_depth is in um, positive is deeper into the brain
+    # if length=np.inf, then by default it is from the surface of the brain to the base
+    # otherwise the end point is at the base, and the starting point is calculated back from the length
+    
+    coords = coords.copy()
     direction_vector = coords[1] - coords[0]
     
     # Normalize the direction vector
     direction_vector_normalized = direction_vector / np.linalg.norm(direction_vector)
+    print(np.linalg.norm(coords[1]-coords[0])*axis_resolution)
+    # if length is set, compute the correct starting point of the probe 
+    if length !=np.inf:
+        #calculate the starting point of the coordinate, and then shift by the shift_depth
+        coords[0] = coords[1] - direction_vector_normalized * length/axis_resolution
     
+    print(coords)
     # Apply the shift
     coords_shifted = np.zeros_like(coords)
-    coords_shifted[0] = coords[0] + shift_depth/axis_resolution * direction_vector_normalized
-    coords_shifted[1] = coords[1] + shift_depth/axis_resolution * direction_vector_normalized
+
+    coords_shifted[0] = coords[0] + shift_depth/axis_resolution * direction_vector_normalized #start piont    
+    coords_shifted[1] = coords[1] + shift_depth/axis_resolution * direction_vector_normalized #end point
     
     return coords_shifted

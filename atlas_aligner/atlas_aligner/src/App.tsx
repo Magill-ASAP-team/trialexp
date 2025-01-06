@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 
 import '@mantine/core/styles.css'
-import { MantineProvider } from '@mantine/core'
-import { Button, Select } from '@mantine/core'
-import { Flex } from '@mantine/core'
+import { Center, MantineProvider } from '@mantine/core'
+import { Button, Select, Flex, Slider, Text, Stack } from '@mantine/core'
 import axios from 'axios'
 import Plot from 'react-plotly.js'
 
@@ -11,6 +10,7 @@ function App() {
   const [cohortList, setCohortList] = useState(['August', 'April'])
   const [animalIDList, setAnimalIDList] = useState(['A', 'B', 'C'])
   const [sessionIDList, setSessionIDList] = useState(['1', '2', '3'])
+  const [depthShift, setDepthShift] = useState(0)
   const [cohort, setCohort] = useState<string | null>(null)
   const [animalID, setAnimalID] = useState<string | null>(null)
   const [sessionID, setSessionID] = useState<string | null>(null)
@@ -55,7 +55,7 @@ function App() {
 
 
   useEffect(() => {
-    axios.get('http://localhost:8000/sessions', 
+    axios.get('http://localhost:8000/sessions',
       { params: { cohort: cohort, animal_id: animalID } })
       .then((response) => {
         setSessionIDList(null);
@@ -64,14 +64,14 @@ function App() {
       .catch((error) => {
         console.log(error);
       })
-      .finally(() => {});
-      
+      .finally(() => { });
+
   }, [cohort, animalID]);
 
   const fetchPlotData = () => {
     if (sessionID) {
-      axios.get('http://localhost:8000/trajectory', 
-        { params: { session_id: sessionID } })
+      axios.get('http://localhost:8000/trajectory',
+        { params: { session_id: sessionID, shift: depthShift } })
         .then((response) => {
           setPlotData(response.data);
         })
@@ -83,11 +83,11 @@ function App() {
 
   useEffect(() => {
     fetchPlotData();
-  }, [sessionID]);
+  }, [sessionID, depthShift]);
 
   const plotTraces = plotData.map((region: any) => ({
     x: ['Brain Regions'],
-    y: [region.depth_end - region.depth_start],
+    y: [region.depth_start - region.depth_end],
     name: region.acronym,
     type: 'bar',
     text: region.acronym,
@@ -97,28 +97,49 @@ function App() {
   return (
     <>
       <MantineProvider>
-        <Flex justify="center" align="flex-end" gap="md">
-          <Select data={cohortList} placeholder="Cohort"
-        label='Cohort'
-        value={cohort} onChange={setCohort} searchable />
-          <Select data={animalIDList} placeholder="Animal" label='Animal'
-        value={animalID} onChange={setAnimalID} searchable/>
-          <Select data={sessionIDList} placeholder="Session" label='Session'
-        value={sessionID} onChange={setSessionID} searchable />
-          <Button onClick={fetchPlotData}> Align probe locations</Button>
-        </Flex>
+
+        <Stack>
+          <Flex justify="center" align="flex-end" gap="md">
+            <Select data={cohortList} placeholder="Cohort"
+              label='Cohort'
+              value={cohort} onChange={setCohort} searchable />
+            <Select data={animalIDList} placeholder="Animal" label='Animal'
+              value={animalID} onChange={setAnimalID} searchable />
+            <Select data={sessionIDList} placeholder="Session" label='Session'
+              value={sessionID} onChange={setSessionID} searchable />
+            <Button onClick={fetchPlotData}> Align probe locations</Button>
+          </Flex>
+
+          <Center>
+            <Stack >
+              <Text> Probe depth shift</Text>
+              <Slider
+                value={depthShift}
+                onChange={setDepthShift}
+                min={-1000}
+                max={1000}
+                labelAlwaysOn
+                style={{ width: 600 }} />
+            </Stack>
+          </Center>
+
+        </Stack>
+
+
+
         <Plot
           data={plotTraces}
-          layout={{ 
-        title: 'Mapped trajectory', 
-        barmode: 'stack', 
-        xaxis: { title: 'Brain Regions' }, 
-        yaxis: { title: 'Depth', autorange: 'reversed' },
-        legend: { traceorder: 'normal' }, // Normal order of the legend
-        height: 1000, // Set the height of the plot here
-        width: 400 // Set the width of the plot here
+          layout={{
+            title: 'Mapped trajectory',
+            barmode: 'stack',
+            xaxis: { title: 'Brain Regions' },
+            yaxis: { title: 'Depth', autorange: 'reversed' },
+            legend: { traceorder: 'normal' }, // Normal order of the legend
+            width: 400, // Set the width of the plot here
+            height: 1000, // Set the height of the plot here
           }}
         />
+
       </MantineProvider>
     </>
   )
