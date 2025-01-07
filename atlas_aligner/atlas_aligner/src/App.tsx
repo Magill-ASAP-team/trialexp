@@ -15,7 +15,8 @@ function App() {
   const [animalID, setAnimalID] = useState<string | null>(null)
   const [sessionID, setSessionID] = useState<string | null>(null)
   const [plotData, setPlotData] = useState([])
-  const [firingRateData, setFiringRateData] = useState([])
+  const [cellMetricsData, setCellMetricsData] = useState([])
+
 
   useEffect(() => {
     // a async function to fetch data
@@ -91,10 +92,10 @@ function App() {
   //Get firing rate data
   useEffect(() => {
     if (sessionID) {
-      axios.get('http://localhost:8000/firing_rate',
+      axios.get('http://localhost:8000/cell_metrics',
         { params: { session_id: sessionID } })
         .then((response) => {
-          setFiringRateData(response.data);
+          setCellMetricsData(response.data);
         })
         .catch((error) => {
           console.log(error);
@@ -109,13 +110,20 @@ function App() {
     base: [region.depth_end],
     name: region.acronym,
     type: 'bar',
-    text: region.acronym,
+    text: region.name,
     textposition: 'inside'
   }));
 
-  const frPlotTraces = firingRateData && Object.keys(firingRateData).length > 0 ? [{
-    x: firingRateData['firing_rate'],
-    y: firingRateData['ks_chan_pos_y'],
+  const frPlotTraces = cellMetricsData && Object.keys(cellMetricsData).length > 0 ? [{
+    x: cellMetricsData['mean'],
+    y: cellMetricsData['ks_chan_pos_y'],
+    type: 'bar',
+    orientation: 'h'
+  }] : [];
+
+  const cellCountTraces = cellMetricsData && Object.keys(cellMetricsData).length > 0 ? [{
+    x: cellMetricsData['count'],
+    y: cellMetricsData['ks_chan_pos_y'],
     type: 'bar',
     orientation: 'h'
   }] : [];
@@ -140,50 +148,63 @@ function App() {
             <Stack >
               <Text> Probe depth shift</Text>
               <Group>
-              <Slider
-                value={depthShift}
-                onChange={setDepthShift}
-                min={-2000}
-                max={2000}
-                labelAlwaysOn
-                style={{ width: 600 }} />
-              <Button onClick={() => setDepthShift(0)}>Reset</Button>
-              <Button>Save</Button>
+                <Slider
+                  value={depthShift}
+                  onChange={setDepthShift}
+                  min={-2000}
+                  max={2000}
+                  labelAlwaysOn
+                  style={{ width: 600 }} />
+                <Button onClick={() => setDepthShift(0)}>Reset</Button>
+                <Button>Save</Button>
               </Group>
-         
+
             </Stack>
           </Center>
 
         </Stack>
 
+        <Center>
+          <Group>
+            <Plot
+              data={plotTraces}
+              layout={{
+                title: 'Mapped trajectory',
+                barmode: 'stack',
+                xaxis: { title: 'Brain Regions' },
+                yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
+                legend: { traceorder: 'normal' },
+                width: 400,
+                height: 1000,
+                base: 1000,
+              }}
+            />
 
-        <Group>
-          <Plot
-            data={plotTraces}
-            layout={{
-              title: 'Mapped trajectory',
-              barmode: 'stack',
-              xaxis: { title: 'Brain Regions' },
-              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
-              legend: { traceorder: 'normal' },
-              width: 400,
-              height: 1000,
-              base: 1000,
-            }}
-          />
+            <Plot
+              data={frPlotTraces}
+              layout={{
+                title: 'Firing Rate by Position (experiment)',
+                xaxis: { title: 'Firing Rate (Hz)' },
+                yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
+                width: 400,
+                height: 1000,
+                orientation: 'h'
+              }}
+            />
+            <Plot
+              data={cellCountTraces}
+              layout={{
+                title: 'Cell count',
+                xaxis: { title: 'Cell count' },
+                yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
+                width: 400,
+                height: 1000,
+                orientation: 'h'
+              }}
+            />
+          </Group>
+        </Center>
 
-          <Plot
-            data={frPlotTraces}
-            layout={{
-              title: 'Firing Rate by Position (experiment)',
-              xaxis: { title: 'Firing Rate (Hz)' },
-              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
-              width: 400,
-              height: 1000,
-              orientation: 'h'
-            }}
-          />
-        </Group>
 
 
       </MantineProvider>

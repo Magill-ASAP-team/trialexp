@@ -51,9 +51,9 @@ probe_idx
 # ref see https://community.brain-map.org/t/how-to-transform-ccf-x-y-z-coordinates-into-stereotactic-coordinates/1858
 
 channel_position =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_positions.npy')
+channel_map =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_map.npy')
 
 probe_coords = trajectory2probe_coords(probe_ccf[probe_idx], channel_position)
-
 
 
 #%% atlas
@@ -71,8 +71,16 @@ df_quality_metrics = pd.read_pickle(df_sel.path/'processed/df_quality_metrics.pk
 
 #%%
 df_fr = df_quality_metrics.groupby('ks_chan_pos_y')[['firing_rate']].mean().reset_index()
-
 df_fr.to_dict(orient='list')
 
 
-#%%
+#%% check spike locations
+
+spike_positions =np.load(df_sel.path/'processed/kilosort4/ProbeA/spike_positions.npy')
+spike_clusters = np.load(df_sel.path/'processed/kilosort4/ProbeA/spike_clusters.npy')
+idx = (spike_clusters==421)
+plt.plot(spike_positions[idx,0], spike_positions[idx,1],'.')
+# %%
+df_quality_metrics[df_quality_metrics.cluID=='TT013-2024-10-24-142256_ProbeA_421']
+# check TT012-2024-11-27-160737, too much activity in the internal capsule
+# %%

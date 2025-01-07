@@ -96,10 +96,10 @@ async def get_trajectory(session_id: str, shift:int = 0):
     shifted_coords = shift_trajectory_depth(probe_coords, shift)
     trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
     trajectory_areas = trajectory_areas.sort_values('depth_start')
-    return trajectory_areas[['acronym','depth_start','depth_end']].to_dict(orient='records')
+    return trajectory_areas[['acronym','depth_start','depth_end','name']].to_dict(orient='records')
 
 
-@app.get('/firing_rate')
+@app.get('/cell_metrics')
 async def get_firing_rate(session_id:str):
     df = app.state.df_session_info
     df = df.query(f"session_id=='{session_id}'")
@@ -108,36 +108,6 @@ async def get_firing_rate(session_id:str):
     if len(df)>0:
         df = df.iloc[0]
         df_quality_metrics = pd.read_pickle(df.path/'processed/df_quality_metrics.pkl')
-        df_fr = df_quality_metrics.groupby('ks_chan_pos_y')['firing_rate'].mean().reset_index()
+        df_fr = df_quality_metrics.groupby('ks_chan_pos_y')['firing_rate'].agg(['mean','count']).reset_index()
         return df_fr.to_dict(orient='list')
-
-# #%%
-
-# root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
-# df_session_info = build_session_info_cohort(root_path)
-# # %%
-# df_sesssion_info = df_session_info.query('neuropixels_sorted==True')
-# #%%
-# df_sel = df_session_info.query('animal_id=="TT011"').iloc[0]
-# # %%
-# # match with the track localization results
-# local_results = Path(root_path)/df_sel.cohort/'histology'/df_sel.animal_id/'RGB'/'Processed'
-# # %%
-
-# probe_ccf = sio.loadmat(str(local_results/'probe_ccf.mat'), simplify_cells=True)['probe_ccf']
-# # %%
-# probe_ccf[0]['trajectory_areas']
-# # %%
-# # trajectory coords is in ap, dv, ml
-# # coords is [start, end] in axis coordinate
-# # ref see https://community.brain-map.org/t/how-to-transform-ccf-x-y-z-coordinates-into-stereotactic-coordinates/1858
-# coords = probe_ccf[0]['trajectory_coords'].astype(float)
-
-# #%% atlas
-# atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
-
-# # Example usage
-# shifted_coords = shift_trajectory_depth(coords, -1000)
-# trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
-# trajectory_areas[['acronym','depth_start','depth_end']]
-# # %%
+    
