@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy.io as sio
+from datetime import datetime
 #%%
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
 df_session_info = build_session_info_cohort(root_path)
@@ -67,12 +68,30 @@ async def get_trajectory(session_id: str, shift:int = 0):
     df = df.iloc[0]
     local_results = Path(root_path)/df.cohort/'histology'/df.animal_id/'RGB'/'Processed'
     probe_ccf = sio.loadmat(str(local_results/'probe_ccf.mat'), simplify_cells=True)['probe_ccf']
-    coords = probe_ccf[0]['trajectory_coords'].astype(float)
+    
+    
+    with open(local_results/'probe_names.txt') as f:
+        probe_names = f.readlines()
+        probes = []
+        for p in probe_names:
+            try: 
+                probes.append(datetime.strptime(p.strip(), '%d/%m/%Y').date())
+            except:
+                probes.append(p)
+
+    probes_name = np.array(probes)
+
+
+    # # match the experiment datetime
+    probe_idx = np.where(probes_name == df.expt_datetime.date())[0]
+    print(probes_name[probe_idx])
+    if len(probe_idx) ==0:
+        return None
     atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
     
     channel_position =np.load(df.path/'processed/kilosort4/ProbeA/channel_positions.npy')
     
-    probe_coords = trajectory2probe_coords(probe_ccf[0], channel_position)
+    probe_coords = trajectory2probe_coords(probe_ccf[probe_idx[0]], channel_position)
     
     shifted_coords = shift_trajectory_depth(probe_coords, shift)
     trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)

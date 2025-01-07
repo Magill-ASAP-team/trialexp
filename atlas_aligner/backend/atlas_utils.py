@@ -5,11 +5,12 @@ from typing import Optional
 from trialexp.process.folder_org.utils import build_session_info_cohort
 from trialexp.process.anatomy.utils import load_ccf_data, shift_trajectory_depth, get_region_boundaries, trajectory2probe_coords
 from fastapi.middleware.cors import CORSMiddleware
+from pandas import Timestamp
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy.io as sio
-
+from datetime import datetime
 #%%
 
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
@@ -24,18 +25,37 @@ local_results = Path(root_path)/df_sel.cohort/'histology'/df_sel.animal_id/'RGB'
 # %%
 
 probe_ccf = sio.loadmat(str(local_results/'probe_ccf.mat'), simplify_cells=True)['probe_ccf']
-# %%
-probe_ccf[0]['trajectory_areas']
+
+#%% Match the date of the experimentn with the probe date
+
+with open(local_results/'probe_names.txt') as f:
+    probe_names = f.readlines()
+    probes = []
+    for p in probe_names:
+        try: 
+            probes.append(datetime.strptime(p.strip(), '%d/%m/%Y').date())
+        except:
+            probes.append(p)
+
+probes_name = np.array(probes)
+
+
+# # match the experiment datetime
+probe_idx = np.where(probes_name == df_sel.expt_datetime.date())[0][0]
+probe_idx
+
+
 # %%
 # trajectory coords is in ap, dv, ml
 # coords is [start, end] in axis coordinate
 # ref see https://community.brain-map.org/t/how-to-transform-ccf-x-y-z-coordinates-into-stereotactic-coordinates/1858
 
-
 channel_position =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_positions.npy')
 
+probe_coords = trajectory2probe_coords(probe_ccf[probe_idx], channel_position)
 
-probe_coords = trajectory2probe_coords(probe_ccf[0], channel_position)
+
+
 #%% atlas
 atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
 
@@ -53,10 +73,6 @@ df_quality_metrics = pd.read_pickle(df_sel.path/'processed/df_quality_metrics.pk
 df_fr = df_quality_metrics.groupby('ks_chan_pos_y')[['firing_rate']].mean().reset_index()
 
 df_fr.to_dict(orient='list')
-# %%
-#TODO: we need to identify the rought location of the tip using the last point from the alignment
-# find the lowest point on the DV axis and 
 
-# %%
 
-# %%
+#%%

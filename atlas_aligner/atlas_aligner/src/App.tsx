@@ -139,6 +139,7 @@ function App() {
           <Center>
             <Stack >
               <Text> Probe depth shift</Text>
+              <Group>
               <Slider
                 value={depthShift}
                 onChange={setDepthShift}
@@ -146,6 +147,10 @@ function App() {
                 max={2000}
                 labelAlwaysOn
                 style={{ width: 600 }} />
+              <Button onClick={() => setDepthShift(0)}>Reset</Button>
+              <Button>Save</Button>
+              </Group>
+         
             </Stack>
           </Center>
 
@@ -170,7 +175,7 @@ function App() {
           <Plot
             data={frPlotTraces}
             layout={{
-              title: 'Firing Rate by Position',
+              title: 'Firing Rate by Position (experiment)',
               xaxis: { title: 'Firing Rate (Hz)' },
               yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
               width: 400,
