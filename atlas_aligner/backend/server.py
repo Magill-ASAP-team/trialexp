@@ -3,7 +3,7 @@ import fastapi
 from enum import Enum
 from typing import Optional
 from trialexp.process.folder_org.utils import build_session_info_cohort
-from trialexp.process.anatomy.utils import load_ccf_data, shift_trajectory_depth, get_region_boundaries
+from trialexp.process.anatomy.utils import load_ccf_data, shift_trajectory_depth, get_region_boundaries, trajectory2probe_coords
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import numpy as np
@@ -71,9 +71,10 @@ async def get_trajectory(session_id: str, shift:int = 0):
     atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
     
     channel_position =np.load(df.path/'processed/kilosort4/ProbeA/channel_positions.npy')
-    max_depth = channel_position.max(axis=0)[1]
     
-    shifted_coords = shift_trajectory_depth(coords, shift, max_depth)
+    probe_coords = trajectory2probe_coords(probe_ccf[0], channel_position)
+    
+    shifted_coords = shift_trajectory_depth(probe_coords, shift)
     trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
     trajectory_areas = trajectory_areas.sort_values('depth_start')
     return trajectory_areas[['acronym','depth_start','depth_end']].to_dict(orient='records')

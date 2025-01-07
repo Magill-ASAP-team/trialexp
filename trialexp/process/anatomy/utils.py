@@ -248,6 +248,8 @@ def load_ccf_data(base_directory):
     # it present the row of in the structure_tree_safe_2017 table
     # the template volume contains the reference image of the brain (voxel with each element the brightness of the pixel)
     # the atlas is 1-based, its index corresponds to the row of the structure_tree_safe_2017 table, so 1 is the first row 
+    # see https://community.brain-map.org/t/how-to-transform-ccf-x-y-z-coordinates-into-stereotactic-coordinates/1858
+    # The dimension is [ML(left-right), DV(top-down), AP(back-front)]
     atlas = np.load(base_directory / 'annotation_volume_10um_by_index.npy', mmap_mode='r')
     structure_tree = pd.read_csv(base_directory / 'structure_tree_safe_2017.csv')
     return atlas, structure_tree
@@ -286,7 +288,7 @@ def get_region_boundaries(coords,  atlas, structure_tree):
     
     return trajectory_areas
 
-def shift_trajectory_depth(coords, shift_depth=0, length=np.inf, axis_resolution=10):
+def shift_trajectory_depth(coords, shift_depth=0, axis_resolution=10):
     # Calculate the direction vector
     # coords is [start, end] in axis coordinate
     # shift_depth is in um, positive is deeper into the brain
@@ -298,12 +300,7 @@ def shift_trajectory_depth(coords, shift_depth=0, length=np.inf, axis_resolution
     
     # Normalize the direction vector
     direction_vector_normalized = direction_vector / np.linalg.norm(direction_vector)
-    # print(np.linalg.norm(coords[1]-coords[0])*axis_resolution)
-    # if length is set, compute the correct starting point of the probe 
-    if length !=np.inf:
-        #calculate the starting point of the coordinate, and then shift by the shift_depth
-        coords[0] = coords[1] - direction_vector_normalized * length/axis_resolution
-    
+
     # print(coords)
     # Apply the shift
     coords_shifted = np.zeros_like(coords)
@@ -312,3 +309,59 @@ def shift_trajectory_depth(coords, shift_depth=0, length=np.inf, axis_resolution
     coords_shifted[1] = coords[1] + shift_depth/axis_resolution * direction_vector_normalized #end point
     
     return coords_shifted
+
+def find_plane_intercept(coords, plane, v):
+    # Convert to numpy arrays if not already
+    p1, p2 = coords[0], coords[1]
+    
+    # Get the direction index based on plane
+    idx = {'ml': 0, 'dv': 1, 'ap': 2}[plane]
+    
+    # Check if line is parallel to plane
+    if p2[idx] == p1[idx]:
+        return None
+        
+    # Calculate intersection parameter t
+    t = (v - p1[idx]) / (p2[idx] - p1[idx])
+    
+    # Return intersection point
+    return p1 + t * (p2 - p1)
+
+
+def trajectory2probe_coords(probe_ccf_data, channel_position, axis_resolution=10):
+    """Calculate probe base and tip coordinates from trajectory data.
+    Takes trajectory coordinates through the brain and channel position data to 
+    determine the actual probe placement coordinates (base and tip).
+    Args:
+        probe_ccf_data (dict): Dictionary containing:
+            - trajectory_coords (np.ndarray): Coordinates of the trajectory through brain
+            - points (np.ndarray): Marked reference points along trajectory
+        channel_position (np.ndarray): Array with channel positions, the form [x,y] for each channel,
+        counting from the tip of the probe
+        axis_resolution (float, optional): unit in um, how large is one unit in the axis
+    Returns:
+        np.ndarray: 2x3 array containing probe base and tip coordinates where:
+            - First row [0,:] represents base coordinates
+            - Second row [1,:] represents tip coordinates
+    Notes:
+        - Finds the plane intersect at the last marked point to determine probe tip
+        - Calculates base position using probe length and trajectory direction
+        - All coordinates are in CCF space
+    """
+    # The original trajectory is through the whole brain
+    # we need to find the last marked point, and find its plane intercept with the fitted line
+    # then use that point as the tentative tip of the probe
+    
+    coords = probe_ccf_data['trajectory_coords'].astype(float) # trajectory
+    points = probe_ccf_data['points'].astype(float)
+    tip_plane = points[:,1].max()
+    tip_coords = find_plane_intercept(coords, 'dv', tip_plane)
+
+    direction_vector = coords[1] - coords[0]
+    direction_vector_normalized = direction_vector / np.linalg.norm(direction_vector)
+
+    probe_length = channel_position.max(axis=0)[1]
+
+    base_coords = tip_coords - direction_vector_normalized*probe_length/axis_resolution
+    
+    return np.array([base_coords, tip_coords])

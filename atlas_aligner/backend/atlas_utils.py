@@ -3,7 +3,7 @@ import fastapi
 from enum import Enum
 from typing import Optional
 from trialexp.process.folder_org.utils import build_session_info_cohort
-from trialexp.process.anatomy.utils import load_ccf_data, shift_trajectory_depth, get_region_boundaries
+from trialexp.process.anatomy.utils import load_ccf_data, shift_trajectory_depth, get_region_boundaries, trajectory2probe_coords
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import numpy as np
@@ -30,22 +30,18 @@ probe_ccf[0]['trajectory_areas']
 # trajectory coords is in ap, dv, ml
 # coords is [start, end] in axis coordinate
 # ref see https://community.brain-map.org/t/how-to-transform-ccf-x-y-z-coordinates-into-stereotactic-coordinates/1858
-coords = probe_ccf[0]['trajectory_coords'].astype(float)
 
+
+channel_position =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_positions.npy')
+
+
+probe_coords = trajectory2probe_coords(probe_ccf[0], channel_position)
 #%% atlas
 atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
 
-# %%
-# load the channel location and limit the trajectory length
-channel_position =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_positions.npy')
-max_depth = channel_position.max(axis=0)[1]
 
-#%%
-all_coords = shift_trajectory_depth(coords)
-trajectory_areas = get_region_boundaries(all_coords, atlas, structure_tree)
-trajectory_areas[['acronym','depth_start','depth_end']]
 # %%
-shifted_coords1 = shift_trajectory_depth(coords, -619, length=max_depth)
+shifted_coords1 = shift_trajectory_depth(probe_coords, -619)
 trajectory_areas = get_region_boundaries(shifted_coords1, atlas, structure_tree)
 trajectory_areas = trajectory_areas.sort_values('depth_start')
 trajectory_areas[['acronym','depth_start','depth_end']]
@@ -59,3 +55,8 @@ df_fr = df_quality_metrics.groupby('ks_chan_pos_y')[['firing_rate']].mean().rese
 df_fr.to_dict(orient='list')
 # %%
 #TODO: we need to identify the rought location of the tip using the last point from the alignment
+# find the lowest point on the DV axis and 
+
+# %%
+
+# %%
