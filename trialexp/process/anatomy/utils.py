@@ -256,33 +256,37 @@ def load_ccf_data(base_directory):
 def get_region_boundaries(coords,  atlas, structure_tree):
     # the trajectory is between the starting and end point of the coords
     # the end point is not the ending of the probe. Neuropixel probe is about 4000um long if only the tip is used
+    # depth is defined from the tip of the probe
     trajectory_depth = np.linalg.norm(np.diff(coords, axis=0)) * 10 # axis unit is in 10um, so we convert it back to 1um
     n_coords = int(trajectory_depth) # sample every 1um
-    trajector_depth_list = np.linspace(trajectory_depth,0, n_coords)
+    trajector_depth_list = np.linspace(0,trajectory_depth, n_coords)
 
     coords_sampled = np.zeros((n_coords, 3)).astype(int)
     for i in range(3):
-        coords_sampled[:, i] = np.linspace(coords[0, i], coords[1, i], n_coords).astype(int)
+        # sample from tip back to the root
+        coords_sampled[:, i] = np.linspace(coords[1, i], coords[0, i], n_coords).astype(int)
 
     # get the annotation index from the coordinates
     annot = np.zeros((coords_sampled.shape[0],))
     for i in range(coords_sampled.shape[0]):
         annot[i] = atlas[coords_sampled[i, 0], coords_sampled[i, 1], coords_sampled[i, 2]] - 1  # convert it to zero based
-
+        # annot is the index in the brain structure tree
+        
     # Find out the boundary regions
     # Find the boundary of the region, where the annot index changes
     regions_bins = [0, *(np.nonzero(np.diff(annot) != 0)[0] + 1), annot.shape[0]-1]  # idx of annot that denotes the boundaries
-    region_boundaries = [regions_bins[:-2], regions_bins[1:-1]]  # the beginning and end of the region
+    region_boundaries = [regions_bins[:-1], regions_bins[1:]]  # the beginning and end of the region
 
     trajectory_areas = structure_tree.loc[annot[region_boundaries[0]]]
     trajectory_areas['depth_start'] = trajector_depth_list[region_boundaries[0]]
     trajectory_areas['depth_end'] = trajector_depth_list[region_boundaries[1]]
     # Note: the actual may be a few microns different from the AP_historylogy results due to
     # slightly different sampling point for the trajectory 
+    # root is where the atlas volume is outside the brain
     
     return trajectory_areas
 
-def shift_trajectory_depth(coords, shift_depth, length=np.inf, axis_resolution=10):
+def shift_trajectory_depth(coords, shift_depth=0, length=np.inf, axis_resolution=10):
     # Calculate the direction vector
     # coords is [start, end] in axis coordinate
     # shift_depth is in um, positive is deeper into the brain

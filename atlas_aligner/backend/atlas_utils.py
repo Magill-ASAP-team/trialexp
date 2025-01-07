@@ -39,8 +39,13 @@ atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software
 # load the channel location and limit the trajectory length
 channel_position =np.load(df_sel.path/'processed/kilosort4/ProbeA/channel_positions.npy')
 max_depth = channel_position.max(axis=0)[1]
+
+#%%
+all_coords = shift_trajectory_depth(coords)
+trajectory_areas = get_region_boundaries(all_coords, atlas, structure_tree)
+trajectory_areas[['acronym','depth_start','depth_end']]
 # %%
-shifted_coords1 = shift_trajectory_depth(coords, 100, length=max_depth)
+shifted_coords1 = shift_trajectory_depth(coords, -619, length=max_depth)
 trajectory_areas = get_region_boundaries(shifted_coords1, atlas, structure_tree)
 trajectory_areas = trajectory_areas.sort_values('depth_start')
 trajectory_areas[['acronym','depth_start','depth_end']]

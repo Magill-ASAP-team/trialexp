@@ -142,8 +142,8 @@ function App() {
               <Slider
                 value={depthShift}
                 onChange={setDepthShift}
-                min={-1000}
-                max={1000}
+                min={-2000}
+                max={2000}
                 labelAlwaysOn
                 style={{ width: 600 }} />
             </Stack>
@@ -159,7 +159,7 @@ function App() {
               title: 'Mapped trajectory',
               barmode: 'stack',
               xaxis: { title: 'Brain Regions' },
-              yaxis: { title: 'Depth', range: [0, 4000] },
+              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
               legend: { traceorder: 'normal' },
               width: 400,
               height: 1000,
@@ -172,7 +172,7 @@ function App() {
             layout={{
               title: 'Firing Rate by Position',
               xaxis: { title: 'Firing Rate (Hz)' },
-              yaxis: { title: 'Position (µm)', range: [0, 4000] },
+              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
               width: 400,
               height: 1000,
               orientation: 'h'
