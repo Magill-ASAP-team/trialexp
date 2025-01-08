@@ -165,44 +165,44 @@ function App() {
         </Stack>
 
         <Center>
-          <Group>
+            <Group>
             <Plot
               data={plotTraces}
               layout={{
-                title: 'Mapped trajectory',
-                barmode: 'stack',
-                xaxis: { title: 'Brain Regions' },
-                yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
-                legend: { traceorder: 'normal' },
-                width: 400,
-                height: 1000,
-                base: 1000,
+              title: plotData[0]['track_date'] ? `Mapped trajectory<br> ${plotData[0]['track_date']}` : 'Mapped trajectory',
+              barmode: 'stack',
+              xaxis: { title: 'Brain Regions' },
+              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
+              legend: { traceorder: 'normal' },
+              width: 400,
+              height: 1000,
+              base: 1000,
               }}
             />
 
             <Plot
               data={frPlotTraces}
               layout={{
-                title: 'Firing Rate by Position (experiment)',
-                xaxis: { title: 'Firing Rate (Hz)' },
-                yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
-                width: 400,
-                height: 1000,
-                orientation: 'h'
+              title: 'Firing Rate by Position (experiment)',
+              xaxis: { title: 'Firing Rate (Hz)' },
+              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
+              width: 400,
+              height: 1000,
+              orientation: 'h'
               }}
             />
             <Plot
               data={cellCountTraces}
               layout={{
-                title: 'Cell count',
-                xaxis: { title: 'Cell count' },
-                yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
-                width: 400,
-                height: 1000,
-                orientation: 'h'
+              title: 'Cell count',
+              xaxis: { title: 'Cell count' },
+              yaxis: { title: 'Distance from tip (µm)', range: [0, 4000] },
+              width: 400,
+              height: 1000,
+              orientation: 'h'
               }}
             />
-          </Group>
+            </Group>
         </Center>
 
 

@@ -84,7 +84,6 @@ async def get_trajectory(session_id: str, shift:int = 0):
 
     # # match the experiment datetime
     probe_idx = np.where(probes_name == df.expt_datetime.date())[0]
-    print(probes_name[probe_idx])
     if len(probe_idx) ==0:
         return None
     atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
@@ -96,7 +95,8 @@ async def get_trajectory(session_id: str, shift:int = 0):
     shifted_coords = shift_trajectory_depth(probe_coords, shift)
     trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
     trajectory_areas = trajectory_areas.sort_values('depth_start')
-    return trajectory_areas[['acronym','depth_start','depth_end','name']].to_dict(orient='records')
+    trajectory_areas['track_date'] = str(probes_name[probe_idx[0]])
+    return trajectory_areas[['acronym','depth_start','track_date','depth_end','name']].to_dict(orient='records')
 
 
 @app.get('/cell_metrics')
