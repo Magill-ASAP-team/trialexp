@@ -73,7 +73,14 @@ df_quality_metrics = pd.read_pickle(df_sel.path/'processed/df_quality_metrics.pk
 df_fr = df_quality_metrics.groupby('ks_chan_pos_y')[['firing_rate']].mean().reset_index()
 df_fr.to_dict(orient='list')
 
+#%%
+bin_size = 200
+bins = np.arange(0,3840+bin_size,60)
+df_fr['pos_y_bin'] = pd.cut(df_fr.ks_chan_pos_y,bins)
 
+df_binned = df_fr.groupby('bin')['firing_rate'].agg(['mean','count']).reset_index()
+df_binned['pos_y_bin'] = bins[:-1]
+df_binned
 #%% check spike locations
 
 spike_positions =np.load(df_sel.path/'processed/kilosort4/ProbeA/spike_positions.npy')

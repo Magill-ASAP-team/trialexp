@@ -3,6 +3,9 @@ import matplotlib.patches as patches
 import numpy as np
 import matplotlib.pylab as plt
 import seaborn as sns
+from pathlib import Path
+from datetime import datetime
+import scipy.io as sio
 
 def get_region_boundary(df_cell, dep_col,group_method='consecutive'):
     df_cell = df_cell.sort_values(dep_col)
@@ -365,3 +368,42 @@ def trajectory2probe_coords(probe_ccf_data, channel_position, axis_resolution=10
     base_coords = tip_coords - direction_vector_normalized*probe_length/axis_resolution
     
     return np.array([base_coords, tip_coords])
+
+def load_probe_dates(probe_names_file):
+    with open(probe_names_file) as f:
+        probe_names = f.readlines()
+        probes = []
+        for p in probe_names:
+            try: 
+                probes.append(datetime.strptime(p.strip(), '%d/%m/%Y').date())
+            except:
+                probes.append(p)
+    return np.array(probes)
+
+def get_trajectory_areas(df_session, shift, root_path):
+    df = df_session.copy()
+    local_results = Path(root_path)/df.cohort/'histology'/df.animal_id/'RGB'/'Processed'
+    probe_ccf = sio.loadmat(str(local_results/'probe_ccf.mat'), simplify_cells=True)['probe_ccf']
+    
+    # Main logic
+    probes_name = load_probe_dates(local_results/'probe_names.txt')
+    probe_idx = np.where(probes_name == df.expt_datetime.date())[0]
+    if len(probe_idx) == 0:
+        return None
+
+    atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
+    channel_position = np.load(df.path/'processed/kilosort4/ProbeA/channel_positions.npy')
+    
+    probe_coords = trajectory2probe_coords(probe_ccf[probe_idx[0]], channel_position)
+    shifted_coords = shift_trajectory_depth(probe_coords, shift)
+    trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
+    
+    trajectory_areas['track_date'] = str(probes_name[probe_idx[0]])
+    
+    trajectory_areas.sort_values('depth_start')
+    
+    trajectory_areas.attrs['shift'] = shift
+    trajectory_areas.attrs['shifed_coords'] = shifted_coords
+    trajectory_areas.attrs['original_coords'] = probe_coords
+    
+    return trajectory_areas
