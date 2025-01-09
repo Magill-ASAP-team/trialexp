@@ -16,7 +16,14 @@ function App() {
   const [animalID, setAnimalID] = useState<string | null>(null)
   const [sessionID, setSessionID] = useState<string | null>(null)
   const [plotData, setPlotData] = useState([])
-  const [cellMetricsData, setCellMetricsData] = useState([])
+  interface CellMetricsData {
+    mean: number[];
+    pos_y_bin: number[];
+    count: number[];
+    [key: string]: any;
+  }
+
+  const [cellMetricsData, setCellMetricsData] = useState<CellMetricsData | null>(null)
   const [trackDate, setTrackDate] = useState('')
   const [binSize, setBinSize] = useState(0);
   const [trajectoryInfoExists, setTrajectoryInfoExists] = useState(false);
@@ -63,7 +70,6 @@ function App() {
     axios.get('http://localhost:8000/sessions',
       { params: { cohort: cohort, animal_id: animalID } })
       .then((response) => {
-        setSessionIDList(null);
         setSessionIDList(response.data['session_id']);
         setSessionID(null);
       })
@@ -120,7 +126,7 @@ function App() {
 
   const handleSave = () => {
     axios.post('http://localhost:8000/save_shift', { shift: depthShift, session_id: sessionID })
-      .then((response) => {
+      .then(() => {
         notifications.show({
           title: 'Info',
           message: 'Shift info saved successfully',
@@ -135,7 +141,6 @@ function App() {
   };
 
   const plotTraces = plotData.map((region: any) => ({
-    //coordinates starts counting from the tip
     x: ['Brain Regions'],
     y: [region.depth_start - region.depth_end],
     base: [region.depth_end],
@@ -145,7 +150,7 @@ function App() {
     textposition: 'inside'
   }));
 
-  const frPlotTraces = cellMetricsData && Object.keys(cellMetricsData).length > 0 ? [{
+  const frPlotTraces = cellMetricsData ? [{
     x: cellMetricsData['mean'],
     y: cellMetricsData['pos_y_bin'],
     type: 'bar',
