@@ -1,0 +1,44 @@
+[project]
+name = "trialexp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "cupy-cuda12x>=13.3.0",
+    "dask[dataframe]>=2024.8.0",
+    "datashader>=0.16.3",
+    "elephant>=1.1.1",
+    "fastdtw>=0.3.4",
+    "h5netcdf>=1.4.1",
+    "holoviews>=1.20.0",
+    "ipywidgets>=8.1.5",
+    "jupyterlab>=4.3.4",
+    "kilosort[gui]>=4.0.22",
+    "loguru>=0.7.3",
+    "neo>=0.13.4",
+    "numpy>=1.26,<2",
+    "open-ephys-python-tools>=0.1.12",
+    "pandas>=2.1,<2.2",
+    "pingouin>=0.5.5",
+    "plotly>=5.24.1",
+    "plotly-resampler>=0.10.0",
+    "pulp==2.7.0",
+    "python-dotenv>=1.0.1",
+    "reflex>=0.6.8",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.13.1",
+    "seaborn>=0.13.2",
+    "shiny>=1.2.1",
+    "snakehelper",
+    "snakemake==7.25.0",
+    "sonpy>=1.9.5",
+    "spikeinterface>=0.101.2",
+    "statsmodels>=0.14.4",
+    "torchaudio>=2.5.1",
+    "tslearn>=0.6.3",
+    "xarray>=2024.7.0",
+]
+
+[tool.uv.sources]
+snakehelper = { git = "https://github.com/teristam/snakehelper.git" }
