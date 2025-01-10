@@ -78,7 +78,7 @@ bin_size = 200
 bins = np.arange(0,3840+bin_size,60)
 df_fr['pos_y_bin'] = pd.cut(df_fr.ks_chan_pos_y,bins)
 
-df_binned = df_fr.groupby('bin')['firing_rate'].agg(['mean','count']).reset_index()
+df_binned = df_fr.groupby('pos_y_bin')['firing_rate'].agg(['mean','count']).reset_index()
 df_binned['pos_y_bin'] = bins[:-1]
 df_binned
 #%% check spike locations
