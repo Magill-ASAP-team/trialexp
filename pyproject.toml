@@ -1,5 +1,5 @@
 [project]
-name = "trialexp"
+name = "trialexp_monorepo"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -9,6 +9,7 @@ dependencies = [
     "dask[dataframe]>=2024.8.0",
     "datashader>=0.16.3",
     "elephant>=1.1.1",
+    "fastapi[standard]>=0.115.6",
     "fastdtw>=0.3.4",
     "h5netcdf>=1.4.1",
     "holoviews>=1.20.0",
@@ -37,11 +38,20 @@ dependencies = [
     "statsmodels>=0.14.4",
     "torchaudio>=2.5.1",
     "tslearn>=0.6.3",
+    "uvicorn>=0.34.0",
     "xarray>=2024.7.0",
 ]
 
 [tool.uv.sources]
 snakehelper = { git = "https://github.com/teristam/snakehelper.git" }
+torch = [
+  { index = "pytorch-cu121", marker = "platform_system != 'Darwin'"},
+]
+torchvision = [
+  { index = "pytorch-cu121", marker = "platform_system != 'Darwin'"},
+]
+trialexp = {workspace=true}
+
 
 [build-system]
 requires = ["setuptools>=42"]
@@ -51,3 +61,11 @@ build-backend = "setuptools.build_meta"
 packages = [
   "trialexp"
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.workspace]
+members = ["trialexp", "atlas_aligner/backend"]
