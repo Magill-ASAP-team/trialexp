@@ -11,6 +11,13 @@ resolution-markers = [
     "python_full_version < '3.10' and sys_platform == 'emscripten'",
 ]
 
+[manifest]
+members = [
+    "backend",
+    "trialexp",
+    "trialexp-monorepo",
+]
+
 [[package]]
 name = "alembic"
 version = "1.14.0"
@@ -178,6 +185,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/2a/74/f1bc80f23eeba1339
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ed/20/bc79bc575ba2e2a7f70e8a1155618bb1301eaa5132a8271373a6903f73f8/babel-2.16.0-py3-none-any.whl", hash = "sha256:368b5b98b37c06b7daf6696391c3240c938b37767d4584413e8438c5c435fa8b", size = 9587599 },
 ]
+
+[[package]]
+name = "backend"
+version = "0.1.0"
+source = { virtual = "atlas_aligner/backend" }
+dependencies = [
+    { name = "trialexp" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "trialexp", virtual = "trialexp" }]
 
 [[package]]
 name = "backports-tarfile"
@@ -5338,6 +5356,11 @@ wheels = [
 
 [[package]]
 name = "trialexp"
+version = "0.1.0"
+source = { virtual = "trialexp" }
+
+[[package]]
+name = "trialexp-monorepo"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
