@@ -6,6 +6,7 @@ from matplotlib import cm, colors
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 import os
+from loguru import logger
 
 #define the color palette for trial_come
 default_palette = plt.cm.tab20.colors
@@ -51,9 +52,18 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     
     if len(df_spout)>1:
         if xbinwidth>0 and len(df_spout[x].unique())>1:
-            sns.histplot(x=x, binwidth=xbinwidth, ax=g.ax_marg_x, data=df_spout)
+            #known issue when bin range < binwidth, see https://github.com/mwaskom/seaborn/issues/3646
+            # check for range of data before proceeding further
+            if np.ptp(df_spout[x])>xbinwidth:
+                sns.histplot(x=x, binwidth=xbinwidth, ax=g.ax_marg_x, data=df_spout)
+            else:
+                logger.warning('data range is smaller than bin width. Skipping histplot')
         if ybinwidth>0 and len(df_spout[y].unique())>1:
-            sns.histplot(y=y, binwidth=ybinwidth, ax=g.ax_marg_y, data=df_spout)
+            if np.ptp(df_spout[y])>ybinwidth:
+                sns.histplot(y=y, binwidth=ybinwidth, ax=g.ax_marg_y, data=df_spout)
+            else:
+                logger.warning('data range is smaller than bin width. Skipping histplot')
+
     
     #plot aborted bar off
     df_baroff = df2plot[(df2plot.content=='bar_off') & (df2plot.trial_outcome =='aborted')]
