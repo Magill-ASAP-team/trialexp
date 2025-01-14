@@ -43,6 +43,7 @@ trigger = df_events_cond.attrs['triggers'][0]
 
 if task_name in ['pavlovian_spontanous_reaching_oct23',
                  'pavlovian_reaching_Oct26',
+                 'pavlovian_spontanous_bar_Sep24',
                  'pavlovian_spontanous_reaching_march23',
                  'pavlovian_spontanous_reaching_oct23',
                  'pavlovian_spontanous_reaching_April24']:
@@ -63,7 +64,8 @@ elif task_name in ['reaching_go_spout_bar_VR_April24']:
     outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     
 
-elif task_name in ['reaching_go_spout_incr_break2_nov22']:
+elif task_name in ['reaching_go_spout_incr_break2_nov22',
+                   'reaching_go_spout_incr_break2_April24']:
     extraction_specs = specs['break2']
     outcome2plot = df_conditions.trial_outcome.unique()
 else:
@@ -131,7 +133,7 @@ valid_trials = np.all(~np.isnan(xr_warped['zscored_df_over_f'].data),axis=1)
 print('Ratio of valid trials:', np.sum(valid_trials)/len(valid_trials))
 
 #%% Plot the time wrapped data
-for var in signal2analyze:
+for var in signal2analyze[:1]:
     unique_outcome = np.unique(xr_warped.trial_outcome)
     fig, axes = plt.subplots(len(outcome2plot),1,figsize=(10,4*len(outcome2plot)))
     
@@ -142,7 +144,7 @@ for var in signal2analyze:
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
         lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
         
-    fig.tight_layout()
+    # fig.tight_layout()
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
 
