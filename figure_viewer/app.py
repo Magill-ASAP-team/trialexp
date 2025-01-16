@@ -7,7 +7,7 @@ import pandas as pd
 
 # logger.debug('Reading sessions data from ettin...')
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
-
+print('Server starting')
 
 
 app_ui = ui.page_sidebar(

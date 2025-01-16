@@ -4,11 +4,6 @@
 
 from setuptools import setup, find_packages
 
-with open('README.rst') as readme_file:
-    readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
 
 requirements = [ ]
 
@@ -31,7 +26,7 @@ setup(
     description="Framework to analyze PyControl and PyPhotometry experiments by trials, and integrate with other data such as DeepLabCut or spikes data",
     install_requires=requirements,
     license="MIT license",
-    long_description=readme + '\n\n' + history,
+    long_description='',
     include_package_data=True,
     keywords='trialexp',
     name='trialexp',
