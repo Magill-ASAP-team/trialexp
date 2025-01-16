@@ -1,3 +1,2 @@
 #!/bin/bash
-
-uv run fastapi dev apps/atlas_aligner/backend/main.py
+uv run fastapi run apps/atlasaligner/backend/main.py

@@ -12,10 +12,12 @@ import pandas as pd
 import scipy.io as sio
 from datetime import datetime
 from pydantic import BaseModel
+import os 
 #%%
-root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
+root_path = os.environ['SESSION_ROOT_DIR']
 df_session_info = build_session_info_cohort(root_path)
 
+print('Backend server starting')
 
 app = fastapi.FastAPI()
 app.state.df_session_info = df_session_info.query('neuropixels_sorted==True').sort_values('expt_datetime', ascending=False)
@@ -77,7 +79,7 @@ async def get_trajectory(session_id: str, shift:int = 0):
     return trajectory_areas[['acronym','depth_start','track_date','depth_end','name']].to_dict(orient='records')
 
 
-@app.get('/cell_metrics/{session_id}')
+@app.get('/api/cell_metrics/{session_id}')
 async def get_firing_rate(session_id:str, bin_size:int=0):
     df = app.state.df_session_info
     df = df.query(f"session_id=='{session_id}'")
