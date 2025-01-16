@@ -40,6 +40,7 @@ dependencies = [
     "tslearn>=0.6.3",
     "uvicorn>=0.34.0",
     "xarray>=2024.7.0",
+    "trialexp",
 ]
 
 [tool.uv.sources]
@@ -53,19 +54,10 @@ torchvision = [
 trialexp = {workspace=true}
 
 
-[build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = [
-  "trialexp"
-]
-
 [[tool.uv.index]]
 name = "pytorch-cu121"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
 [tool.uv.workspace]
-members = ["trialexp", "atlas_aligner/backend"]
+members = ["libs/trialexp", "apps/atlasaligner/backend"]

@@ -13,8 +13,8 @@ services:
 
   backend:
     build:
-      context: ./atlas_aligner/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/atlas_aligner/backend/Dockerfile
     working_dir: /app
     volumes:
       - .:/app

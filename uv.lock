@@ -13,7 +13,7 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "backend",
+    "atlasaligner",
     "trialexp",
     "trialexp-monorepo",
 ]
@@ -169,6 +169,11 @@ wheels = [
 ]
 
 [[package]]
+name = "atlasaligner"
+version = "0.1.0"
+source = { virtual = "apps/atlasaligner/backend" }
+
+[[package]]
 name = "attrs"
 version = "24.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -185,17 +190,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/2a/74/f1bc80f23eeba1339
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ed/20/bc79bc575ba2e2a7f70e8a1155618bb1301eaa5132a8271373a6903f73f8/babel-2.16.0-py3-none-any.whl", hash = "sha256:368b5b98b37c06b7daf6696391c3240c938b37767d4584413e8438c5c435fa8b", size = 9587599 },
 ]
-
-[[package]]
-name = "backend"
-version = "0.1.0"
-source = { virtual = "atlas_aligner/backend" }
-dependencies = [
-    { name = "trialexp" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "trialexp", virtual = "trialexp" }]
 
 [[package]]
 name = "backports-tarfile"
@@ -5357,12 +5351,12 @@ wheels = [
 [[package]]
 name = "trialexp"
 version = "0.1.0"
-source = { virtual = "trialexp" }
+source = { editable = "libs/trialexp" }
 
 [[package]]
 name = "trialexp-monorepo"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "cupy-cuda12x" },
     { name = "dask", version = "2024.8.0", source = { registry = "https://pypi.org/simple" }, extra = ["dataframe"], marker = "python_full_version < '3.10'" },
@@ -5398,6 +5392,7 @@ dependencies = [
     { name = "spikeinterface" },
     { name = "statsmodels" },
     { name = "torchaudio" },
+    { name = "trialexp" },
     { name = "tslearn" },
     { name = "uvicorn" },
     { name = "xarray", version = "2024.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -5438,6 +5433,7 @@ requires-dist = [
     { name = "spikeinterface", specifier = ">=0.101.2" },
     { name = "statsmodels", specifier = ">=0.14.4" },
     { name = "torchaudio", specifier = ">=2.5.1" },
+    { name = "trialexp", editable = "libs/trialexp" },
     { name = "tslearn", specifier = ">=0.6.3" },
     { name = "uvicorn", specifier = ">=0.34.0" },
     { name = "xarray", specifier = ">=2024.7.0" },

@@ -1,3 +1,4 @@
+#Need to be built from project root
 FROM python:3.9
 
 WORKDIR /app
@@ -11,7 +12,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
 # Copy the startup script into the container
-COPY startup.sh /usr/local/bin/startup.sh
+COPY apps/atlas_aligner/backend/startup.sh /usr/local/bin/startup.sh
 # Ensure the startup script is executable
 RUN chmod +x /usr/local/bin/startup.sh
 
