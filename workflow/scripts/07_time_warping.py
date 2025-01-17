@@ -24,7 +24,7 @@ import json
 # %% Load data
 df_events_cond = pd.read_pickle(sinput.event_dataframe)
 df_conditions = pd.read_pickle(sinput.condition_dataframe)
-xr_photometry = xr.open_dataset(sinput.xr_photometry, engine = 'h5netcdf')
+xr_photometry = xr.load_dataset(sinput.xr_photometry, engine = 'h5netcdf')
 
 
 # %% Parameters
@@ -133,7 +133,7 @@ valid_trials = np.all(~np.isnan(xr_warped['zscored_df_over_f'].data),axis=1)
 print('Ratio of valid trials:', np.sum(valid_trials)/len(valid_trials))
 
 #%% Plot the time wrapped data
-for var in signal2analyze[:1]:
+for var in signal2analyze:
     unique_outcome = np.unique(xr_warped.trial_outcome)
     fig, axes = plt.subplots(len(outcome2plot),1,figsize=(10,4*len(outcome2plot)))
     

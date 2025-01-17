@@ -41,8 +41,10 @@ df_pycontrol.attrs['session_id'] = session_id
 #%% process lick events
 # check if lick event is in the pycontrol file, if not, try to analyze it from the analog signal
 lick_signal_path = list(path.glob('*_lick_analog.data*'))
+lick_events = df_pycontrol[df_pycontrol.content=='lick']
 
-if len(lick_signal_path)>0:
+if len(lick_events)<10 and len(lick_signal_path)>0:
+    # only do it if there is no lick detected using other means
     lick_signal_path = list(path.glob('*_lick_analog.data*'))[0]
     lick_ts_path = list(path.glob('*_lick_analog.time*'))[0]
     lick_on, lick_off, lick = analyze_lick_signal(lick_signal_path, lick_ts_path)
