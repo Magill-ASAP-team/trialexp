@@ -32,7 +32,7 @@ function App() {
     // a async function to fetch data
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:8000/cohorts')
+        const response = await fetch('/api/cohorts')
         if (!response.ok) {
           throw new Error('Server error');
         }
@@ -50,7 +50,7 @@ function App() {
     // a async function to fetch data
     const fetchData = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/animal_id?cohort=${cohort}`)
+        const response = await fetch(`/api/animal_id?cohort=${cohort}`)
         if (!response.ok) {
           throw new Error('Server error');
         }
@@ -67,7 +67,7 @@ function App() {
 
 
   useEffect(() => {
-    axios.get('http://localhost:8000/sessions',
+    axios.get('/api/sessions',
       { params: { cohort: cohort, animal_id: animalID } })
       .then((response) => {
         setSessionIDList(response.data['session_id']);
@@ -82,7 +82,7 @@ function App() {
 
   const fetchPlotData = () => {
     if (sessionID) {
-      axios.get(`http://localhost:8000/trajectory/${sessionID}`,
+      axios.get(`/api/trajectory/${sessionID}`,
         { params: { shift: depthShift } })
         .then((response) => {
           setPlotData(response.data);
@@ -103,7 +103,7 @@ function App() {
   //Get firing rate data
   useEffect(() => {
     if (sessionID) {
-      axios.get(`http://localhost:8000/cell_metrics/${sessionID}`,
+      axios.get(`/api/cell_metrics/${sessionID}`,
         { params: { bin_size: binSize } })
         .then((response) => {
           setCellMetricsData(response.data);
@@ -125,7 +125,7 @@ function App() {
   }, [sessionID, binSize])
 
   const handleSave = () => {
-    axios.post('http://localhost:8000/save_shift', { shift: depthShift, session_id: sessionID })
+    axios.post('/api/save_shift', { shift: depthShift, session_id: sessionID })
       .then(() => {
         notifications.show({
           title: 'Info',

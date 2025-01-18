@@ -1,9 +1,3 @@
-FROM node:latest
-
-WORKDIR /app
-
-COPY . .
-
-RUN npm install
-
-CMD ["npm", "run", "host"]
+FROM nginx:alpine
+COPY ./dist /usr/share/nginx/html
+CMD ["nginx", "-g", "daemon off;"]

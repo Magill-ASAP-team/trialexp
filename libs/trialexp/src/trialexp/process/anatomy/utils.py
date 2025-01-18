@@ -391,7 +391,7 @@ def get_trajectory_areas(df_session, shift, root_path):
     if len(probe_idx) == 0:
         return None
 
-    atlas, structure_tree = load_ccf_data(Path('/mnt/Magill_Lab/Julien/ASAP/software/allenccf'))
+    atlas, structure_tree = load_ccf_data(Path(root_path)/'allenccf')
     channel_position = np.load(df.path/'processed/kilosort4/ProbeA/channel_positions.npy')
     
     probe_coords = trajectory2probe_coords(probe_ccf[probe_idx[0]], channel_position)

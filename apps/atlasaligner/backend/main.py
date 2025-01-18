@@ -19,7 +19,7 @@ df_session_info = build_session_info_cohort(root_path)
 
 print('Backend server starting')
 
-app = fastapi.FastAPI()
+app = fastapi.FastAPI(root_path='/api')
 app.state.df_session_info = df_session_info.query('neuropixels_sorted==True').sort_values('expt_datetime', ascending=False)
 
 app.add_middleware(
@@ -79,7 +79,7 @@ async def get_trajectory(session_id: str, shift:int = 0):
     return trajectory_areas[['acronym','depth_start','track_date','depth_end','name']].to_dict(orient='records')
 
 
-@app.get('/api/cell_metrics/{session_id}')
+@app.get('/cell_metrics/{session_id}')
 async def get_firing_rate(session_id:str, bin_size:int=0):
     df = app.state.df_session_info
     df = df.query(f"session_id=='{session_id}'")
