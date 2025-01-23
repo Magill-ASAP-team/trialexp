@@ -222,7 +222,6 @@ def zigzag_path(x0,y0,segment_length=1, height=1):
     
     # Create Path object
     zigzag_path = Path(vertices, codes)
-    
     # Create a PathPatch object
     patch = patches.PathPatch(zigzag_path, facecolor='none', edgecolor='k', lw=1,zorder=3, clip_on=False)
     
@@ -239,7 +238,6 @@ def add_compressed_mark(ax,x, y, h, w):
                [x - mw/2, y-h/2]])
     
     ax.add_patch(Polygon(xy, color='white', closed=True, zorder=3, clip_on=False))
-
     # draw the zigzag mark
     zigzag = zigzag_path(x-w*2,y, segment_length=w, height=h)
     ax.add_patch(zigzag)
@@ -269,8 +267,7 @@ def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected
         if draw_protected_region:
             ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
         label = specs.get('label', evt.replace('_', ' '))
-        ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
-            
+        ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')        
         cur_time += (post_time-pre_time)+padding
 
         ylim = ax.get_ylim()
@@ -313,7 +310,7 @@ def compute_ticks(extraction_specs):
     return ticks, ticks_labels
 
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,min_ylim=0.1,
                        ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
     
     if palette_colors is None:
@@ -351,8 +348,16 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
         sns.lineplot(df, x='time',y=signal_var, 
                     hue=hue, palette=palette, ax = ax, n_boot=100)
         
+        # avoid plotting error when signal is close to zero
+        # otherwise the zigzag mark will be very far away from the original axis
+        yrange = ax.get_ylim()[1] - ax.get_ylim()[0]
+
+        if yrange<min_ylim:
+            ax.set_ylim([-min_ylim, min_ylim]) #prevent the axis range become too low
+
         if ylim is not None:
             ax.set_ylim(ylim)
+       
         
         if ylabel is None:
             ylabel = 'z-scored dF/F'

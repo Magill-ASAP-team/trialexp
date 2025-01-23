@@ -172,8 +172,10 @@ def build_evt_fr_xarray(fr_xr, timestamps, trial_index, name, trial_window, bin_
     else:
         # Concatenate the timestamps
         timestamps = timestamps.dropna()
-        timestamps = timestamps.sum()
+        if len(timestamps)> 0:
+            timestamps = timestamps.sum() #concatenate list of lists
         trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
+
         
         da = xr.DataArray(
             trial_rates,

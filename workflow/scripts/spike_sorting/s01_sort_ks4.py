@@ -3,7 +3,6 @@ Script to compute cell metrics by CellExplorer from Kilosort3 results
 '''
 #%%
 import os
-import warnings
 
 import shutil
 
@@ -21,6 +20,12 @@ import settings
 import torch
 from trialexp.process.ephys.artifact_removal import filter_artifact_sensor
 from kilosort.io import BinaryFiltered
+from open_ephys.analysis import Session
+from scipy import signal
+import matplotlib.pylab as plt
+import numpy as np 
+from loguru import logger
+from trialexp.process.ephys.artifact_removal import plot_spectrogram
 
 #%% Load inputs
 spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
@@ -31,6 +36,7 @@ spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike
 
 sorter_name = 'kilosort4'
 verbose = True
+skip_sorted_session = True
 rec_properties_path = Path(sinput.rec_properties)
 session_path = rec_properties_path.parents[1]/'processed'
 session_id = rec_properties_path.parents[1].stem
@@ -43,6 +49,12 @@ root_data_path = os.environ['SORTING_ROOT_DATA_PATH']
 temp_sorter_folder = Path(os.environ['TEMP_DATA_PATH']) /session_id
 output_si_sorted_folder = Path(soutput.si_output_folder)
 
+#%% plot spectrogram to check for artifacts
+
+if skip_sorted_session and not Path(soutput.spectrogram).exists():
+    fig,ax =plot_spectrogram(rec_properties.iloc[idx_to_sort[0]], 30000, freq_pool_ratio=100);
+    fig.suptitle(session_id)
+    fig.savefig(soutput.spectrogram, dpi=300)
 # %%
 for idx_rec in idx_to_sort:
 
@@ -57,30 +69,30 @@ for idx_rec in idx_to_sort:
     else:
         raise ValueError(f'invalid probe name rec: {rec_properties_path.parent}')
 
-    # Define outputs folder, specific for each probe and sorter
-    temp_output_sorter_specific_folder = temp_sorter_folder / sorter_name / probe_name
-
-    # ephys_path = Path(rec_properties.full_path.iloc[idx_rec]).parents[4]
     
     # Maybe not the best method to get it
     # has introduced some bugs for forgotten reason related to folder changes
     # # TODO improve to join just before relative_ephys_path and root_data_path overlap
-    # relative_ephys_path = os.path.join(*ephys_path.parts[5:])
-    # ephys_path = os.path.join(root_data_path, relative_ephys_path)
     ephys_path = Path(rec_properties.full_path.iloc[idx_rec]).parts[-10:]
     
     recording_path = os.path.join(root_data_path, *ephys_path)
     
     if not (output_si_sorted_folder/probe_name).exists():
         (output_si_sorted_folder/probe_name).mkdir()
+    else:
+        # skip if the sorting has already been done
+        # used when we need to manually sort a certain session
+        if skip_sorted_session:
+            logger.info(f'Skipping {session_id} as it has already been sorted')
+            continue
     
     # use kilosort4 directly
     device = torch.device('cuda:0')
     settings = {'data_dir': recording_path, 
                 'n_chan_bin': 384, 
-                'batch_size' : 30000*8, # 8*Fs for speeding up, for bad session, use a smaller batch_size
+                'batch_size' : 30000*4, # 8*Fs for speeding up, for bad session, use a smaller batch_size
                 'save_extra_vars': True,
-                # 'tmax':1600,
+                # 'tmax':900, #for bad session, set the tmax manually
                 'results_dir': output_si_sorted_folder/probe_name}
     
     #####
@@ -96,5 +108,26 @@ for idx_rec in idx_to_sort:
 
 
 
-# %% free GPU memory
+# free GPU memory
 torch.cuda.empty_cache()
+Path(soutput.sorting_complete).touch() # for use during manual pipeline run
+
+# %% Manual clean up of unsorted sessions
+# base_search_folder = os.path.join(os.environ['SESSION_ROOT_DIR'], 
+#                             '2024_August_cohort',
+#                             'by_sessions',
+#                             'reaching_go_spout_bar_VR_April24')
+
+# # search to see if processed/kilosort4/ProbeA exists in the session folder
+# session_folders = Path(base_search_folder).glob('*')
+# for s in session_folders:
+#     if (s/'processed'/'kilosort4').exists() and not (s/'processed'/'kilosort4'/'ProbeA').exists():
+#         print(f'{s.stem} is not yet sorted. cleaning up')
+#         if (s/'processed'/'spike_sorting.done').exists():
+#             # remove the spike_sorting.done file
+#             (s/'processed'/'spike_sorting.done').unlink()
+        
+#         if (s/'processed'/'spike_workflow.done').exists():
+#             (s/'processed'/'spike_workflow.done').unlink()
+        
+# %%

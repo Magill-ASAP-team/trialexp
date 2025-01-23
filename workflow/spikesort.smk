@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# temp attempt, to move to .env 
-sorter_name = 'kilosort3'
-
 def rec_properties_input(wildcards):
     # determine if there is an ephys recording for that folder
     recording_csv = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/ephys/states.npy')
@@ -34,7 +31,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
 rule spike_all:
      # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    input: session2analyze(cohort=['2024_April_cohort'], tasks=['reaching_go_spout_bar_VR_April24'])
+    input: session2analyze(cohort=['2024_August_cohort'], tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule spike_sorting:
     input:
@@ -42,6 +39,7 @@ rule spike_sorting:
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
         si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
+        spectrogram = '{sessions}/{task_path}/{session_id}/processed/figures/spectrogram.png',
     threads: 96
     script:
         "scripts/spike_sorting/s01_sort_ks4.py"

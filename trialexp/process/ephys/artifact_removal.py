@@ -3,6 +3,8 @@ from kilosort.run_kilosort import get_run_parameters
 from scipy import signal
 import torchaudio
 import matplotlib.pylab as plt
+from open_ephys.analysis import Session
+from loguru import logger 
 
 def cascade_filter_coeff(blist, alist):
     # combine the filter coefficient together 
@@ -114,3 +116,50 @@ def filter_artifact_sensor(self, X, ops=None, ibatch=None):
         else:
             X = self.whiten_mat @ X
     return X
+
+def max_pooling(data, freq_pool=2):
+    # Downsample frequency dimension by taking max values in blocks
+    freq_size = data.shape[0]
+    new_freq_size = freq_size // freq_pool
+    data_reshaped = data[:new_freq_size*freq_pool, ...].reshape(new_freq_size, freq_pool, -1)
+    return data_reshaped.max(axis=1)
+
+
+def extract_samples_from_recording(rec2plot, Fs):
+    # Get the correct recording
+    session_path = Path(rec2plot.full_path).parents[1]
+    session_basepath = session_path.parents[1]
+    session = Session(session_basepath)
+    matched_recording = [r for r in session.recordings if Path(r.directory) == session_path]
+    if len(matched_recording) >0:
+        matched_recording = matched_recording[0]
+    else:
+        raise ValueError('Recording not found in the session')
+
+    # get raw data
+    Fs=30000
+    data = matched_recording.continuous[0]
+    data_length, chanN = data.samples.shape
+    chanSelect = np.arange(0,chanN,30)
+    samples = data.get_samples(start_sample_index=0, end_sample_index = data_length, selected_channels=chanSelect)
+    samples = signal.decimate(samples, 2, axis=0)
+    return data_length,samples
+
+
+def plot_spectrogram(rec2plot, Fs, freq_pool_ratio=100):
+    logger.debug('loading recording')
+    data_length, samples = extract_samples_from_recording(rec2plot, Fs)
+
+    logger.debug('Computing spectrogram')
+    f,t,Sxx = signal.spectrogram(samples[:,0], fs=Fs/2, nperseg=Fs, noverlap=Fs/2, return_onesided=True)
+    Sxxd = max_pooling(Sxx, freq_pool=freq_pool_ratio)
+    freqd = f[::freq_pool_ratio]
+
+    logger.debug('Plotting spectrogram')
+    fig,ax = plt.subplots(2,1, figsize=(8,3*2))
+    ax[0].imshow(Sxxd, cmap='gray', aspect='auto', interpolation='none', origin='lower',
+            extent=[t[0], t[-1], freqd[0], freqd[-1]])
+    ax[0].set(xlabel='Time(s)', ylabel='Frequency(Hz)')
+    # add axis label to imshow
+    ax[1].plot(Sxx.max(axis=0))
+    return fig,ax

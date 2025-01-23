@@ -327,3 +327,21 @@ def get_photom_config_info(xr_photometry):
     df_photom_info['1st min. baseline'] = df_photom_info['1st min. baseline'].round(2)
     return df_photom_info
    
+   
+def get_session_info(df_pycontrol, df_conditions):
+    df_info = pd.DataFrame(df_pycontrol.attrs.items(), columns=['info', 'value'])
+    
+    start_params = df_pycontrol[df_pycontrol.subtype=='run_start'].iloc[0].content
+    start_params = {k:v for k,v in start_params.items() if not k.endswith('___')}
+    df_start_params = pd.DataFrame(start_params.items(), columns=['info', 'value'])
+
+    user_param = df_pycontrol[df_pycontrol.subtype=='user_set'].content
+    user_param = [item for row in user_param for item in row.items()]
+    df_user_param = pd.DataFrame(user_param, columns=['variable','value'])
+
+    df_conditions.trial_outcome.value_counts()/len(df_conditions)
+    df_trial_outcome_counts = df_conditions.trial_outcome.value_counts(normalize=True).reset_index()
+    df_trial_outcome_counts.columns = ['trial_outcome', 'proportion']
+    df_trial_outcome_counts
+    
+    return df_info, df_start_params, df_user_param, df_trial_outcome_counts
