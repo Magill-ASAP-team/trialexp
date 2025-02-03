@@ -150,31 +150,21 @@
         }
     },
     "spontanous_reaching": {
-        "US_timer": {
-            "event_window": [
-                -500,
-                0
-            ],
-            "order": "only",
-            "padding": 300,
-            "label": "reward"
-
-        },
         "bar_off": {
             "event_window": [
                 0,
-                0
+                50
             ],
             "order": "last_before_first",
             "dependent_event": "spout",
-            "padding": 300,
+            "padding": 100,
             "label": "last bar off"
 
         },
         "spout": {
             "event_window": [
-                0,
-                300
+                -50,
+                0
             ],
             "order": "first",
             "padding": 0,
