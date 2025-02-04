@@ -692,3 +692,20 @@ def get_warping_specs(df_events_cond, df_conditions, specs_path):
         extraction_specs[trigger] = extraction_specs.pop('trigger')
         outcome2plot = df_conditions.trial_outcome.unique()
     return trigger,extraction_specs,outcome2plot
+
+def normalize_signal(data_array, baseline_period:list):
+    """
+    Normalize a signal by subtracting the baseline period mean.
+
+    Parameters:
+    data_array (xarray.DataArray): The input data array containing the signal to be normalized.
+    baseline_period (list): A list containing two elements [start_time, end_time] that define the period 
+                            over which the baseline mean is calculated.
+
+    Returns:
+    xarray.DataArray: The normalized data array with the baseline mean subtracted from the original signal.
+    """
+    # Substracting the baseline from the whole signal
+    baseline = data_array.sel(time=slice(baseline_period[0],baseline_period[1])).mean(dim='time',skipna=True)
+    da_norm = data_array-baseline
+    return da_norm
