@@ -32,7 +32,7 @@ tasks = tasks_params_df.task.values.tolist()
 skip_existing = True #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2024_August_cohort','2024_October_cohort','2025_January_cohort'] 
+cohort_to_copy = ['2025_January_cohort','2025_Feb_cohort'] 
 
 # %%
 
