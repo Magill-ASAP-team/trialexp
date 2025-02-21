@@ -59,13 +59,14 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
     extraction_specs = specs['reaching_go_spout_bar_reward']
     outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
     
-elif task_name in ['reaching_go_spout_bar_VR_April24']:
+elif task_name in ['reaching_go_spout_bar_VR_April24','reaching_go_spout_bar_VR_April24_silent']:
     extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
     outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     
 
 elif task_name in ['reaching_go_spout_incr_break2_nov22',
-                   'reaching_go_spout_incr_break2_April24']:
+                   'reaching_go_spout_incr_break2_April24',
+                   'reaching_go_spout_incr_break2_Feb25']:
     extraction_specs = specs['break2']
     outcome2plot = df_conditions.trial_outcome.unique()
 else:
