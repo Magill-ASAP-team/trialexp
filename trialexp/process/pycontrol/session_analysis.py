@@ -287,7 +287,8 @@ def compute_trial_outcome(row, task_name):
         else:
             return 'undefined'
     elif task_name in ['reaching_go_spout_bar_VR_April24',
-                       'reaching_go_spout_bar_VR_April24_silent']:
+                       'reaching_go_spout_bar_VR_April24_silent',
+                       'reaching_go_spout_bar_VR_Feb25']:
         if row.break_after_abort:
             return 'aborted'
         elif not row.spout:
@@ -475,7 +476,8 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
                         'reaching_go_spout_bar_june05',
                         'reaching_go_spout_bar_VR_Dec23',
                         'reaching_go_spout_bar_VR_April24',
-                        'reaching_go_spout_bar_VR_April24_silent']:
+                        'reaching_go_spout_bar_VR_April24_silent'
+                        'reaching_go_spout_bar_VR_Feb25']:
 
         if 'spout_trial_time' in df_events.columns and 'US_end_timer_trial_time' in df_events.columns:
 
