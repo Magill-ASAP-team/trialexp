@@ -31,8 +31,4 @@ cupy-cuda12x
 torchaudio
 reflex
 plotly-resampler
-'''
-Other installation requirement:
-You will need to install cudatool kit 12.1 for cupy to work
-conda install cuda -c nvidia/label/cuda-12.1.0
-'''
+scikit-posthocs
