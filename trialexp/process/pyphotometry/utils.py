@@ -1511,7 +1511,7 @@ def preprocess_photometry(data_photometry, df_pycontrol):
         animal_id = df_pycontrol.attrs['Subject ID'] 
         
     if animal_id in animal_info.index:
-        injection = animal_info.loc[animal_id].injection.split(';')
+        injection = animal_info.loc[animal_id].injection.strip().split(';')
         if len(injection) == 1:
             #single injection, skip all motion correction for now
             # TODO do motion correction for tdtomato
