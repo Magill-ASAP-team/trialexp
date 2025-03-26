@@ -131,7 +131,7 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         # warp the signal in the padding_len region
         t[cur_idx:(cur_idx+padding_len)] = np.linspace(cur_time, t_event+specs['event_window'][0], padding_len)
         cur_idx += padding_len
-        # cur_time = cur_time + padding
+        # cur_time = cur_time + padding # the original idea is only to compress the signal, never expand it
         cur_time = t_event+specs['event_window'][0]+1
 
         # copy the data around event

@@ -101,7 +101,7 @@
         },
         "spout": {
             "event_window": [
-                -50,
+                0,
                 500
             ],
             "order": "first",
