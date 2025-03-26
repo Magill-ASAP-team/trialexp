@@ -84,12 +84,20 @@ xr_conditions = xr.Dataset.from_dataframe(df_conditions)
 
 xa_list = []
 for signal_var in signal2analyze:
+    # xa, interp_results_list = lm.time_warp_data(df_events_cond[df_events_cond.trial_outcome=='success'], 
+    #                        xr_photometry[signal_var], 
+    #                        extraction_specs, 
+    #                        trigger,
+    #                        xr_photometry.attrs['sampling_rate'],
+    #                        verbose=True)
+    
     xa, interp_results_list = lm.time_warp_data(df_events_cond, 
                            xr_photometry[signal_var], 
                            extraction_specs, 
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
-                           verbose=False)
+                           verbose=True)
+                        
                         
     
     xa_list.append(xa)
@@ -129,11 +137,13 @@ xa_list.append(xa)
 
 #%% Save data
 xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
+xr_warped.attrs['extraction_specs'] = json.dumps(extraction_specs) # also store the spec for reference
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
 #%% check for valid trials
-valid_trials = np.all(~np.isnan(xr_warped['zscored_df_over_f'].data),axis=1)
-print('Ratio of valid trials:', np.sum(valid_trials)/len(valid_trials))
+xr_success  = xr_warped.sel(trial_nb=(xr_warped.trial_outcome=='success'))
+valid_trials = np.all(~np.isnan(xr_success['zscored_df_over_f'].data),axis=1)
+print('Ratio of valid successful trials:', np.sum(valid_trials)/len(valid_trials))
 
 #%% Plot the time wrapped data
 for var in signal2analyze:

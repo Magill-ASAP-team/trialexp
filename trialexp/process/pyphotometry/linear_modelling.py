@@ -89,7 +89,8 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     padding_len = int(padding/1000*sampling_rate)
     
     interp_result = {'interp_'+trigger:True} #the trigger is always found
-    
+    last_event = trigger
+    last_event_time = t_trigger
     # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
 
     # process the other events one by one
@@ -112,19 +113,26 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         '''
         Warp the inter-event period
         Raise error if the padding is too long
-        cur_time is pointing at the timestamp of last event
+        cur_time is pointing at the timestamp of last event + post-event window
         Note: there will be error when animal put its right paw on the holding bar. This will somtimes result
         in the spout happening before bar_off, thus searching for the last bar_off before the first spout will fail
         '''
 
         # TODO: handle this gracefully
-        if cur_time + padding > t_event+specs['event_window'][0]:
-            raise ValueError(f'Padding too long. {evt}  time diff: {cur_time + padding - t_event+specs["event_window"][0]}')
+        if (cur_time) > (t_event+specs['event_window'][0]):
+            raise ValueError(f'\nEvent:  {evt}.\n'
+                              'Error: no enough time to warp. \n'
+                            f'Last event: {last_event} \n'
+                            f'Time different from last event: {t_event-last_event_time}\n'
+                            f'Available time for warping: {t_event-cur_time} \n'
+                            f'Required min pre-event window: {-specs["event_window"][0]} \n'
+                            f'trial outcome: {df_trial.iloc[0].trial_outcome} \n')
 
         # warp the signal in the padding_len region
         t[cur_idx:(cur_idx+padding_len)] = np.linspace(cur_time, t_event+specs['event_window'][0], padding_len)
         cur_idx += padding_len
-        cur_time = cur_time + padding
+        # cur_time = cur_time + padding
+        cur_time = t_event+specs['event_window'][0]+1
 
         # copy the data around event
         event_window_time = specs['event_window'][1] - specs['event_window'][0]
@@ -135,6 +143,10 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         cur_time = cur_time + event_window_time
         padding = specs['padding']
         padding_len = int(specs['padding']/1000*sampling_rate)
+
+        last_event = evt
+        last_event_time = t_event
+        # Here both cur_idx and cur_time are right post event window but pre-padding
         # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
         
     # use linear interpolation to warp them
