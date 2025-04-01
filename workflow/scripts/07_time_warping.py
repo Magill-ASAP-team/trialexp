@@ -84,19 +84,13 @@ xr_conditions = xr.Dataset.from_dataframe(df_conditions)
 
 xa_list = []
 for signal_var in signal2analyze:
-    # xa, interp_results_list = lm.time_warp_data(df_events_cond[df_events_cond.trial_outcome=='success'], 
-    #                        xr_photometry[signal_var], 
-    #                        extraction_specs, 
-    #                        trigger,
-    #                        xr_photometry.attrs['sampling_rate'],
-    #                        verbose=True)
-    
+    # TODO: find a way to warp aborted trial differently
     xa, interp_results_list = lm.time_warp_data(df_events_cond, 
                            xr_photometry[signal_var], 
                            extraction_specs, 
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
-                           verbose=True)
+                           verbose=False)
                         
                         
     
