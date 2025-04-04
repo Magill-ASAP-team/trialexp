@@ -126,7 +126,7 @@ def build_session_info_cohort(root_path, load_pycontrol=False,
             raise ValueError('You need to set the parameters to extract')
         
         df_parameters = pd.concat([load_pycontrol_variables(p,pycontrol_parameters,param_extract_method) for p in paths])
-
+        df_parameters = df_parameters.drop_duplicates('session_id') #avoid many-to-many mapping for duplicated sessions
         
         #merge the paramteres to df_session_info
         df_session_info = df_session_info.merge(df_parameters, on='session_id')
