@@ -89,7 +89,8 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     padding_len = int(padding/1000*sampling_rate)
     
     interp_result = {'interp_'+trigger:True} #the trigger is always found
-    
+    last_event = trigger
+    last_event_time = t_trigger
     # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
 
     # process the other events one by one
@@ -112,19 +113,26 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         '''
         Warp the inter-event period
         Raise error if the padding is too long
-        cur_time is pointing at the timestamp of last event
+        cur_time is pointing at the timestamp of last event + post-event window
         Note: there will be error when animal put its right paw on the holding bar. This will somtimes result
         in the spout happening before bar_off, thus searching for the last bar_off before the first spout will fail
         '''
 
         # TODO: handle this gracefully
-        if cur_time + padding > t_event+specs['event_window'][0]:
-            raise ValueError(f'Padding too long. {evt}  time diff: {cur_time + padding - t_event+specs["event_window"][0]}')
+        if (cur_time) > (t_event+specs['event_window'][0]):
+            raise ValueError(f'\nEvent:  {evt}.\n'
+                              'Error: no enough time to warp. \n'
+                            f'Last event: {last_event} \n'
+                            f'Time different from last event: {t_event-last_event_time}\n'
+                            f'Available time for warping: {t_event-cur_time} \n'
+                            f'Required min pre-event window: {-specs["event_window"][0]} \n'
+                            f'trial outcome: {df_trial.iloc[0].trial_outcome} \n')
 
         # warp the signal in the padding_len region
         t[cur_idx:(cur_idx+padding_len)] = np.linspace(cur_time, t_event+specs['event_window'][0], padding_len)
         cur_idx += padding_len
-        cur_time = cur_time + padding
+        # cur_time = cur_time + padding # the original idea is only to compress the signal, never expand it
+        cur_time = t_event+specs['event_window'][0]+1
 
         # copy the data around event
         event_window_time = specs['event_window'][1] - specs['event_window'][0]
@@ -135,6 +143,10 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         cur_time = cur_time + event_window_time
         padding = specs['padding']
         padding_len = int(specs['padding']/1000*sampling_rate)
+
+        last_event = evt
+        last_event_time = t_event
+        # Here both cur_idx and cur_time are right post event window but pre-padding
         # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
         
     # use linear interpolation to warp them
@@ -222,7 +234,6 @@ def zigzag_path(x0,y0,segment_length=1, height=1):
     
     # Create Path object
     zigzag_path = Path(vertices, codes)
-    
     # Create a PathPatch object
     patch = patches.PathPatch(zigzag_path, facecolor='none', edgecolor='k', lw=1,zorder=3, clip_on=False)
     
@@ -239,7 +250,6 @@ def add_compressed_mark(ax,x, y, h, w):
                [x - mw/2, y-h/2]])
     
     ax.add_patch(Polygon(xy, color='white', closed=True, zorder=3, clip_on=False))
-
     # draw the zigzag mark
     zigzag = zigzag_path(x-w*2,y, segment_length=w, height=h)
     ax.add_patch(zigzag)
@@ -269,8 +279,7 @@ def add_warp_info(ax, extraction_specs,trigger, adjust_ylim=True, draw_protected
         if draw_protected_region:
             ax.axvspan(cur_time, cur_time+(post_time-pre_time), alpha=0.1,color=color)
         label = specs.get('label', evt.replace('_', ' '))
-        ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')
-            
+        ax.text(cur_time-pre_time-10, ax.get_ylim()[1], label, rotation = 90, ha='right', va='top')        
         cur_time += (post_time-pre_time)+padding
 
         ylim = ax.get_ylim()
@@ -313,7 +322,7 @@ def compute_ticks(extraction_specs):
     return ticks, ticks_labels
 
 
-def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
+def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,min_ylim=0.1,
                        ylabel=None,ax=None, hue='trial_outcome', palette_colors=None):
     
     if palette_colors is None:
@@ -351,8 +360,16 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,
         sns.lineplot(df, x='time',y=signal_var, 
                     hue=hue, palette=palette, ax = ax, n_boot=100)
         
+        # avoid plotting error when signal is close to zero
+        # otherwise the zigzag mark will be very far away from the original axis
+        yrange = ax.get_ylim()[1] - ax.get_ylim()[0]
+
+        if yrange<min_ylim:
+            ax.set_ylim([-min_ylim, min_ylim]) #prevent the axis range become too low
+
         if ylim is not None:
             ax.set_ylim(ylim)
+       
         
         if ylabel is None:
             ylabel = 'z-scored dF/F'
@@ -687,3 +704,20 @@ def get_warping_specs(df_events_cond, df_conditions, specs_path):
         extraction_specs[trigger] = extraction_specs.pop('trigger')
         outcome2plot = df_conditions.trial_outcome.unique()
     return trigger,extraction_specs,outcome2plot
+
+def normalize_signal(data_array, baseline_period:list):
+    """
+    Normalize a signal by subtracting the baseline period mean.
+
+    Parameters:
+    data_array (xarray.DataArray): The input data array containing the signal to be normalized.
+    baseline_period (list): A list containing two elements [start_time, end_time] that define the period 
+                            over which the baseline mean is calculated.
+
+    Returns:
+    xarray.DataArray: The normalized data array with the baseline mean subtracted from the original signal.
+    """
+    # Substracting the baseline from the whole signal
+    baseline = data_array.sel(time=slice(baseline_period[0],baseline_period[1])).mean(dim='time',skipna=True)
+    da_norm = data_array-baseline
+    return da_norm

@@ -37,7 +37,7 @@ try:
     pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
     data_photometry = import_ppd_auto(pyphotometry_file)
-    data_photmetry = preprocess_photometry(data_photometry, df_pycontrol)
+    data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
     
     # Convert to xarray
     skip_var = ['analog_1_est_motion','time',

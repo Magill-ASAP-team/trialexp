@@ -101,7 +101,7 @@
         },
         "spout": {
             "event_window": [
-                -50,
+                0,
                 500
             ],
             "order": "first",
@@ -149,32 +149,62 @@
             "label": "first spout"
         }
     },
-    "spontanous_reaching": {
-        "US_timer": {
+    "reaching_go_spout_bar_reward_tight": {
+        "hold_for_water": {
             "event_window": [
                 -500,
-                0
+                500
             ],
             "order": "only",
-            "padding": 300,
-            "label": "reward"
-
+            "padding": 500,
+            "label": "cue on"
         },
         "bar_off": {
             "event_window": [
-                0,
+                -200,
                 0
             ],
             "order": "last_before_first",
             "dependent_event": "spout",
-            "padding": 300,
+            "padding": 100,
+            "label": "reach start"
+        },
+        "spout": {
+            "event_window": [
+                0,
+                500
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "reach finish"
+        },
+        "US_delay_timer": {
+            "event_window": [
+                0,
+                1000
+            ],
+            "alternative": ["US_jackpot","US_omission"],
+            "order": "first",
+            "padding": 0,
+            "label": "reward\ndelivery"
+        }
+    },
+    "spontanous_reaching": {
+        "bar_off": {
+            "event_window": [
+                0,
+                50
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 100,
             "label": "last bar off"
 
         },
         "spout": {
             "event_window": [
-                0,
-                300
+                -50,
+                0
             ],
             "order": "first",
             "padding": 0,

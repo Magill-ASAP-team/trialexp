@@ -41,8 +41,10 @@ df_pycontrol.attrs['session_id'] = session_id
 #%% process lick events
 # check if lick event is in the pycontrol file, if not, try to analyze it from the analog signal
 lick_signal_path = list(path.glob('*_lick_analog.data*'))
+lick_events = df_pycontrol[df_pycontrol.content=='lick']
 
-if len(lick_signal_path)>0:
+if len(lick_events)<10 and len(lick_signal_path)>0:
+    # only do it if there is no lick detected using other means
     lick_signal_path = list(path.glob('*_lick_analog.data*'))[0]
     lick_ts_path = list(path.glob('*_lick_analog.time*'))[0]
     lick_on, lick_off, lick = analyze_lick_signal(lick_signal_path, lick_ts_path)
@@ -102,25 +104,3 @@ df_events_cond.to_pickle(soutput.event_dataframe)
 df_conditions.to_pickle(soutput.condition_dataframe)
 df_events_trials.to_pickle(soutput.trial_dataframe)
 
-
-# %%
-
-def get_session_info(df_pycontrol, df_conditions):
-    df_info = pd.DataFrame(df_pycontrol.attrs.items(), columns=['info', 'value'])
-    
-    start_params = df_pycontrol[df_pycontrol.subtype=='run_start'].iloc[0].content
-    start_params = {k:v for k,v in start_params.items() if not k.endswith('___')}
-    df_start_params = pd.DataFrame(start_params.items(), columns=['info', 'value'])
-
-    user_param = df_pycontrol[df_pycontrol.subtype=='user_set'].content
-    user_param = [item for row in user_param for item in row.items()]
-    df_user_param = pd.DataFrame(user_param, columns=['variable','value'])
-
-    df_conditions.trial_outcome.value_counts()/len(df_conditions)
-    df_trial_outcome_counts = df_conditions.trial_outcome.value_counts(normalize=True).reset_index()
-    df_trial_outcome_counts.columns = ['trial_outcome', 'proportion']
-    df_trial_outcome_counts
-    
-    return df_info, df_start_params, df_user_param, df_trial_outcome_counts
-
-df_info, df_start_params, df_user_param, df_trial_outcome_counts = get_session_info(df_pycontrol, df_conditions)

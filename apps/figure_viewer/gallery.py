@@ -51,6 +51,8 @@ def figure_server(input, output, session, figure_info):
         df_conditions = pd.DataFrame()
         df_info = pd.DataFrame()
         df_start_params = pd.DataFrame()
+        df_user_param = pd.DataFrame()
+        df_trial_outcome_counts = pd.DataFrame()
         
     #Each figure_server is a separate module, so function inside can access its own figure_info
     # basically it generate a different show_figure function and attached it to the card

@@ -31,3 +31,4 @@ cupy-cuda12x
 torchaudio
 reflex
 plotly-resampler
+scikit-posthocs

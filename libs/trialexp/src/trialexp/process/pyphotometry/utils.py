@@ -72,6 +72,7 @@ def denoise_filter(photometry_dict:dict, lowpass_freq, highpass_freq=None) -> di
     return photometry_dict
     
 def motion_correction_win(photometry_dict: dict) -> dict:
+    # use analog_2_filt to remove the motion artifact in analog_1_filt
 
     if any(['analog_1_filt' not in photometry_dict, 'analog_2_filt' not in photometry_dict]):
         raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
@@ -1510,19 +1511,28 @@ def preprocess_photometry(data_photometry, df_pycontrol):
         animal_id = df_pycontrol.attrs['Subject ID'] 
         
     if animal_id in animal_info.index:
-        injection = animal_info.loc[animal_id].injection.split(';')
-        if set(['Rdlight', 'rDA','tdTomato']) & set(injection):
-            logger.debug('Processing multicolor photometry')
-            if not 'analog_3' in data_photometry:
-                baseline_correction_multicolor(data_photometry)
-                data_photometry['motion_corrected'] = 1
+        injection = animal_info.loc[animal_id].injection.strip().split(';')
+        if len(injection) == 1:
+            #single injection, skip all motion correction for now
+            # TODO do motion correction for tdtomato
+            data_photometry['analog_1_corrected'] = data_photometry['analog_1_filt']
+            data_photometry['analog_2_corrected'] = data_photometry['analog_2_filt']
+            data_photometry['motion_corrected'] = 0
 
-            else:
-                # Do multicolor correction
-                data_photometry = motion_correction_multicolor(data_photometry)
-        else:    
-            data_photometry = motion_correction_win(data_photometry)
+        else:
+            if set(['Rdlight', 'rDA','tdTomato']) & set(injection):
+                logger.debug('Processing multicolor photometry')
+                if not 'analog_3' in data_photometry:
+                    baseline_correction_multicolor(data_photometry)
+                    data_photometry['motion_corrected'] = 1
+
+                else:
+                    # Do multicolor correction
+                    data_photometry = motion_correction_multicolor(data_photometry)
+            else:    
+                data_photometry = motion_correction_win(data_photometry)
     else:
+        #old data, use the old correction method
         data_photometry = motion_correction_win(data_photometry)
     
     
