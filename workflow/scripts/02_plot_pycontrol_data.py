@@ -41,5 +41,6 @@ fig,ax = plt.subplots(1,1,dpi=200)
 if 'break2' in df_pycontrol.attrs['task_name']:
     df_dprime = get_windowed_discriminability_score(df_pycontrol)
     sns.lineplot(df_dprime, x='time',y='dprime', ax=ax)
-    fig.savefig(soutput.discrim_scores)
+
+fig.savefig(soutput.discrim_scores)
 # %%
