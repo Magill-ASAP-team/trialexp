@@ -23,7 +23,6 @@ from trialexp.process.pycontrol import event_filters
 # %%
 df_event = pd.read_pickle(sinput.event_dataframe)
 df_conditions = pd.read_pickle(sinput.condition_dataframe)
-
 # %% Time between the bar off and first spout touch
 
 first_reach_travel_time = df_event.groupby('trial_nb').apply(event_filters.get_reach_travel_time)
@@ -42,3 +41,4 @@ xr_behaviour = xr_behaviour.expand_dims({'session_id':[df_event.attrs['session_i
 
 # %%
 xr_behaviour.to_netcdf(soutput.xr_behaviour, engine='h5netcdf')
+

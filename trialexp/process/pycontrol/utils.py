@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 import os
 from loguru import logger
 import scipy
+from scipy.stats import norm
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
@@ -1185,3 +1186,52 @@ def add_lick_events(df_pycontrol, lick_on, lick_off):
     df_pycontrol.attrs = attrs
     
     return df_pycontrol
+
+def get_discrminability_score(df_pycontrol, state1, state2, event='spout'):
+    # Calculate the discrminability score between action in the two states
+    cue_on = df_pycontrol[df_pycontrol.content==state1]
+    touch_rate = []
+
+    for _, row in cue_on.iterrows():
+        start_time = row.time
+        end_time = row.time + row.duration
+
+        df_states = df_pycontrol[(df_pycontrol.time>start_time) & (df_pycontrol.time<=end_time)]
+        num_events = len(df_states[df_states.content==event])
+        if row.duration>0:
+            touch_rate.append(num_events/(row.duration/1000)) # in event per second
+
+    touch_rate = np.array(touch_rate)
+    cue_off = df_pycontrol[df_pycontrol.content==state2]
+
+
+    touch_rate_off = []
+
+    for _, row in cue_off.iterrows():
+        start_time = row.time
+        end_time = row.time + row.duration
+
+        df_states = df_pycontrol[(df_pycontrol.time>start_time) & (df_pycontrol.time<=end_time)]
+        num_events = len(df_states[df_states.content==event])
+        if row.duration>0:
+            touch_rate_off.append(num_events/(row.duration/1000)) # in event per second
+
+    touch_rate_off = np.array(touch_rate_off[:len(touch_rate)])
+
+
+    # any reach in the respective period
+    # match the probability back to the z score
+    H = np.mean(touch_rate>0) #hit probability
+    F = np.mean(touch_rate_off>0) # false alarm
+    return norm.ppf(H) - norm.ppf(F), H, F
+
+def get_windowed_discriminability_score(df_pycontrol, window=3*60*1000):
+    # window should be in ms
+    # calculate the discriminability score in each window
+    df_pycontrol = df_pycontrol.copy() 
+    bins = np.arange(df_pycontrol.time.min(), df_pycontrol.time.max()+window, window)
+    df_pycontrol['discrim_bin'] = pd.cut(df_pycontrol.time, bins)
+    dprime = df_pycontrol.groupby('discrim_bin').apply(lambda df: get_discrminability_score(df, 'busy_win','short_break')[0])
+    t = [idx.left/1000 for idx in dprime.index]
+
+    return pd.DataFrame({'time': t, 'dprime':dprime.values})

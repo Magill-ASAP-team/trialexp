@@ -32,3 +32,4 @@ torchaudio
 reflex
 plotly-resampler
 scikit-posthocs
+rust-just

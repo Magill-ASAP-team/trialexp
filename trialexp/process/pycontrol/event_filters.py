@@ -151,3 +151,4 @@ def get_first_sig_bar_off_time(df_trial, min_off_time = 100):
         idx = np.where(interval>min_off_time)[0]
         if len(idx)>0:
             return bar_off.iloc[idx[0]].trial_time
+
