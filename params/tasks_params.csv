@@ -47,3 +47,4 @@
 45,reaching_go_spout_incr_break2_Feb25,busy_win,bar; bar_off; spout; US_end_timer;lick,spout; US_end_timer; button_press; busy_win,-1000;3000,spout;bar_off;lick;US_end_timer,
 46,reaching_go_spout_bar_VR_Feb25,hold_for_water,bar; bar_off; spout; US_end_timer;lick;US_delay_timer,Go_to_get_water; US_end_timer; break_after_abort; water_on; water by bar_off; water by spout; water for free; water success; button_press; busy_win_timer; spout; waiting_for_spout;US_jackpot;US_omission;US_random_water,-2000;3000,spout;bar_off;lick;US_random_water;US_end_timer,Reward;Extra reward
 47,pavlovian_2s_delay,CS_Go,bar;bar_off;reward_delay_timer;US_end_timer,,-2000;3000,bar_off;US_end_timer;CS_Go,
+48,cued_and_cued_reward_May25,busy_win,bar; bar_off; spout; US_end_timer;lick,spout; US_end_timer; button_press; busy_win,-1000;3000,spout;bar_off;lick;US_end_timer,
