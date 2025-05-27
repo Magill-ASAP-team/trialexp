@@ -815,6 +815,7 @@ def cal_dtw(da_norm, i):
 
 def plot_cell_waveforms(xa_waveforms, cluIDs, ncol=3, metrics=None, figsize_subplot=(3,3)):
     # plot the spike waveform of specified IDs
+    # xa_waveforms is assumed to have the dimension ['cluID', 'channels','waveform_time_idx']
 
     fig, axes = create_plot_grid(len(cluIDs), ncol, dpi=100, figsize_plot=figsize_subplot)
 
@@ -837,6 +838,8 @@ def plot_cell_waveforms(xa_waveforms, cluIDs, ncol=3, metrics=None, figsize_subp
 def prominence_score(w,axis):
     # ratio of the peak to peak to the standard deviation
     return np.log(np.max(np.ptp(w,axis=1)/(np.median(w,axis=1)+0.001),axis=1))
+
+
 
 def get_random_evt_data(xr_fr, da, trial_window, num_sample=1000):
     timestamps = sorted(np.random.choice(xr_fr.time, size=num_sample, replace=False))

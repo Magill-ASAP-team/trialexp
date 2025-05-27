@@ -8,6 +8,8 @@ import xarray as xr
 from trialexp.process.pycontrol import event_filters
 from pandas.api.types import infer_dtype
 from functools import partial
+from scipy.optimize import curve_fit
+import matplotlib.pylab as plt 
         
 def dataframe_cleanup(dataframe: pd.DataFrame):
     '''
@@ -31,10 +33,13 @@ def get_max_timestamps_from_probes(timestamp_files: list):
         max_ts[f_idx] = np.nanmax(synced_ts)
     return max(max_ts)
 
-def load_kilosort(ks_result_folder):
+def load_kilosort(ks_result_folder, skip_PC_feature=False):
     #load the results from kilosort
     ks_results = {}
     for f in Path(ks_result_folder).glob('*.npy'):
+        if skip_PC_feature and 'pc_features' in f.name:
+            continue
+
         ks_results[f.stem]=np.load(f, allow_pickle=True)
         
     for f in Path(ks_result_folder).glob('*.tsv'):
@@ -270,3 +275,58 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
 
     return df_aggregated
+
+
+def exp_decay(x, b0, b1):
+    return b0 * np.exp(-b1 * x)
+
+def fit_spatial_decay(tmp, chan_positions):
+    CHANNEL_TOLERANCE = 33
+    NUM_CHANNELS_FOR_FIT = 10
+
+    cb = np.argmax(np.ptp(tmp,axis=0)) # max. channel, similar to bombcell implementation
+    max_amp = np.max(np.abs(tmp),axis=0)
+
+    # only select channels there are close
+    candidates = (chan_positions[cb,0] - chan_positions[:,0])<CHANNEL_TOLERANCE
+
+    #calculate the relative distance from other channel to the max channel
+    distance = np.sqrt(np.sum((chan_positions[cb,:] - chan_positions)**2,axis=1))
+    sort_idx = np.argsort(distance)
+    
+    x_data = distance[sort_idx][:NUM_CHANNELS_FOR_FIT]
+    y_data = max_amp[sort_idx][:NUM_CHANNELS_FOR_FIT]
+
+    # Fit the model
+    popt, pcov = curve_fit(exp_decay, x_data, y_data, p0=(0.1, 0.1))  # initial guess for b1 and b2
+    
+    return popt, x_data, y_data
+
+def plot_spatial_decay_fit(popt, x_data, y_data):
+
+    y_fit = exp_decay(x_data, popt[0], popt[1])
+    
+    # Plot
+    plt.scatter(x_data, y_data, label='Data')
+    plt.plot(x_data, y_fit, color='red', label=f'Fit: {popt[0]:.2f} * exp(-{popt[1]:.2f} * x)')
+    plt.legend()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Exponential Fit')
+
+
+def compute_spatial_decay(sorting_result_folder, cluID):
+    cluster_labels = np.array([int(c.split('_')[-1]) for c in cluID]) #get the cluster label
+    sorting_result = load_kilosort(sorting_result_folder, skip_PC_feature=True)
+    if len(sorting_result.keys()) == 0:
+        raise FileNotFoundError(f'Error reaching the result folder, please check the path {sorting_result_folder}')
+    templates = sorting_result['templates']
+    chan_positions = sorting_result['channel_positions']
+
+    good_templates = templates[cluster_labels,:,:]
+
+    decay_coeff = np.zeros((good_templates.shape[0],))
+    for i in range(good_templates.shape[0]):
+        popt, _, _= fit_spatial_decay(good_templates[i,:,:], chan_positions)
+        decay_coeff[i] = popt[1]
+    return decay_coeff
