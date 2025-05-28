@@ -94,7 +94,7 @@ for probe_folder in kilosort_folder.glob('Probe*'):
                         bin_ms=1.0,
                         method="auto")
     isi =  analyzer.compute(input="isi_histograms",
-                         window_ms=50.0,
+                         window_ms=1000.0,
                          bin_ms=1.0,
                          method="auto")
 
