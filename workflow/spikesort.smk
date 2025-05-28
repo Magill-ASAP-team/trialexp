@@ -39,7 +39,7 @@ rule spike_sorting:
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
         si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
-        spectrogram = '{sessions}/{task_path}/{session_id}/processed/figures/spectrogram.png',
+        # spectrogram = '{sessions}/{task_path}/{session_id}/processed/figures/spectrogram.png',
     threads: 96
     script:
         "scripts/spike_sorting/s01_sort_ks4.py"
