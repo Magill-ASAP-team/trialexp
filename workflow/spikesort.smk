@@ -31,7 +31,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
 rule spike_all:
      # input: task2analyze(['reaching_go_spout_bar_nov22', 'reaching_go_spout_incr_break2_nov22','pavlovian_spontanous_reaching_march23'])
-    input: session2analyze(cohort=['2024_August_cohort'], tasks=['reaching_go_spout_bar_VR_April24'])
+    input: session2analyze(cohort=['2024_April_cohort'], tasks=['reaching_go_spout_bar_VR_April24'])
 
 rule spike_sorting:
     input:
