@@ -38,9 +38,11 @@ fig.savefig(soutput.reach_histogram, dpi=300)
 # %%
 # %% Also calculate the discriminative index for the break2 task
 fig,ax = plt.subplots(1,1,dpi=200)
-if 'break2' in df_pycontrol.attrs['task_name']:
-    df_dprime = get_windowed_discriminability_score(df_pycontrol)
+task_name = df_pycontrol.attrs['task_name'] 
+if 'break2' in task_name or 'cued_and_cued_reward' in task_name:
+    df_dprime = get_windowed_discriminability_score(df_pycontrol, window_sec=3*60)
     sns.lineplot(df_dprime, x='time',y='dprime', ax=ax)
+    ax.axhline(1,ls='--', color='gray')
 
 fig.savefig(soutput.discrim_scores)
 # %%
