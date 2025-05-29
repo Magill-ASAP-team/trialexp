@@ -200,8 +200,16 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
             if verbose:
                 print(f'Skipping trial {i}', e)
             
-        
-    xa = xr.concat(data_list,dim='trial_nb')
+    if len(data_list)>0: 
+        xa = xr.concat(data_list,dim='trial_nb')
+    else:
+        xa = xr.DataArray(
+            data=np.array([]).reshape(0, 0),
+            dims=['trial_nb', 'time'],
+            coords={'trial_nb': [], 'time': []},
+            attrs=xr_signal.attrs,
+            name = xr_signal.name
+        )
 
     return xa,interp_results_list
 
