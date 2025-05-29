@@ -1187,11 +1187,12 @@ def add_lick_events(df_pycontrol, lick_on, lick_off):
     
     return df_pycontrol
 
-def get_discrminability_score(df_pycontrol, state1, state2, event='spout'):
+def get_discrminability_score(df_pycontrol, on_state, off_state, event='spout'):
     # Calculate the discrminability score between action in the two states
-    cue_on = df_pycontrol[df_pycontrol.content==state1]
+    cue_on = df_pycontrol[df_pycontrol.content==on_state]
     touch_rate = []
 
+    # find the on state touch rate
     for _, row in cue_on.iterrows():
         start_time = row.time
         end_time = row.time + row.duration
@@ -1202,11 +1203,12 @@ def get_discrminability_score(df_pycontrol, state1, state2, event='spout'):
             touch_rate.append(num_events/(row.duration/1000)) # in event per second
 
     touch_rate = np.array(touch_rate)
-    cue_off = df_pycontrol[df_pycontrol.content==state2]
+    cue_off = df_pycontrol[df_pycontrol.content==off_state]
 
 
     touch_rate_off = []
 
+    # find the off state touch rate
     for _, row in cue_off.iterrows():
         start_time = row.time
         end_time = row.time + row.duration
@@ -1223,11 +1225,13 @@ def get_discrminability_score(df_pycontrol, state1, state2, event='spout'):
     # match the probability back to the z score
     H = np.mean(touch_rate>0) #hit probability
     F = np.mean(touch_rate_off>0) # false alarm
-    return norm.ppf(H) - norm.ppf(F), H, F
+    # return norm.ppf(H) - norm.ppf(F), H, F
+    return touch_rate.mean()/touch_rate_off.mean(), H, F
 
-def get_windowed_discriminability_score(df_pycontrol, window=3*60*1000):
+def get_windowed_discriminability_score(df_pycontrol, window_sec=3*60):
     # window should be in ms
     # calculate the discriminability score in each window
+    window = window_sec*1000
     df_pycontrol = df_pycontrol.copy() 
     bins = np.arange(df_pycontrol.time.min(), df_pycontrol.time.max()+window, window)
     df_pycontrol['discrim_bin'] = pd.cut(df_pycontrol.time, bins)
