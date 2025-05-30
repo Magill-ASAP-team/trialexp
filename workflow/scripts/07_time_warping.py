@@ -68,7 +68,8 @@ elif task_name in ['reaching_go_spout_bar_VR_April24',
 
 elif task_name in ['reaching_go_spout_incr_break2_nov22',
                    'reaching_go_spout_incr_break2_April24',
-                   'reaching_go_spout_incr_break2_Feb25']:
+                   'reaching_go_spout_incr_break2_Feb25',
+                   'cued_and_cued_reward_May25']:
     extraction_specs = specs['break2']
     outcome2plot = df_conditions.trial_outcome.unique()
 else:
