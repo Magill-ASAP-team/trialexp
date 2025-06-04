@@ -125,3 +125,5 @@ reports
 *.nc
 
 node_modules
+
+*.eeg-info
