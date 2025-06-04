@@ -30,7 +30,7 @@ def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2025_January_cohort','2025_Feb_cohort','2025_May_cohort'])
+    input: session2analyze(cohort=['2025_May_cohort','2025_January_cohort'])
 
 rule process_pycontrol:
     input:

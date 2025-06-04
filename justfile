@@ -17,7 +17,7 @@ find-data pattern:
 make-session SEARCH_TERM *FLAGS:
   #!/usr/bin/bash 
   #shebang is necessary otherwise it will be executed line by line indepedently
-  target=$(fd --type d --full-path '{{SEARCH_TERM}}.*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}$' $SESSION_ROOT_DIR)
+  target=$(fd --type d --full-path '{{SEARCH_TERM}}.*-[0-9]{6}$' $SESSION_ROOT_DIR)
   echo "$target" | while read line; do echo "$line"; done
   read -p "Are you sure you want to proceed? [y/N] " ans; \
   if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
@@ -29,13 +29,12 @@ make-session SEARCH_TERM *FLAGS:
 sort SEARCH_TERM *FLAGS:
     #!/usr/bin/bash 
     #shebang is necessary otherwise it will be executed line by line indepedently
-    target=$(fd --type d --full-path '{{SEARCH_TERM}}.*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}$' $SESSION_ROOT_DIR
+    target=$(fd --type d --full-path '{{SEARCH_TERM}}.*-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{6}$' $SESSION_ROOT_DIR)
     echo "$target" | while read line; do echo "$line"; done
     read -p "Are you sure you want to proceed? [y/N] " ans; \
     if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
         echo "Aborted."; exit 1; \
     fi
     targets=$(echo "$target" | awk '{printf "%s/processed/pycontrol_workflow.done ", $0}')
-    snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}} 
+    snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}}
 
-    

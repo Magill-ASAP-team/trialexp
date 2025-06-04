@@ -17,7 +17,6 @@ from pandas import Timestamp
 from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
 import warnings
-from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 import platform
 from dotenv import load_dotenv
 import os
