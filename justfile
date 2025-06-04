@@ -1,10 +1,10 @@
 # Run the full pipeline
 run-pipeline: copy-data
     # Run the Python file
-    snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime
+    uv run snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime
 
 copy-data:
-    python workflow/scripts/00_create_session_folders.py
+    uv run python workflow/scripts/00_create_session_folders.py
 
 # search for the pattern in the data folders
 find-session pattern:
@@ -24,7 +24,7 @@ make-session SEARCH_TERM *FLAGS:
       echo "Aborted."; exit 1; \
   fi
   targets=$(echo "$target" | awk '{printf "%s/processed/pycontrol_workflow.done ", $0}')
-  snakemake $targets --snakefile workflow/pycontrol.smk -c20 {{FLAGS}}
+  uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 {{FLAGS}}
 
 sort SEARCH_TERM *FLAGS:
     #!/usr/bin/bash 
@@ -36,5 +36,5 @@ sort SEARCH_TERM *FLAGS:
         echo "Aborted."; exit 1; \
     fi
     targets=$(echo "$target" | awk '{printf "%s/processed/pycontrol_workflow.done ", $0}')
-    snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}}
+    uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}}
 
