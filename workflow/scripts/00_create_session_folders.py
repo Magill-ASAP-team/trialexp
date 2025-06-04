@@ -18,6 +18,7 @@ from trialexp.utils.pyphotometry_utilities import match_photometry, parse_pyhoto
 from trialexp.utils.ephys_utilities import match_ephys, parse_openephys_folder, get_recordings_properties, create_ephys_rsync
 from trialexp.process.pycontrol.utils import auto_load_dotenv
 from loguru import logger
+print("Working directory:", os.getcwd())
 import settings
 
 #%% Retrieve all task names from the tasks_params.csv
