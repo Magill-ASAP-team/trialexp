@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from trialexp.process.pycontrol.utils import auto_load_dotenv
+from trialexp import config
 
 auto_load_dotenv()
 def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
@@ -25,7 +26,7 @@ def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
         for a in animals:
             for t in tasks:
                 total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', 
-                    sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/{a}'))        
+                    sessions = Path(config.SESSION_ROOT_DIR).glob(f'{c}/by_sessions/{t}/{a}'))        
 
     return total_sessions
 

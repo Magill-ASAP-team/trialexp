@@ -34,7 +34,7 @@ import settings
 
 verbose = True
 
-root_path = Path(os.environ['SESSION_ROOT_DIR'])
+root_path = Path(config.SESSION_ROOT_DIR)
 
 # Get probe names from folder path
 sorting_path = Path(sinput.xr_session).parent/'kilosort4'

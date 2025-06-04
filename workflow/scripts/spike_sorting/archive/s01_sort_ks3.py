@@ -37,8 +37,8 @@ rec_properties['sorting_error'] = False
 # Only select longest syncable recordings to sort
 idx_to_sort = rec_properties[(rec_properties.syncable == True) & (rec_properties.longest==True)].index.values
 
-root_data_path = os.environ['SORTING_ROOT_DATA_PATH']
-temp_sorter_folder = Path(os.environ['TEMP_DATA_PATH']) /session_id
+root_data_path = config.SORTING_ROOT_DATA_PATH
+temp_sorter_folder = Path(config.TEMP_DATA_PATH) /session_id
 output_si_sorted_folder = Path(soutput.si_output_folder)
 
 # %%

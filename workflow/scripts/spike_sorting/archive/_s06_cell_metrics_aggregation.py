@@ -24,7 +24,7 @@ import seaborn as sns
 sorter_name = 'kilosort3'
 verbose = True
 
-root_path = Path(os.environ['SESSION_ROOT_DIR'])
+root_path = Path(config.SESSION_ROOT_DIR)
 # Where to store globally computed figures
 clusters_figure_path = Path(os.environ['CLUSTERS_FIGURES_PATH'])
 # where to store global processed data

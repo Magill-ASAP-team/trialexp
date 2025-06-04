@@ -5,11 +5,11 @@ This repository contains the analysis pipeline for pycontrol, pyphotometry and N
 ## Installation
 This project manages its dependencis via uv
 1. Install `uv` following instruction [here](https://docs.astral.sh/uv/getting-started/installation/)
-2. At the project directory, run `uv sync`
+2. At the current project directory, run `uv sync`
 
 ## Usage
 This pipline uses [just](https://github.com/casey/just) to handle receipes to run the pipeline
-1. Run `just run-pipeline` to execute the full pipeline
+1. Run `just run-pipeline` to run the full pipeline
 2. To force rerun a certain session use `just make-session <search term> -F`  
  e.g. `just make-session TT021-2025-06-04 -F`
 

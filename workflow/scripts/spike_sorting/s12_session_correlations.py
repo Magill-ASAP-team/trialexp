@@ -34,7 +34,7 @@ from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr
 
 #%% Path definitions
 verbose = True
-root_path = Path(os.environ['SESSION_ROOT_DIR'])
+root_path = Path(config.SESSION_ROOT_DIR)
 
 #%% Loading files
 xr_spike_trial = xr.open_dataset(sinput.xr_spikes_trials) #file is huge, use lazy loading

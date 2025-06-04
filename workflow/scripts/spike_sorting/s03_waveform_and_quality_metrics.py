@@ -41,7 +41,7 @@ rec_properties_path = Path(sinput.rec_properties)
 kilosort_folder = Path(sinput.kilosort_folder)
 
 # Get the location of the recording
-root_data_path = Path(os.environ['SORTING_ROOT_DATA_PATH'])
+root_data_path = Path(config.SORTING_ROOT_DATA_PATH)
 
 
 #%%
