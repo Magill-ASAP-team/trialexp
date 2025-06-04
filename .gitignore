@@ -92,7 +92,6 @@ celerybeat-schedule
 # virtualenv
 .venv
 venv/
-ENV/
 
 # Spyder project settings
 .spyderproject
@@ -117,8 +116,6 @@ notebooks/noncanonical/nb20221018_130600_workflow_pyPhot_heatmap.ipynb
 .snakemake/
 reports
 
-
-.env
 *.mp4
 *.gif
 *.png
