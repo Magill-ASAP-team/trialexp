@@ -4,15 +4,13 @@ from trialexp.process.pycontrol.utils import auto_load_dotenv
 
 
 # Load environment variables from .env file
-# auto_load_dotenv()
-load_dotenv('env')
+load_dotenv('env/.env')
 
 # Pre-load environment variables from .env file
 SNAKEMAKE_DEBUG_ROOT = os.environ.get('SNAKEMAKE_DEBUG_ROOT')
 ETTIN_MOUNT_PATH = os.environ.get('ETTIN_MOUNT_PATH')
 SESSION_ROOT_DIR = os.environ.get('SESSION_ROOT_DIR')
 ETTIN_DATA_FOLDER = os.environ.get('ETTIN_DATA_FOLDER')
-
 # Deeplabcut
 VIDEO_DIR = os.environ.get('VIDEO_DIR')
 DLC_CONFIG_PATH = os.environ.get('DLC_CONFIG_PATH')
