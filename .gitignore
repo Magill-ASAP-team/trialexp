@@ -119,6 +119,7 @@ reports
 *.gif
 *.png
 *.nc
+.env
 
 node_modules
 
