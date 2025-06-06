@@ -2736,22 +2736,11 @@ wheels = [
 
 [[package]]
 name = "pymer4"
-version = "0.8.2"
+version = "0.9.2"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "joblib" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "patsy" },
-    { name = "rpy2" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "seaborn" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/98/7c7e844cd57b0a2c641b323f4842b14159997158d069f500ce119ccec6f4/pymer4-0.8.2.tar.gz", hash = "sha256:58b2af7a6fb69cad9c579920dd79ae7774f6d30857c07a7e8747275b0eaf257e", size = 133309 }
+sdist = { url = "https://files.pythonhosted.org/packages/01/e5/be115cff3d8e6575c3aed446a27fd786ed696f9bba11652a5f32982d20e1/pymer4-0.9.2.tar.gz", hash = "sha256:85715b642affd02fac4e26031aa5c31eafaa1ce72baab4bb67bb9c712b0b4ccf", size = 2399639 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/60/65d2bfdabe9534bc28fa78b310d0a71b6c5a2a4cdc487727fbd7cfed34b1/pymer4-0.8.2-py2.py3-none-any.whl", hash = "sha256:1cda5134a6fdb3fe7c199543078fda818caf598f4a257d8fdcc6821a4f74a52b", size = 136899 },
+    { url = "https://files.pythonhosted.org/packages/a5/0f/ef5bfc3951ba9f04ddcab48da9902f4f2f7c0dad89d714b176136a2d9c3b/pymer4-0.9.2-py3-none-any.whl", hash = "sha256:e1e2eb0bdb06610b8e7ff0f4caacac881d945a374ad9f70b5c102710bb5b31df", size = 2313219 },
 ]
 
 [[package]]
@@ -3337,18 +3326,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/92/00/426001ad8c36f1a9a76cc414489f3eab6750f34cf1fee5ec054dba8af07f/rpds_py-0.18.1-pp310-pypy310_pp73-musllinux_1_2_i686.whl", hash = "sha256:618916f5535784960f3ecf8111581f4ad31d347c3de66d02e728de460a46303c", size = 1306612 },
     { url = "https://files.pythonhosted.org/packages/07/e9/89e1f70ee6e32fd2c7f0829d9264b28683bcb4ddb54bcfff0fa4506bf629/rpds_py-0.18.1-pp310-pypy310_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:17c6d2155e2423f7e79e3bb18151c686d40db42d8645e7977442170c360194d4", size = 1281640 },
 ]
-
-[[package]]
-name = "rpy2"
-version = "3.5.17"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cffi" },
-    { name = "jinja2" },
-    { name = "packaging", marker = "sys_platform == 'win32'" },
-    { name = "tzlocal" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/65/85/f3bf48052106fd93e74bea512a43d3de48617953cba7e6dd40e8626f27f5/rpy2-3.5.17.tar.gz", hash = "sha256:dbff08c30f3d79161922623858a5b3b68a3fba8ee1747d6af41bc4ba68f3d582", size = 220963 }
 
 [[package]]
 name = "rust-just"
@@ -4207,7 +4184,6 @@ dependencies = [
     { name = "rfc3986-validator" },
     { name = "rich" },
     { name = "rpds-py" },
-    { name = "rpy2" },
     { name = "rust-just" },
     { name = "scikit-learn" },
     { name = "scipy" },
@@ -4455,7 +4431,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.10.2" },
     { name = "pydantic-core", specifier = "==2.27.1" },
     { name = "pygments", specifier = "==2.18.0" },
-    { name = "pymer4", specifier = "==0.8.2" },
+    { name = "pymer4", specifier = "==0.9.2" },
     { name = "pyparsing", specifier = "==3.1.2" },
     { name = "pyproject-hooks", specifier = "==1.2.0" },
     { name = "pyqt6", specifier = "==6.7.0" },
@@ -4489,7 +4465,6 @@ requires-dist = [
     { name = "rfc3986-validator", specifier = "==0.1.1" },
     { name = "rich", specifier = "==13.9.4" },
     { name = "rpds-py", specifier = "==0.18.1" },
-    { name = "rpy2", specifier = "==3.5.17" },
     { name = "rust-just", specifier = "==1.40.0" },
     { name = "scikit-learn", specifier = "==1.5.0" },
     { name = "scipy", specifier = "==1.13.1" },

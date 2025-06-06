@@ -1,3 +1,5 @@
+set dotenv-load	:= true #load the .env file for folder paths
+
 # Run the full pipeline
 run-pipeline: copy-data
     # Run the Python file
@@ -24,7 +26,7 @@ make-session SEARCH_TERM *FLAGS:
   if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
       echo "Aborted."; exit 1; \
   fi
-  targets=$(echo "$target" | awk '{printf "%s/processed/pycontrol_workflow.done ", $0}')
+  targets=$(echo "$target" | awk '{printf "%sprocessed/pycontrol_workflow.done ", $0}')
   uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 {{FLAGS}}
 
 #Search for and execute the sorting workflow in a session folder
@@ -37,6 +39,5 @@ sort SEARCH_TERM *FLAGS:
     if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
         echo "Aborted."; exit 1; \
     fi
-    targets=$(echo "$target" | awk '{printf "%s/processed/pycontrol_workflow.done ", $0}')
+    targets=$(echo "$target" | awk '{printf "%sprocessed/pycontrol_workflow.done ", $0}')
     uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}}
-

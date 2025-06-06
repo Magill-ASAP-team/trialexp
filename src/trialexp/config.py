@@ -4,7 +4,7 @@ from trialexp.process.pycontrol.utils import auto_load_dotenv
 
 
 # Load environment variables from .env file
-load_dotenv('env/.env')
+load_dotenv()
 
 # Pre-load environment variables from .env file
 SNAKEMAKE_DEBUG_ROOT = os.environ.get('SNAKEMAKE_DEBUG_ROOT')

@@ -8,7 +8,7 @@ This project manages its dependencis via uv
 2. At the current project directory, run `uv sync`
 
 ## Configurations
-The pipeline relies on a set of environmental variables for the directory location. Choose an example that is closest to your system under `env` folder, fill out the content and rename it to `.env`.
+The pipeline relies on a set of environmental variables for the directory location. Choose an example that is closest to your system under `env` folder, fill out the content and rename it to `.env`, and copy it to the project root e.g. as `trialexp\.env`.
 
 ## Usage
 This pipline uses [just](https://github.com/casey/just) to handle receipes to run the pipeline
