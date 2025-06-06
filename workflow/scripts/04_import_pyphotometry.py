@@ -12,14 +12,14 @@ import pandas as pd
 import numpy as np
 from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_event_time
-import settings
+from trialexp import config
 from pathlib import Path
 import pickle
 from datetime import datetime
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-   [settings.debug_folder + '/processed/xr_photometry.nc'],
+   [config.debug_folder + '/processed/xr_photometry.nc'],
   'import_pyphotometry')
 
  

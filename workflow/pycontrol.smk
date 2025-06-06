@@ -2,8 +2,7 @@ from glob import glob
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-from trialexp.process.pycontrol.utils import auto_load_dotenv
-from trialexp import config
+from trialexp.config import SESSION_ROOT_DIR #cannot import the root config module in snakefile
 
 load_dotenv()
 
@@ -26,8 +25,10 @@ def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
     for c in cohort:
         for a in animals:
             for t in tasks:
-                total_sessions+=expand('{sessions}/processed/pycontrol_workflow.done', 
-                    sessions = Path(config.SESSION_ROOT_DIR).glob(f'{c}/by_sessions/{t}/{a}'))     
+                session_paths = list(Path(SESSION_ROOT_DIR).glob(f'{c}/by_sessions/{t}/{a}'))
+                for session_path in session_paths:
+                    target_file = f"{str(session_path)}/processed/pycontrol_workflow.done"
+                    total_sessions.append(target_file)  
                 
     return total_sessions
 
@@ -41,7 +42,7 @@ rule process_pycontrol:
         event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
         condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
         pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
-        trial_dataframe = '{session_path}/{task}/{session_id}/processed/df_trials.pkl'
+        trial_dataframe = '{session_path}/{task}/{session_id}/processed/df_trials.pkl',
     script:
         'scripts/01_process_pycontrol.py'
 

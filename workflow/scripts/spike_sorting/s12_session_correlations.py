@@ -19,7 +19,7 @@ from snakehelper.SnakeIOHelper import getSnake
 from trialexp.process.ephys.utils import calculate_pearson_lags
 from trialexp.process.group_analysis.plot_utils import style_plot
 from trialexp.process.pyphotometry.utils import *
-import settings
+from trialexp import config
 import itertools
 from tqdm.auto import tqdm
 from loguru import logger
@@ -29,7 +29,7 @@ from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/xr_corr.nc'],
+  [config.debug_folder + r'/processed/xr_corr.nc'],
   'session_correlations')
 
 #%% Path definitions

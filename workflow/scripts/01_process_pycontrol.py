@@ -11,11 +11,11 @@ from trialexp.process.pycontrol.data_import import session_dataframe
 from datetime import datetime
 from snakehelper.SnakeIOHelper import getSnake
 from pathlib import Path
-import settings
+from trialexp import config
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-  [settings.debug_folder + '/processed/df_events_cond.pkl'],
+  [config.debug_folder + '/processed/df_events_cond.pkl'],
   'process_pycontrol')
 
 #%% Read pycontrol file

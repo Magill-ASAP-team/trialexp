@@ -2,7 +2,8 @@ from glob import glob
 from pathlib import Path
 import os 
 from dotenv import load_dotenv
-from trialexp import config
+from trialexp.config import SESSION_ROOT_DIR
+
 load_dotenv()
 
 def rec_properties_input(wildcards):
@@ -25,7 +26,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
     for c in cohort:
         for t in tasks:
-            total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(config.SESSION_ROOT_DIR).glob(f'{c}/by_sessions/{t}/*'))        
+            total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(SESSION_ROOT_DIR).glob(f'{c}/by_sessions/{t}/*'))        
 
     return total_sessions
 

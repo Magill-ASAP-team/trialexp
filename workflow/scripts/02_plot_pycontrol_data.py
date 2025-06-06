@@ -2,13 +2,13 @@
 import pandas as pd 
 from trialexp.process.pycontrol.plot_utils import *
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 from trialexp.process.pycontrol.utils import get_windowed_discriminability_score
 
 #%%
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-  [settings.debug_folder+'/processed/log/pycontrol.done'],'pycontrol_figures')
+  [config.debug_folder+'/processed/log/pycontrol.done'],'pycontrol_figures')
 
 #%%
 df_events_cond = pd.read_pickle(sinput.event_dataframe)

@@ -10,13 +10,13 @@ from scipy.interpolate import interp1d
 import seaborn as sns 
 import numpy as np
 import os
-import settings
+from trialexp import config
 from trialexp.process.pycontrol import event_filters
 
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-  [settings.debug_folder + '/processed/xr_behaviour.nc'],
+  [config.debug_folder + '/processed/xr_behaviour.nc'],
   'behavorial_analysis')
 
 

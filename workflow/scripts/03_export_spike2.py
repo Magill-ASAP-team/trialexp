@@ -5,7 +5,7 @@ Export event data to spike2
 import pandas as pd 
 from trialexp.process.pycontrol.utils import extract_v_line_v2, export_session_v2, get_sync_time
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 from re import match
 from pathlib import Path
 from trialexp.process.pyphotometry.utils import *
@@ -13,7 +13,7 @@ import os
 #%%
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-    [settings.debug_folder +'/processed/spike2_export.done'],
+    [config.debug_folder +'/processed/spike2_export.done'],
     'export_spike2')
 
 #%% Load data

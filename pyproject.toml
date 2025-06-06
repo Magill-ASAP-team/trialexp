@@ -3,7 +3,7 @@ name = "trialexp"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "alembic==1.14.0",
     "annotated-types==0.7.0",
@@ -278,7 +278,6 @@ dependencies = [
     "wsproto==1.2.0",
     "xarray==2024.6.0",
     "xyzservices==2024.6.0",
-    "yte==1.5.4",
     "zarr==2.17.2",
     "zipp==3.19.2",
     "zmq==0.0.0",

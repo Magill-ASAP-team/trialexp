@@ -8,12 +8,12 @@ import shutil
 import matlab.engine
 from snakehelper.SnakeIOHelper import getSnake
 
-import settings
+from trialexp import config
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/spike_metrics.done'],
+  [config.debug_folder + r'/processed/spike_metrics.done'],
   'spike_metrics_ks3')
 
 

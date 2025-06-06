@@ -15,13 +15,13 @@ from trialexp.process.ephys.utils import *
 from trialexp.process.group_analysis.plot_utils import style_plot
 from joblib import Parallel, delayed
 
-import settings 
+from trialexp import config 
 
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/cell_overview.done'],
+  [config.debug_folder + r'/processed/cell_overview.done'],
   'cell_overview_plot')
 
 

@@ -13,13 +13,13 @@ import pandas as pd
 import numpy as np
 
 from snakehelper.SnakeIOHelper import getSnake
-import settings
-import settings
+from trialexp import config
+from trialexp import config
 from trialexp.utils.ephys_utilities import create_ephys_rsync
 
 
 #%% Load inputs
-ephys_sync_done_path = str(Path(settings.debug_folder) / 'processed' / 'ephys_sync.done')
+ephys_sync_done_path = str(Path(config.debug_folder) / 'processed' / 'ephys_sync.done')
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
  [ephys_sync_done_path], 'ephys_sync')

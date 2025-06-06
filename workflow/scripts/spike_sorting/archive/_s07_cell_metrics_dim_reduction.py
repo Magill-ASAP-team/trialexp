@@ -12,12 +12,12 @@ from sklearn import manifold
 from sklearn.preprocessing import StandardScaler
 
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/cell_metrics_aggregation.done'],
+  [config.debug_folder + r'/processed/cell_metrics_aggregation.done'],
   'cell_metrics_aggregation')
 
 

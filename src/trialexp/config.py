@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from trialexp.process.pycontrol.utils import auto_load_dotenv
-
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,3 +26,6 @@ RAW_DATA_ROOT_DIR = os.environ.get('RAW_DATA_ROOT_DIR')
 ANATOMY_ROOT_DIR = os.environ.get('ANATOMY_ROOT_DIR')
 TEMP_DATA_PATH = os.environ.get('TEMP_DATA_PATH')
 
+session_id = 'TT018-2025-06-06-151339'
+debug_folder = list(Path(SESSION_ROOT_DIR).glob(f'*/by_sessions/*/{session_id}'))[0]
+debug_folder = str(debug_folder)

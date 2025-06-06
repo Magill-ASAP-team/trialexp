@@ -17,12 +17,12 @@ import plotly.graph_objects as go
 import seaborn as sns
 
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/cell_metrics_clustering.done'],
+  [config.debug_folder + r'/processed/cell_metrics_clustering.done'],
   'cell_metrics_clustering')
 
 

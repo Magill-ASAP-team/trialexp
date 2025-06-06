@@ -16,7 +16,7 @@ import spikeinterface.extractors as se
 import spikeinterface.sorters as ss
 from spikeinterface.core import select_segment_recording
 from kilosort import run_kilosort
-import settings
+from trialexp import config
 import torch
 from trialexp.process.ephys.artifact_removal import filter_artifact_sensor
 from kilosort.io import BinaryFiltered
@@ -28,7 +28,7 @@ from loguru import logger
 from trialexp.process.ephys.artifact_removal import plot_spectrogram
 
 #%% Load inputs
-spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
+spike_sorting_done_path = str(Path(config.debug_folder) / 'processed' / 'spike_sorting.done')
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
  [spike_sorting_done_path], 'spike_sorting')
 
