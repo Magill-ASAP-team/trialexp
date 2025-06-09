@@ -2,7 +2,7 @@ from shiny import App, reactive, ui, render
 from loguru import logger
 from trialexp.process.folder_org.utils import build_session_info_cohort, load_and_concat_dataset, filter_sessions
 import os
-from figure_viewer.gallery import gallery_server, gallery_ui
+from gallery import gallery_server, gallery_ui
 import pandas as pd
 
 # logger.debug('Reading sessions data from ettin...')
