@@ -21,13 +21,13 @@ from spikeinterface import qualitymetrics
 from trialexp.process.ephys.spikes_preprocessing import load_kilosort, add_ks_metadata
 from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_specific_uid, analyzer2dataframe
 import shutil
-import settings
+from trialexp import config
 import time
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/df_quality_metrics.pkl'],
+  [config.debug_folder + r'/processed/df_quality_metrics.pkl'],
   'waveform_and_quality_metrics')
 
 
@@ -41,7 +41,7 @@ rec_properties_path = Path(sinput.rec_properties)
 kilosort_folder = Path(sinput.kilosort_folder)
 
 # Get the location of the recording
-root_data_path = Path(os.environ['SORTING_ROOT_DATA_PATH'])
+root_data_path = Path(config.SORTING_ROOT_DATA_PATH)
 
 
 #%%

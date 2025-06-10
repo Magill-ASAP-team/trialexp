@@ -12,7 +12,7 @@ import pandas as pd
 import seaborn as sns 
 from matplotlib import pyplot as plt 
 import numpy as np
-import settings
+from trialexp import config
 import trialexp.process.pyphotometry.linear_modelling as lm
 from pathlib import Path
 import itertools
@@ -20,7 +20,7 @@ import trialexp.process.ephys.photom_correlation as pc
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + '/processed/xr_spikes_timewarped.nc'],
+  [config.debug_folder + '/processed/xr_spikes_timewarped.nc'],
   'spike_timewarp')
 
 # %% Load data

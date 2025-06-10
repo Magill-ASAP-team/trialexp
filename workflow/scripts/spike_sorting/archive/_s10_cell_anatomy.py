@@ -16,12 +16,12 @@ from matplotlib import gridspec
 from snakehelper.SnakeIOHelper import getSnake
 
 
-import settings
+from trialexp import config
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/ephys_anatomy.done'],
+  [config.debug_folder + r'/processed/ephys_anatomy.done'],
   'cell_anatomy')
 
 

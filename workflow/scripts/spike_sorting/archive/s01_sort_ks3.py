@@ -13,14 +13,14 @@ import numpy as np
 import pandas as pd
 
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 import spikeinterface.extractors as se
 import spikeinterface.sorters as ss
 from spikeinterface.core import select_segment_recording
 
-import settings
+from trialexp import config
 #%% Load inputs
-spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
+spike_sorting_done_path = str(Path(config.debug_folder) / 'processed' / 'spike_sorting.done')
 # print(spike_sorting_done_path)
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
  [spike_sorting_done_path], 'spike_sorting')
@@ -37,8 +37,8 @@ rec_properties['sorting_error'] = False
 # Only select longest syncable recordings to sort
 idx_to_sort = rec_properties[(rec_properties.syncable == True) & (rec_properties.longest==True)].index.values
 
-root_data_path = os.environ['SORTING_ROOT_DATA_PATH']
-temp_sorter_folder = Path(os.environ['TEMP_DATA_PATH']) /session_id
+root_data_path = config.SORTING_ROOT_DATA_PATH
+temp_sorter_folder = Path(config.TEMP_DATA_PATH) /session_id
 output_si_sorted_folder = Path(soutput.si_output_folder)
 
 # %%

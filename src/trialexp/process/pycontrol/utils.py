@@ -17,7 +17,6 @@ from pandas import Timestamp
 from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
 import warnings
-from trialexp.process.pycontrol.spike2_export import Spike2Exporter
 import platform
 from dotenv import load_dotenv
 import os
@@ -29,7 +28,7 @@ Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
 
 
-def auto_load_dotenv(workspace_dir=''):
+def auto_load_dotenv(workspace_dir='env'):
     #automatically local the correct dotenv file based on the platform
     # load_dotenv will search for the .env file incrementally higher up
     

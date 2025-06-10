@@ -15,14 +15,14 @@ import seaborn as sns
 from matplotlib import pyplot as plt 
 import numpy as np
 import os
-import settings
+from trialexp import config
 from joblib import Parallel, delayed
 import time
 from pathlib import Path
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-  [settings.debug_folder + '/processed/log/photometry.done'],
+  [config.debug_folder + '/processed/log/photometry.done'],
   'photometry_figure')
 
 

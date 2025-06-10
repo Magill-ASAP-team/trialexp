@@ -21,12 +21,12 @@ import spikeinterface.extractors as se
 from spikeinterface.core import select_segment_recording
 
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 from trialexp.process.ephys.utils import cellmat2xarray, denest_string_cell, session_and_probe_specific_uid, cellmat2dataframe
 
 xr.set_options(display_expand_attrs=False) # attrs is too long
 #%% Load inputs
-cell_metrics_processing_done_path = str(Path(settings.debug_folder) / 'processed' /'cell_metrics_full.nc')
+cell_metrics_processing_done_path = str(Path(config.debug_folder) / 'processed' /'cell_metrics_full.nc')
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
  [cell_metrics_processing_done_path], 'cell_metrics_processing')

@@ -11,14 +11,14 @@ import pandas as pd
 import seaborn as sns 
 from matplotlib import pyplot as plt 
 import numpy as np
-import settings
+from trialexp import config
 import trialexp.process.pyphotometry.linear_modelling as lm
 from pathlib import Path
 import json
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-  [settings.debug_folder + '/processed/xr_photom_timewarped.nc'],
+  [config.debug_folder + '/processed/xr_photom_timewarped.nc'],
   'time_warping')
 
 # %% Load data
@@ -61,7 +61,8 @@ elif task_name in ['reaching_go_spout_bar_VR_Dec23',
     
 elif task_name in ['reaching_go_spout_bar_VR_April24',
                    'reaching_go_spout_bar_VR_April24_silent',
-                   'reaching_go_spout_bar_VR_Feb25']:
+                   'reaching_go_spout_bar_VR_Feb25',
+                    'reaching_go_spout_bar_VR_cued_random_June25']:
     extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
     outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     

@@ -1,0 +1,318 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Restarted .venv (Python 3.9.19)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "61161e20-1be9-466f-91e2-e8ab6d015860",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/home/MRC.OX.AC.UK/ndcn1330/code/trialexp/.venv/lib/python3.11/site-packages/snakehelper/__init__.py:2: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.\n",
+      "  from pkg_resources import get_distribution, DistributionNotFound\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "/mnt/Magill_Lab/Julien/ASAP/Data/2025_May_cohort/by_sessions/reaching_go_spout_bar_VR_cued_random_June25/TT018-2025-06-06-151339\n"
+     ]
+    }
+   ],
+   "source": [
+    "import pandas as pd\n",
+    "import seaborn as sns\n",
+    "import numpy as np\n",
+    "from trialexp.process.pycontrol.session_analysis import *\n",
+    "from trialexp.process.pycontrol.utils import *\n",
+    "from trialexp.process.pycontrol.plot_utils import *\n",
+    "from trialexp.process.pycontrol.session_analysis import Session # do not look used\n",
+    "from trialexp.process.pycontrol.data_import import session_dataframe\n",
+    "from datetime import datetime\n",
+    "from snakehelper.SnakeIOHelper import getSnake\n",
+    "from pathlib import Path\n",
+    "from trialexp import config"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2f80e73a-27d1-499f-9bda-a461e6d924a1",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Changing working directory to:/home/MRC.OX.AC.UK/ndcn1330/code/trialexp\n",
+      "Created folder:/mnt/Magill_Lab/Julien/ASAP/Data/2025_May_cohort/by_sessions/reaching_go_spout_bar_VR_cued_random_June25/TT018-2025-06-06-151339/processed\n"
+     ]
+    }
+   ],
+   "source": [
+    "(sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',\n",
+    "  [config.debug_folder + '/processed/df_events_cond.pkl'],\n",
+    "  'process_pycontrol')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "872bc897-1a75-4ed8-8950-3da9c6479ac7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import seaborn as sns\n",
+    "import numpy as np\n",
+    "from trialexp.process.pycontrol.session_analysis import *\n",
+    "from trialexp.process.pycontrol.utils import *\n",
+    "from trialexp.process.pycontrol.plot_utils import *\n",
+    "from trialexp.process.pycontrol.session_analysis import Session # do not look used\n",
+    "from trialexp.process.pycontrol.data_import import session_dataframe\n",
+    "from datetime import datetime\n",
+    "from snakehelper.SnakeIOHelper import getSnake\n",
+    "from pathlib import Path\n",
+    "from trialexp import config"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fc14d08f-5f9d-4687-88dd-1a275078e5fc",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Changing working directory to:/home/MRC.OX.AC.UK/ndcn1330/code/trialexp\n"
+     ]
+    }
+   ],
+   "source": [
+    "(sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',\n",
+    "  [config.debug_folder + '/processed/df_events_cond.pkl'],\n",
+    "  'process_pycontrol')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b0e4ac80-e4d8-48e3-9f29-38c45dbbd553",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%%\n",
+    "import pandas as pd\n",
+    "import seaborn as sns\n",
+    "import numpy as np\n",
+    "from trialexp.process.pycontrol.session_analysis import *\n",
+    "from trialexp.process.pycontrol.utils import *\n",
+    "from trialexp.process.pycontrol.plot_utils import *\n",
+    "from trialexp.process.pycontrol.session_analysis import Session # do not look used\n",
+    "from trialexp.process.pycontrol.data_import import session_dataframe\n",
+    "from datetime import datetime\n",
+    "from snakehelper.SnakeIOHelper import getSnake\n",
+    "from pathlib import Path\n",
+    "from trialexp import config"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4a628029-5e2c-4e83-b265-e8bdcd1e2c9e",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Changing working directory to:/home/MRC.OX.AC.UK/ndcn1330/code/trialexp\n"
+     ]
+    }
+   ],
+   "source": [
+    "(sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',\n",
+    "  [config.debug_folder + '/processed/df_events_cond.pkl'],\n",
+    "  'process_pycontrol')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "31c4cd2e-5d25-4697-a574-7b5bf0a92b0f",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "/mnt/Magill_Lab/Julien/ASAP/Data/2025_May_cohort/by_sessions/reaching_go_spout_bar_VR_cued_random_June25/TT018-2025-06-06-151339/pycontrol\n"
+     ]
+    }
+   ],
+   "source": [
+    "path = Path(sinput.session_path, 'pycontrol')\n",
+    "print(path)\n",
+    "filename = list(path.glob('*.txt')) + list(path.glob('*.tsv'))\n",
+    "if len(filename)>1:\n",
+    "    raise ValueError('There are more than one pycontrol file there', filename)\n",
+    "\n",
+    "df_session = session_dataframe(filename[0])\n",
+    "df_pycontrol = parse_session_dataframe(df_session)\n",
+    "if df_pycontrol.attrs['framework_version'] in ['1.8.1','1.8']:\n",
+    "    session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S')\n",
+    "else:\n",
+    "    session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S.%f')\n",
+    "\n",
+    "\n",
+    "subjectID = df_pycontrol.attrs['subject_id']\n",
+    "task_name = df_pycontrol.attrs['task_name']\n",
+    "session_id = Path(sinput.session_path).name\n",
+    "\n",
+    "df_pycontrol.attrs['session_id'] = session_id"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e8180d17-91ab-45de-b23f-a17200d37fe7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# check if lick event is in the pycontrol file, if not, try to analyze it from the analog signal\n",
+    "lick_signal_path = list(path.glob('*_lick_analog.data*'))\n",
+    "lick_events = df_pycontrol[df_pycontrol.content=='lick']\n",
+    "\n",
+    "if len(lick_events)<10 and len(lick_signal_path)>0:\n",
+    "    # only do it if there is no lick detected using other means\n",
+    "    lick_signal_path = list(path.glob('*_lick_analog.data*'))[0]\n",
+    "    lick_ts_path = list(path.glob('*_lick_analog.time*'))[0]\n",
+    "    lick_on, lick_off, lick = analyze_lick_signal(lick_signal_path, lick_ts_path)\n",
+    "    # add lick back to pycontrol\n",
+    "    df_pycontrol = add_lick_events(df_pycontrol, lick_on, lick_off)\n",
+    "\n",
+    "    \n",
+    "df_pycontrol.to_pickle(soutput.pycontrol_dataframe)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "77116d23-660c-4c7f-aaaa-f15ba31a59f6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "tasks = pd.read_csv('params/tasks_params.csv', index_col=0)\n",
+    "\n",
+    "timelim = [1000, 4000] # in ms\n",
+    "\n",
+    "(conditions, triggers, events_to_process, \n",
+    "    trial_window, extra_trigger_events, trial_parameters) = get_task_specs(tasks,  task_name)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "411454e7-a082-406e-b95c-2de072ff7510",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/home/MRC.OX.AC.UK/ndcn1330/code/trialexp/src/trialexp/process/pycontrol/session_analysis.py:141: FutureWarning: Logical ops (and, or, xor) between Pandas objects and dtype-less sequences (e.g. list, tuple) are deprecated and will raise in a future version. Wrap the object in a Series, Index, or np.array before operating instead.\n",
+      "  if any(last_idx & idx):\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_pycontrol = df_pycontrol[~(df_pycontrol.subtype=='sync')] #remove the sync pulse\n",
+    "df_pycontrol  = print2event(df_pycontrol, conditions, trial_parameters)\n",
+    "\n",
+    "df_events_trials, df_events = extract_trial_by_trigger(df_pycontrol, triggers[0], \n",
+    "                                                       conditions+events_to_process+triggers+trial_parameters, \n",
+    "                                            trial_window, subjectID, session_time)\n",
+    "\n",
+    "df_conditions = compute_conditions_by_trial(df_events_trials, conditions)\n",
+    "df_conditions = add_trial_params(df_conditions, trial_parameters, df_events)\n",
+    "df_conditions = compute_success(df_events_trials, df_conditions,\n",
+    "                                  task_name, triggers, timelim)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "93592e39-289f-4664-aaef-da717d8289a3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_conditions['trial_outcome'] = df_conditions.apply(compute_trial_outcome, \n",
+    "                                                   task_name = df_pycontrol.attrs['task_name'],\n",
+    "                                                   axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "287ca3e3-8db6-4e00-be8d-47cfb79a4db8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_events_cond = df_events.merge(df_conditions, on='trial_nb')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f69af0fd-792c-47ea-8b3d-6f546759b423",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_events_cond.attrs.update(df_events.attrs)\n",
+    "df_events_cond.attrs.update(\n",
+    "    {'conditions': conditions,\n",
+    "     'triggers': triggers,\n",
+    "     'extra_event_triggers': extra_trigger_events, # used to average over additional events without considering the trial structure\n",
+    "     'events_to_process': events_to_process}\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "46803067-0756-4598-b326-b2ede2d64d73",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_events_cond.to_pickle(soutput.event_dataframe)\n",
+    "df_conditions.to_pickle(soutput.condition_dataframe)\n",
+    "df_events_trials.to_pickle(soutput.trial_dataframe)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": ".venv",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.9.19"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
