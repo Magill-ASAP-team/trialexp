@@ -219,30 +219,39 @@
                 200
             ],
             "order": "only",
-            "padding": 20,
+            "padding": 100,
             "label": "cue"
 
         },
         "bar_off": {
             "event_window": [
                 -100,
-                100
+                0
             ],
             "order": "last_before_first",
             "dependent_event": "spout",
-            "padding": 50,
-            "label": "last bar off"
+            "padding": 100,
+            "label": "reach start"
 
         },
         "spout": {
             "event_window": [
-                -50,
+                0,
                 300
             ],
             "order": "first",
             "padding": 0,
-            "label": "first spout"
+            "label": "reach finish"
 
+        },
+          "US_delay_timer": {
+            "event_window": [
+                0,
+                1000
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "reward\ndelivery"
         }
     },
     "default": {

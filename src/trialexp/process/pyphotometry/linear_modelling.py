@@ -364,7 +364,6 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,m
         
         palette = {k:palette_colors[i] for i,k in enumerate(outcomes)}
         
-
         sns.lineplot(df, x='time',y=signal_var, 
                     hue=hue, palette=palette, ax = ax, n_boot=100)
         
@@ -382,7 +381,7 @@ def plot_warpped_data(xa_cond, signal_var, extraction_specs,trigger, ylim=None,m
         if ylabel is None:
             ylabel = 'z-scored dF/F'
         sns.move_legend(ax, "upper right", bbox_to_anchor=(1.25,1),title=None, frameon=False)
-        ax.set(xlabel='Time around events (ms)', ylabel = ylabel, xlim=[-500,2300])
+        ax.set(xlabel='Time around events (ms)', ylabel = ylabel)
         
         # add in the warp information
         

@@ -72,7 +72,7 @@ elif task_name in ['reaching_go_spout_incr_break2_nov22',
                    'reaching_go_spout_incr_break2_Feb25',
                    'cued_and_cued_reward_May25']:
     extraction_specs = specs['break2']
-    outcome2plot = df_conditions.trial_outcome.unique()
+    outcome2plot = ['success', 'no_reach', 'late_reach']
 else:
     extraction_specs = specs['default']
     #update the trigger
@@ -153,7 +153,7 @@ for var in signal2analyze:
         xr2plot = xr_warped.sel(trial_nb = xr_warped.trial_outcome.isin(outcome))
         lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
         
-    # fig.tight_layout()
+    fig.tight_layout()
     fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
 
