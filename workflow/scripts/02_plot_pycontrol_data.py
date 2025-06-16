@@ -3,7 +3,7 @@ import pandas as pd
 from trialexp.process.pycontrol.plot_utils import *
 from snakehelper.SnakeIOHelper import getSnake
 from trialexp import config
-from trialexp.process.pycontrol.utils import get_windowed_discriminability_score
+from trialexp.process.pycontrol.utils import get_windowed_discriminability_score, discrminability_before_after
 
 #%%
 
@@ -35,7 +35,6 @@ sns.histplot(reach_t,bins = 50, binrange=[0,500], ax=ax)
 ax.set(xlabel='Reach time (ms)')
 fig.savefig(soutput.reach_histogram, dpi=300)
 
-# %%
 # %% Also calculate the discriminative index for the break2 task
 fig,ax = plt.subplots(1,1,dpi=200)
 task_name = df_pycontrol.attrs['task_name'] 
@@ -45,4 +44,10 @@ if 'break2' in task_name or 'cued_and_cued_reward' in task_name:
     ax.axhline(1,ls='--', color='gray')
 
 fig.savefig(soutput.discrim_scores)
+# %%
+
+# df_discrim = discrminability_before_after(df_pycontrol, windows=(-2000,2000))
+# df_discrim['cue_time'] = pd.to_timedelta(df_discrim['cue_time'], unit='ms')
+# df_discrim = df_discrim.set_index('cue_time')
+# df_discrim.resample('5min').mean()
 # %%

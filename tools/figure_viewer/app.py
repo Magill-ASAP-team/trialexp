@@ -15,7 +15,7 @@ app_ui = ui.page_sidebar(
         ui.input_select("cohort", "Select cohort", choices=[]),
         ui.input_checkbox_group('animal_id', 'Animals', choices=[]),
         ui.input_checkbox_group('task_name', 'Task', choices=[]),
-        ui.input_radio_buttons('modality', 'Modality', choices =['Photometry', 'Neuropixels']),
+        ui.input_radio_buttons('modality', 'Modality', choices =['Photometry', 'Neuropixels', 'Behaviour']),
         ui.input_radio_buttons('figure_list', 'Figures', choices=[0,1]),
         ui.input_action_button('plot_btn', 'Plot figures'),
         width=600        
@@ -68,9 +68,12 @@ def server(input, output, session):
             for p in df.path:
                 figure_names += list((p/'processed'/'figures'/'photometry').glob('*.png'))
                 figure_names += list((p/'processed'/'figures'/'timewarp').glob('*.png'))
-        else:
+        elif input.modality() == 'Neuropixels':
             for p in df.path:
                 figure_names += list((p/'processed'/'figures'/'ephys').rglob('*.png'))
+        else:
+            for p in df.path:
+                figure_names += list((p/'processed'/'figures').glob('*.png'))
 
         
         figure_names = [f.name for f in figure_names]
