@@ -55,8 +55,8 @@ rule pycontrol_figures:
     output:
         event_histogram = report('{session_path}/{task}/{session_id}/processed/figures/event_histogram_{session_id}.png', 
                                     caption='report/event_histogram.rst', category='Plots' ),
-        reach_histogram = '{session_path}/{task}/{session_id}/processed/figures/reach_histogram_{session_id}.png',
-        discrim_scores  = '{session_path}/{task}/{session_id}/processed/figures/discrim_score_{session_id}.png',
+        reach_histogram = '{session_path}/{task}/{session_id}/processed/figures/reach_histogram.png',
+        discrim_scores  = '{session_path}/{task}/{session_id}/processed/figures/discrim_score.png',
         rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/pycontrol.done')
     script:
         'scripts/02_plot_pycontrol_data.py'
