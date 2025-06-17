@@ -50,8 +50,18 @@ try:
 except IndexError:
     has_photometry = False
 
+#%% Also add lick rate as another variables
+lick_on = df_event[df_event.content=='lick'].time
 
+lick_rate,_ = np.histogram(lick_on, dataset.time)
+lick_rate = np.append(lick_rate, lick_rate[-1]) # make sure the size are the same as
 
+# calculate the rolling mean lick rate
+lick_bin_size = 0.2 # in seconds
+win_size = int(lick_bin_size*dataset.attrs['sampling_rate'])
+lick_rate = np.convolve(lick_rate, np.ones(win_size)/win_size, mode='same')*dataset.attrs['sampling_rate']
+
+dataset['lick_rate'] = xr.DataArray(lick_rate, dims=['time'], coords={'time':dataset.time})
 # %% synchornize pyphotometry with pycontrol
 
 # Add in the relative time to different events
@@ -76,6 +86,10 @@ if has_photometry:
         
     if 'zscored_df_over_f_analog_3' in dataset:
         var2add.append('zscored_df_over_f_analog_3')
+    
+    if 'lick_rate' in dataset:
+        var2add.append('lick_rate')
+
 
 
     for var in var2add:
