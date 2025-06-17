@@ -1238,3 +1238,21 @@ def get_windowed_discriminability_score(df_pycontrol, window_sec=3*60):
     t = [idx.left/1000 for idx in dprime.index]
 
     return pd.DataFrame({'time': t, 'dprime':dprime.values})
+ 
+
+def discrminability_before_after(df_pycontrol, windows=(-1000,1000), event_name='busy_win'):
+    # use the touch rate before and after cue as the discrminability score
+    busy_win_time = df_pycontrol[df_pycontrol.content==event_name].time
+    spout_time = df_pycontrol[df_pycontrol.content == 'spout']
+    
+    before_reach = np.zeros_like(busy_win_time)
+    after_reach = np.zeros_like(busy_win_time)
+    for i,t in enumerate(busy_win_time):
+      before_reach[i] = len(spout_time[(spout_time.time<=t) & (spout_time.time> (t+windows[0]))])
+      after_reach[i] = len(spout_time[(spout_time.time>=t) & (spout_time.time< (t+windows[1]))])
+
+    return pd.DataFrame({
+      'cue_time':busy_win_time,
+      'before_cue_reach': before_reach,
+      'after_cue_reach': after_reach 
+    })
