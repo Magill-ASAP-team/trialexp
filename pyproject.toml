@@ -264,19 +264,21 @@ dependencies = [
     "zmq==0.0.0",
 ]
 [project.optional-dependencies]
-sort = [
+full = [
     "torch",
     "torchaudio",
     "kilosort",
+    "snakemake==7.32.0",
+    "snakehelper",
 ]
 
 [tool.uv.sources]
-snakehelper = { git = "https://github.com/teristam/snakehelper.git", rev = "2f1cd158bfa0d79eb6e10178370b4f7ef89d4c8a" }
+snakehelper = { git = "https://github.com/teristam/snakehelper.git"}
 torch = [
-  { index = "pytorch-cu118", extra="sort" },
+  { index = "pytorch-cu118", extra="full" },
 ]
 torchaudio = [
-  { index = "pytorch-cu118", extra="sort"},
+  { index = "pytorch-cu118", extra="full"},
 ]
 
 
