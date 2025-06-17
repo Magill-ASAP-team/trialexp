@@ -6,6 +6,7 @@ This repository contains the analysis pipeline for pycontrol, pyphotometry and N
 This project manages its dependencis via uv
 1. Install `uv` following instruction [here](https://docs.astral.sh/uv/getting-started/installation/)
 2. At the current project directory, run `uv sync`
+   1. For gpu support do `uv sync --extra gpu`
 
 ## Configurations
 The pipeline relies on a set of environmental variables for the directory location. Choose an example that is closest to your system under `env` folder, fill out the content and rename it to `.env`, and copy it to the project root e.g. as `trialexp\.env`.
