@@ -272,6 +272,24 @@ dependencies = [
 
 [tool.uv.sources]
 snakehelper = { git = "https://github.com/teristam/snakehelper.git", rev = "2f1cd158bfa0d79eb6e10178370b4f7ef89d4c8a" }
+torch = [
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-cu118", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-cu118", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]
