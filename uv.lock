@@ -556,12 +556,6 @@ wheels = [
 ]
 
 [[package]]
-name = "datrie"
-version = "0.8.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9d/fe/db74bd405d515f06657f11ad529878fd389576dca4812bea6f98d9b31574/datrie-0.8.2.tar.gz", hash = "sha256:525b08f638d5cf6115df6ccd818e5a01298cd230b2dac91c8ff2e6499d18765d", size = 63278, upload-time = "2020-03-26T03:31:53.681Z" }
-
-[[package]]
 name = "debugpy"
 version = "1.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3227,47 +3221,6 @@ wheels = [
 ]
 
 [[package]]
-name = "snakehelper"
-version = "0.0.post0.dev21+g2f1cd15"
-source = { git = "https://github.com/teristam/snakehelper.git?rev=2f1cd158bfa0d79eb6e10178370b4f7ef89d4c8a#2f1cd158bfa0d79eb6e10178370b4f7ef89d4c8a" }
-dependencies = [
-    { name = "snakemake" },
-]
-
-[[package]]
-name = "snakemake"
-version = "7.25.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "appdirs" },
-    { name = "configargparse" },
-    { name = "connection-pool" },
-    { name = "datrie" },
-    { name = "docutils" },
-    { name = "gitpython" },
-    { name = "humanfriendly" },
-    { name = "jinja2" },
-    { name = "jsonschema" },
-    { name = "nbformat" },
-    { name = "psutil" },
-    { name = "pulp" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "reretry" },
-    { name = "smart-open" },
-    { name = "stopit" },
-    { name = "tabulate" },
-    { name = "throttler" },
-    { name = "toposort" },
-    { name = "wrapt" },
-    { name = "yte" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/99/db/15229fefe6100958a77d4acf95e0b244c9c1e7cdfd6f4ac0aa67be1ff63a/snakemake-7.25.0.tar.gz", hash = "sha256:98982c210a2077e54a4e58eba11ed7811dd91885d63782d760f21837f4ff35cd", size = 353963, upload-time = "2023-03-23T07:33:58.398Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/aa/fb0e493cd769cc4fb7f6ba60a0215d47f22f02bb05601286de21c48eaaf1/snakemake-7.25.0-py3-none-any.whl", hash = "sha256:b103e87d749e2d4be7ba31c913a2d471fd8e5a37a953f986bc9ede4bf96a253a", size = 366092, upload-time = "2023-03-23T07:33:56.145Z" },
-]
-
-[[package]]
 name = "sniffio"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3675,7 +3628,6 @@ dependencies = [
     { name = "dask" },
     { name = "dask-expr" },
     { name = "datashader" },
-    { name = "datrie" },
     { name = "debugpy" },
     { name = "decorator" },
     { name = "defusedxml" },
@@ -3846,8 +3798,6 @@ dependencies = [
     { name = "six" },
     { name = "smart-open" },
     { name = "smmap" },
-    { name = "snakehelper" },
-    { name = "snakemake" },
     { name = "sniffio" },
     { name = "sonpy" },
     { name = "soupsieve" },
@@ -3946,7 +3896,6 @@ requires-dist = [
     { name = "dask", specifier = "==2024.8.0" },
     { name = "dask-expr", specifier = "==1.1.10" },
     { name = "datashader", specifier = "==0.16.3" },
-    { name = "datrie", specifier = "==0.8.2" },
     { name = "debugpy", specifier = "==1.8.1" },
     { name = "decorator", specifier = "==5.1.1" },
     { name = "defusedxml", specifier = "==0.7.1" },
@@ -4118,8 +4067,6 @@ requires-dist = [
     { name = "six", specifier = "==1.16.0" },
     { name = "smart-open", specifier = "==7.0.4" },
     { name = "smmap", specifier = "==5.0.1" },
-    { name = "snakehelper", git = "https://github.com/teristam/snakehelper.git?rev=2f1cd158bfa0d79eb6e10178370b4f7ef89d4c8a" },
-    { name = "snakemake", specifier = "==7.25.0" },
     { name = "sniffio", specifier = "==1.3.1" },
     { name = "sonpy", specifier = "==1.9.5" },
     { name = "soupsieve", specifier = "==2.5" },
@@ -4510,20 +4457,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/12/ca/257bd311f5399bfb69765492e57e714aec8d503a3b44b9e695a47feb8c40/xyzservices-2024.6.0.tar.gz", hash = "sha256:58c1bdab4257d2551b9ef91cd48571f77b7c4d2bc45bf5e3c05ac97b3a4d7282", size = 1131290, upload-time = "2024-06-06T10:26:49.957Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5f/51/c106f095c33de0b833d3823fbab3383248476b3a9fd4dcd59ba01d950361/xyzservices-2024.6.0-py3-none-any.whl", hash = "sha256:fecb2508f0f2b71c819aecf5df2c03cef001c56a4b49302e640f3b34710d25e4", size = 83928, upload-time = "2024-06-06T10:26:47.613Z" },
-]
-
-[[package]]
-name = "yte"
-version = "1.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "dpath" },
-    { name = "plac" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/79/2d/e397aba1d413e6141ee52e495600d613d77e7d3d89270eda9c60818139bc/yte-1.7.0.tar.gz", hash = "sha256:d9cadcb597128490356a8260842fd71bf3145fa4ee633ecc4023f53a6b3f646d", size = 6849, upload-time = "2025-02-24T18:44:49.966Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/44/b813873f367abf85c76cc16598e64c37d431609fe78357c77f293a816784/yte-1.7.0-py3-none-any.whl", hash = "sha256:ebe106c97544e90068b57edd90ee552cefc42cd6421e76065c6c6aa0f5a93308", size = 8787, upload-time = "2025-02-24T18:44:49.043Z" },
 ]
 
 [[package]]
