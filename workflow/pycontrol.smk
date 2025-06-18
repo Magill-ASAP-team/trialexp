@@ -35,6 +35,17 @@ def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
 rule pycontrol_all:
     input: session2analyze(cohort=['2025_May_cohort','2025_January_cohort'])
 
+'''
+Ach/DA cohort
+2024_April_cohort
+2024_August_cohort
+2025_Feb_cohort
+
+HC:
+2025_January_cohort
+'''
+
+
 rule process_pycontrol:
     input:
         session_path = '{session_path}/{task}/{session_id}'
