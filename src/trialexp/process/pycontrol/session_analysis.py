@@ -381,6 +381,7 @@ def compute_trial_outcome(row, task_name):
         "reaching_go_spout_incr_break2_Feb25",
         "reaching_go_spout_incr_break2_April24",
         "reaching_go_spout_incr_break2_Feb25",
+        'reaching_go_spout_incr_break2_June25',
         'cued_and_cued_reward_May25'
     ]:
         if not row.spout:
@@ -592,7 +593,8 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
         'cued_and_cued_reward_May25',
         'reaching_go_spout_incr_break2_Feb25',
         'reaching_go_spout_incr_break2_April24',
-        'reaching_go_spout_incr_break2_nov22'
+        'reaching_go_spout_incr_break2_nov22',
+        'reaching_go_spout_incr_break2_June25'
     ]:
         if 'US_end_timer_trial_time' in df_events.columns:
             df_conditions['success'] = ~df_events.US_end_timer_trial_time.isna()
