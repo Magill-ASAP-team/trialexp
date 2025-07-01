@@ -6,8 +6,10 @@ from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_clean_trigger_event
 
 class ReachingGoSpoutAnalysis(TaskAnalysis):
+    def __init__(self,task_name, session_path):
+        super().__init__(task_name, session_path)
 
-    def process_pycontrol(self, df_pycontrol: pd.DataFrame) -> pd.DataFrame:
+    def process_pycontrol(self, df_pycontrol: pd.DataFrame, session_time: datetime, subjectID: str) -> pd.DataFrame:
         # Not implemented for this task
         return super().process_pycontrol(df_pycontrol)
     

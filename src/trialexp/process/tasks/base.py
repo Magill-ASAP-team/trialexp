@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 import pandas as pd
+from datetime import datetime
 
 class TaskAnalysis(ABC):
     """
@@ -9,12 +10,12 @@ class TaskAnalysis(ABC):
     Each task should have its own subclass that implements the abstract methods.
     """
 
-    def __init__(self, session_path: Path, task_name: str):
+    def __init__(self,  task_name: str, session_path: Path):
         self.session_path = session_path
         self.task_name = task_name
 
     @abstractmethod
-    def process_pycontrol(self, df_pycontrol: pd.DataFrame) -> pd.DataFrame:
+    def process_pycontrol(self, df_pycontrol: pd.DataFrame, session_time: datetime, subjectID: str) -> pd.DataFrame:
         """
         Process the pycontrol data for the specific task.
         """
