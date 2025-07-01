@@ -51,7 +51,16 @@ if len(lick_events)<10 and len(lick_signal_path)>0:
     # add lick back to pycontrol
     df_pycontrol = add_lick_events(df_pycontrol, lick_on, lick_off)
 
-    
+#%% Also load the analog data
+analog_files = path.glob('*.npy')
+
+for f in analog_files:
+    data = np.load(f)
+    s = f.name.split('_')[1]
+    var_name, var_type, _ = s.split('.')
+    df_pycontrol.attrs[f'{var_name}.{var_type}'] = data
+
+#%%    
 df_pycontrol.to_pickle(soutput.pycontrol_dataframe)
 
     
