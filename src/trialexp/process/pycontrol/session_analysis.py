@@ -395,6 +395,13 @@ def compute_trial_outcome(row, task_name):
         else:
             return "undefined"
     elif task_name in [
+        'force_feedback_June25'
+    ]:
+        if row.US_end_timer:
+            return 'success'
+        else:
+            return 'undefined'
+    elif task_name in [
         "reaching_go_spout_bar_dual_dec22",
         "reaching_go_spout_bar_dual_all_reward_dec22",
     ]:
@@ -591,6 +598,7 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
             df_conditions["success"] = False
     elif task_name in [
         'cued_and_cued_reward_May25',
+        'force_feedback_June25',
         'reaching_go_spout_incr_break2_Feb25',
         'reaching_go_spout_incr_break2_April24',
         'reaching_go_spout_incr_break2_nov22',
