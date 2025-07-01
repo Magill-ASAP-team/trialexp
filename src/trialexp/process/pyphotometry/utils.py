@@ -1073,6 +1073,35 @@ def align_photometry_to_pycontrol(xr_photometry, df_event, pycontrol_aligner):
     
     return xr_photometry
         
+def add_analog_data_to_dataset(df_pycontrol, dataset):
+    """
+    Add analog data from pycontrol to the photometry dataset.
+    
+    Parameters:
+    -----------
+    df_pycontrol : pd.DataFrame
+        Pycontrol dataframe with analog data in attrs
+    dataset : xr.Dataset
+        Target dataset to add analog data to
+        
+    Returns:
+    --------
+    xr.Dataset
+        Dataset with added analog data variables
+    """
+    analog_data = [d for d in df_pycontrol.attrs.keys() if '.data' in d]
+    for var_name in analog_data:
+        data = df_pycontrol.attrs[var_name]
+        data_name = var_name.split('.')[0]
+        time_var = data_name + '.time'
+        time = df_pycontrol.attrs[time_var] * 1000  # original is in second
+        xr_data = xr.DataArray(data, dims=['time'], coords={'time': time})
+        xr_data = xr_data.drop_duplicates(dim='time')
+        xr_data = xr_data.interp(time=dataset.time)
+        
+        dataset[data_name] = xr_data
+    
+    return dataset
 
 def resample_event(aligner, ref_time, event_time, event_value, fill_value=-1):
     """

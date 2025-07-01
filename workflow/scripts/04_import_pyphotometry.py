@@ -60,6 +60,10 @@ if has_photometry:
 
     dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
 
+#%% Also try to add in analog data from pycontrol if there is any
+
+dataset = add_analog_data_to_dataset(df_pycontrol, dataset)
+
 
 #%% Also add lick rate as another variables
 if any(df_event.content == 'lick'):
