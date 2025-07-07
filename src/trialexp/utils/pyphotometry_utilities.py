@@ -20,6 +20,7 @@ from trialexp.utils.rsync import *
 from trialexp.process.pycontrol.data_import import session_dataframe
 from trialexp.process.pyphotometry.utils import import_ppd
 from trialexp.utils.rsync import Rsync_aligner, RsyncError
+from loguru import logger
 
 def create_photo_sync(data_pycontrol, photometry_dict):
     with warnings.catch_warnings():
@@ -44,6 +45,7 @@ def create_photo_sync(data_pycontrol, photometry_dict):
                 pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
             
         except (RsyncError, ValueError, ZeroDivisionError) as e:
+            logger.info('Cannot align sync pulse. Trying another signal')
             # First try fail, let's try the next one
             if 'pulse_times_3' in photometry_dict:
                 photo_rsync = photometry_dict['pulse_times_3']
@@ -52,6 +54,7 @@ def create_photo_sync(data_pycontrol, photometry_dict):
                         pulse_times_B= pycontrol_rsync, plot=False) #align pycontrol time to pyphotometry time
                     
                 except (RsyncError, ValueError,ZeroDivisionError) as e:
+                    logger.error('Failed to align sync pulse')
                     return None
 
 def parse_pyhoto_fn(fn):
