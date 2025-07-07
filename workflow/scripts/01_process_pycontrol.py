@@ -56,7 +56,7 @@ analog_files = path.glob('*.npy')
 
 for f in analog_files:
     data = np.load(f)
-    s = f.name.split('_')[1]
+    s = '_'.join(f.name.split('_')[1:])
     var_name, var_type, _ = s.split('.')
     df_pycontrol.attrs[f'{var_name}.{var_type}'] = data
 

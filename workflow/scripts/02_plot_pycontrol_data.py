@@ -44,10 +44,3 @@ if 'break2' in task_name or 'cued_and_cued_reward' in task_name:
     ax.axhline(1,ls='--', color='gray')
 
 fig.savefig(soutput.discrim_scores)
-# %%
-
-# df_discrim = discrminability_before_after(df_pycontrol, windows=(-2000,2000))
-# df_discrim['cue_time'] = pd.to_timedelta(df_discrim['cue_time'], unit='ms')
-# df_discrim = df_discrim.set_index('cue_time')
-# df_discrim.resample('5min').mean()
-# %%
