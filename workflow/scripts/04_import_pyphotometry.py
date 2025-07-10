@@ -65,10 +65,10 @@ if has_photometry:
 dataset = add_analog_data_to_dataset(df_pycontrol, dataset)
 
 
-    # Also add lick rate as another variables
-    if any(df_event.content == 'lick'):
-        xa_lick_rate = calculate_lick_rate(df_event, dataset)
-        dataset['lick_rate'] = xa_lick_rate
+# Also add lick rate as another variables
+if any(df_event.content == 'lick'):
+    xa_lick_rate = calculate_lick_rate(df_event, dataset)
+    dataset['lick_rate'] = xa_lick_rate
 
 #%% Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000
