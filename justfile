@@ -40,5 +40,5 @@ sort SEARCH_TERM *FLAGS:
     if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
         echo "Aborted."; exit 1; \
     fi
-    targets=$(echo "$target" | awk '{printf "%sprocessed/pycontrol_workflow.done ", $0}')
+    targets=$(echo "$target" | awk '{printf "%sprocessed/spike_workflow.done ", $0}')
     uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}}
