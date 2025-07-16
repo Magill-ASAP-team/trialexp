@@ -100,15 +100,16 @@ def add_trial_nb(df_events, trigger_time, trial_window):
     valid_trigger_time = []
     skip_trials = 0
 
-    if len(trigger_time) == 0:
+    if len(trigger_time) <2:
         logging.warning(
-            "No trigger can be found. I will treat the whole session as one trial"
+            "Not enough trigger can be found. I will treat the whole session as one trial"
         )
         trigger_time = [
             df_events.iloc[0].time - trial_window[0],
             df_events.iloc[-1].time,
         ]  # make sure we have enough data to extract
 
+    
     for i in range(
         len(trigger_time) - 1
     ):  # skip the last trial because it can be incomplete
