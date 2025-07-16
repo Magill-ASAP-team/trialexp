@@ -77,12 +77,13 @@ xr_session.close()
 for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success','aborted']):
     # only plot successful trials
     idx = xr_session.isel(session_id=0).trial_outcome ==outcome
-    xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
-    xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
-    xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
-    
-    fig = plot_extrem_corr(xr_corr2plot, xr_spike2plot, xr_session2plot, evt_name, sig_name)
-    fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}_{outcome}.png',dpi=200)
+    if sum(idx)>0:
+        xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
+        xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
+        xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
+        
+        fig = plot_extrem_corr(xr_corr2plot, xr_spike2plot, xr_session2plot, evt_name, sig_name)
+        fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}_{outcome}.png',dpi=200)
 
 # %% plot the overall distribution
 sig_names = ['_zscored_df_over_f','_zscored_df_over_f_analog_2']
