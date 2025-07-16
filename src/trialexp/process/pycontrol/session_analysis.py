@@ -21,7 +21,7 @@ from trialexp.process.pycontrol.utils import (
     find_last_time_before_list,
 )
 import logging
-
+from loguru import logger
 
 def add_time_rel_trigger(df_events, trigger_time, trigger_name, col_name, trial_window):
     # Add new time column to the event data, aligned to the trigger time
@@ -101,7 +101,7 @@ def add_trial_nb(df_events, trigger_time, trial_window):
     skip_trials = 0
 
     if len(trigger_time) <2:
-        logging.warning(
+        logger.warning(
             "Not enough trigger can be found. I will treat the whole session as one trial"
         )
         trigger_time = [
@@ -214,11 +214,15 @@ def get_rel_time(df, trigger_name):
     # get the relative time to the trigger within a trial
     t0 = df[df["content"] == trigger_name].time.values
     if len(t0) > 1:
-        logging.warn(
+        logger.warning(
             f"Warning: not exactly 1 trigger found. I will only take the first trigger"
         )
         t0 = t0[0]
-    df["trial_time"] = df.time - t0
+    elif len(t0) == 0:
+        logger.warning('No trigger can be found in trial. Trial time is made relative to the beginning')
+        df['trial_time'] = df.time - df.time[0]
+    else:
+        df["trial_time"] = df.time - t0
     return df
 
 
