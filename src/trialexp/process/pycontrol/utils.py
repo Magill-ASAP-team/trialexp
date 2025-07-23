@@ -23,6 +23,7 @@ import os
 from loguru import logger
 import scipy
 from scipy.stats import norm
+import xarray as xr
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
@@ -1256,3 +1257,34 @@ def discrminability_before_after(df_pycontrol, windows=(-1000,1000), event_name=
       'before_cue_reach': before_reach,
       'after_cue_reach': after_reach 
     })
+
+
+def calculate_lick_rate(df_event, dataset, lick_bin_size=0.2):
+    """
+    Calculate lick rate from event data and return as xarray DataArray.
+    
+    Parameters:
+    -----------
+    df_event : pd.DataFrame
+        Event dataframe containing lick events
+    dataset : xr.Dataset
+        Dataset containing time coordinates and sampling rate
+    lick_bin_size : float, optional
+        Window size for rolling mean in seconds (default: 0.2)
+    
+    Returns:
+    --------
+    xr.DataArray
+        Lick rate data array with time coordinates
+    """
+    lick_on = df_event[df_event.content=='lick'].time
+    
+    lick_rate,_ = np.histogram(lick_on, dataset.time)
+    
+    # calculate the rolling mean lick rate
+    win_size = int(lick_bin_size*dataset.attrs['sampling_rate'])
+    lick_rate = np.convolve(lick_rate, np.ones(win_size)/win_size, mode='same')*dataset.attrs['sampling_rate']
+    
+    xa_lick_rate = xr.DataArray(lick_rate,
+                                coords={'time':dataset.time[:-1]},dims=['time'])
+    return xa_lick_rate

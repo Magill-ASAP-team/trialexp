@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_event_time
+from trialexp.process.pycontrol.utils import calculate_lick_rate
 from trialexp import config
 from pathlib import Path
 import pickle
@@ -50,32 +51,39 @@ try:
 except IndexError:
     has_photometry = False
 
+#%% Align data
+if has_photometry:    
+    photo_rsync = dataset.attrs['pulse_times_2']
+
+    #align pyphotometry time to pycontrol
+    pycontrol_aligner = create_photo_sync(df_pycontrol, data_photometry)
+
+    dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
 
 
-# %% synchornize pyphotometry with pycontrol
+    # Also add lick rate as another variables
+    if any(df_event.content == 'lick'):
+        xa_lick_rate = calculate_lick_rate(df_event, dataset)
+        dataset['lick_rate'] = xa_lick_rate
 
-# Add in the relative time to different events
+#%% Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000
 
 
 if has_photometry:
     sampling_freq = dataset.attrs['sampling_rate']
     event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
-    
-    photo_rsync = dataset.attrs['pulse_times_2']
-
-    #align pyphotometry time to pycontrol
-    pycontrol_aligner = create_photo_sync(df_pycontrol, data_photometry)
-    
-    dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
-
-        
+       
     var2add = ['zscored_df_over_f']
     if 'zscored_df_over_f_analog_2' in  dataset:
         var2add.append('zscored_df_over_f_analog_2')
         
     if 'zscored_df_over_f_analog_3' in dataset:
         var2add.append('zscored_df_over_f_analog_3')
+    
+    if 'lick_rate' in dataset:
+        var2add.append('lick_rate')
+
 
 
     for var in var2add:
@@ -141,11 +149,12 @@ else:
     Path(soutput.xr_photometry).touch()
         
 #%% Bin the data such that we only have 1 data point per time bin
-# bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz
 down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
 if down_sample_ratio>0:
+    # bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz for continuous data
     dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
 else:
+    # do not resample when sampling rate is lower than 100
     dataset_binned = dataset
 dataset_binned['event_time'] = dataset_binned.event_time.astype(int) #cast to int to avoid floating point error later
 dataset_binned.attrs.update(dataset.attrs)

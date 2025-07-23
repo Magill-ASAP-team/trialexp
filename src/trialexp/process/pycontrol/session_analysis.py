@@ -21,7 +21,7 @@ from trialexp.process.pycontrol.utils import (
     find_last_time_before_list,
 )
 import logging
-
+from loguru import logger
 
 def add_time_rel_trigger(df_events, trigger_time, trigger_name, col_name, trial_window):
     # Add new time column to the event data, aligned to the trigger time
@@ -100,15 +100,16 @@ def add_trial_nb(df_events, trigger_time, trial_window):
     valid_trigger_time = []
     skip_trials = 0
 
-    if len(trigger_time) == 0:
-        logging.warning(
-            "No trigger can be found. I will treat the whole session as one trial"
+    if len(trigger_time) <2:
+        logger.warning(
+            "Not enough trigger can be found. I will treat the whole session as one trial"
         )
         trigger_time = [
             df_events.iloc[0].time - trial_window[0],
             df_events.iloc[-1].time,
         ]  # make sure we have enough data to extract
 
+    
     for i in range(
         len(trigger_time) - 1
     ):  # skip the last trial because it can be incomplete
@@ -213,11 +214,15 @@ def get_rel_time(df, trigger_name):
     # get the relative time to the trigger within a trial
     t0 = df[df["content"] == trigger_name].time.values
     if len(t0) > 1:
-        logging.warn(
+        logger.warning(
             f"Warning: not exactly 1 trigger found. I will only take the first trigger"
         )
         t0 = t0[0]
-    df["trial_time"] = df.time - t0
+    elif len(t0) == 0:
+        logger.warning('No trigger can be found in trial. Trial time is made relative to the beginning')
+        df['trial_time'] = df.time - df.time[0]
+    else:
+        df["trial_time"] = df.time - t0
     return df
 
 
@@ -381,6 +386,7 @@ def compute_trial_outcome(row, task_name):
         "reaching_go_spout_incr_break2_Feb25",
         "reaching_go_spout_incr_break2_April24",
         "reaching_go_spout_incr_break2_Feb25",
+        'reaching_go_spout_incr_break2_June25',
         'cued_and_cued_reward_May25'
     ]:
         if not row.spout:
@@ -592,7 +598,8 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
         'cued_and_cued_reward_May25',
         'reaching_go_spout_incr_break2_Feb25',
         'reaching_go_spout_incr_break2_April24',
-        'reaching_go_spout_incr_break2_nov22'
+        'reaching_go_spout_incr_break2_nov22',
+        'reaching_go_spout_incr_break2_June25'
     ]:
         if 'US_end_timer_trial_time' in df_events.columns:
             df_conditions['success'] = ~df_events.US_end_timer_trial_time.isna()
