@@ -28,7 +28,7 @@ make-session SEARCH_TERM *FLAGS:
   fi
   targets=$(echo "$target" | awk '{printf "%sprocessed/pycontrol_workflow.done ", $0}')
   echo $targets
-  uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 {{FLAGS}}
+  uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 -k {{FLAGS}}
 
 #Search for and execute the sorting workflow in a session folder
 sort SEARCH_TERM *FLAGS:
@@ -41,4 +41,4 @@ sort SEARCH_TERM *FLAGS:
         echo "Aborted."; exit 1; \
     fi
     targets=$(echo "$target" | awk '{printf "%sprocessed/spike_workflow.done ", $0}')
-    uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 {{FLAGS}}
+    uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 -k {{FLAGS}}
