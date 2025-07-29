@@ -98,7 +98,11 @@ def extract_clean_trigger_event(df_trial, target_event_name, clean_window, ignor
 def get_reach_travel_time(df_trial):
     # Calculate time between the last bar off and spout touch
     #' to be used '
+    # Note: the animal can start the bar off before the cue and then touch after the cue
     
+    # only consider reach after the trial start
+    df_trial = df_trial[df_trial.trial_time>0]
+
     bar_off =  df_trial[df_trial['content']=='bar_off']
     spout =  df_trial[df_trial['content']=='spout']
     
@@ -109,7 +113,20 @@ def get_reach_travel_time(df_trial):
         last_bar_off_time = filtered_df['trial_time'].max()
     
         return spout1.trial_time - last_bar_off_time
+
+def get_last_bar_off_time(df_trial):
+    # last bar off before spout touch
+    df_trial = df_trial[df_trial.trial_time>0]
+
+    bar_off =  df_trial[df_trial['content']=='bar_off']
+    spout =  df_trial[df_trial['content']=='spout']
     
+    if len(spout) > 0 and len(bar_off) > 0:
+        spout1 = spout.iloc[0]
+
+        filtered_df = bar_off[bar_off['trial_time'] < spout1['trial_time']]
+        last_bar_off_time = filtered_df['trial_time'].max()
+        return last_bar_off_time
     
 def get_first_bar_off_speed(df_trial):
     # Calculate the time between the first bar off and the next bar on
@@ -130,8 +147,10 @@ def get_first_sig_bar_off_time(df_trial, min_off_time = 100):
     # Calculate the trial time of the first bar off, time between bar off and the next on 
     # must be larger than min_off_time
     
-    bar_off =  df_trial[df_trial['content']=='bar_off']
-    bar_on =  df_trial[df_trial['content']=='bar']
+    df_trial = df_trial[df_trial.trial_time>0]
+
+    bar_off =  df_trial[(df_trial['content']=='bar_off')]
+    bar_on =  df_trial[(df_trial['content']=='bar')]
     # print(bar_on)
     
     if len(bar_off) > 0 and len(bar_on) > 0:
@@ -152,3 +171,10 @@ def get_first_sig_bar_off_time(df_trial, min_off_time = 100):
         if len(idx)>0:
             return bar_off.iloc[idx[0]].trial_time
 
+def get_first_bar_off_time(df_trial):
+    # Calculate the trial time of the first bar off, time between bar off and the next on 
+    # must be larger than min_off_time
+    df_trial = df_trial[df_trial.trial_time>0]
+    bar_off =  df_trial[df_trial['content']=='bar_off']
+    if (len(bar_off))>0:
+        return bar_off.iloc[0].trial_time
