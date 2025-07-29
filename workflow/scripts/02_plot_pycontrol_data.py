@@ -41,13 +41,6 @@ task_name = df_pycontrol.attrs['task_name']
 if 'break2' in task_name or 'cued_and_cued_reward' in task_name:
     df_dprime = get_windowed_discriminability_score(df_pycontrol, window_sec=3*60)
     sns.lineplot(df_dprime, x='time',y='dprime', ax=ax)
-    ax.axhline(1,ls='--', color='gray')
+    ax.axhline(0,ls='--', color='gray')
 
 fig.savefig(soutput.discrim_scores)
-# %%
-
-# df_discrim = discrminability_before_after(df_pycontrol, windows=(-2000,2000))
-# df_discrim['cue_time'] = pd.to_timedelta(df_discrim['cue_time'], unit='ms')
-# df_discrim = df_discrim.set_index('cue_time')
-# df_discrim.resample('5min').mean()
-# %%

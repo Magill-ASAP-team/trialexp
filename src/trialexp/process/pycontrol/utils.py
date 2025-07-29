@@ -1219,14 +1219,19 @@ def get_discrminability_score(df_pycontrol, on_state, off_state, event='spout'):
             touch_rate_off.append(num_events/(row.duration/1000)) # in event per second
 
     touch_rate_off = np.array(touch_rate_off[:len(touch_rate)])
+    
+    all_rate = np.concatenate([touch_rate, touch_rate_off])
+    rate_mean = np.mean(all_rate)
+    rate_std = np.std(all_rate)
 
+    # transform the rate into z score
+    ztouch_rate = (touch_rate-rate_mean)/rate_std
+    ztouch_rate_off = (touch_rate_off-rate_mean)/rate_std
 
-    # any reach in the respective period
-    # match the probability back to the z score
-    H = np.mean(touch_rate>0) #hit probability
-    F = np.mean(touch_rate_off>0) # false alarm
-    # return norm.ppf(H) - norm.ppf(F), H, F
-    return touch_rate.mean()/touch_rate_off.mean(), H, F
+    H = np.mean(ztouch_rate)
+    F = np.mean(ztouch_rate_off)
+
+    return H-F, H, F
 
 def get_windowed_discriminability_score(df_pycontrol, window_sec=3*60):
     # window should be in ms
