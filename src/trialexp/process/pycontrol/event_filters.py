@@ -101,7 +101,7 @@ def get_reach_travel_time(df_trial):
     # Note: the animal can start the bar off before the cue and then touch after the cue
     
     # only consider reach after the trial start
-    df_trial = df_trial[df_trial.trial_time>0]
+    df_trial = df_trial[df_trial.trial_time>=0]
 
     bar_off =  df_trial[df_trial['content']=='bar_off']
     spout =  df_trial[df_trial['content']=='spout']
@@ -116,7 +116,7 @@ def get_reach_travel_time(df_trial):
 
 def get_last_bar_off_time(df_trial):
     # last bar off before spout touch
-    df_trial = df_trial[df_trial.trial_time>0]
+    df_trial = df_trial[df_trial.trial_time>=0]
 
     bar_off =  df_trial[df_trial['content']=='bar_off']
     spout =  df_trial[df_trial['content']=='spout']
@@ -147,7 +147,7 @@ def get_first_sig_bar_off_time(df_trial, min_off_time = 100):
     # Calculate the trial time of the first bar off, time between bar off and the next on 
     # must be larger than min_off_time
     
-    df_trial = df_trial[df_trial.trial_time>0]
+    df_trial = df_trial[df_trial.trial_time>=0]
 
     bar_off =  df_trial[(df_trial['content']=='bar_off')]
     bar_on =  df_trial[(df_trial['content']=='bar')]
@@ -174,7 +174,7 @@ def get_first_sig_bar_off_time(df_trial, min_off_time = 100):
 def get_first_bar_off_time(df_trial):
     # Calculate the trial time of the first bar off, time between bar off and the next on 
     # must be larger than min_off_time
-    df_trial = df_trial[df_trial.trial_time>0]
+    df_trial = df_trial[df_trial.trial_time>=0]
     bar_off =  df_trial[df_trial['content']=='bar_off']
     if (len(bar_off))>0:
         return bar_off.iloc[0].trial_time
