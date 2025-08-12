@@ -1533,7 +1533,7 @@ def preprocess_photometry(data_photometry, df_pycontrol):
                 data_photometry = motion_correction_win(data_photometry)
     else:
         # Canont find animal, emit error and stop
-        raise ValueError(f'Error: cannot find animation info for {animal_id}. Aborting.') 
+        raise ValueError(f'Error: cannot find animal info for {animal_id}. Aborting.') 
     
     
     data_photometry = compute_df_over_f(data_photometry, low_pass_cutoff=0.01)
