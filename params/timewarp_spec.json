@@ -237,7 +237,7 @@
         "spout": {
             "event_window": [
                 0,
-                300
+                500
             ],
             "order": "first",
             "padding": 0,
