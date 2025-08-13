@@ -90,6 +90,8 @@ rule export_parquet:
         pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
     output:
         photometry_parquet = '{session_path}/{task}/{session_id}/processed/photometry.parquet'
+    script:
+        'scripts/03_export_parquet.py'
 
 
 rule import_pyphotometry:
