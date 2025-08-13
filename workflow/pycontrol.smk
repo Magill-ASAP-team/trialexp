@@ -83,6 +83,15 @@ rule export_spike2:
     script:
         'scripts/03_export_spike2.py'
 
+
+rule export_parquet:
+    input:
+        xr_photometry = '{session_path}/{task}/{session_id}/processed/xr_photometry.nc',
+        pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
+    output:
+        photometry_parquet = '{session_path}/{task}/{session_id}/processed/photometry.parquet'
+
+
 rule import_pyphotometry:
     input:
         pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
@@ -160,6 +169,7 @@ rule pycontrol_final:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
         pycontrol_done = '{session_path}/{task}/{session_id}/processed/log/pycontrol.done',
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
+        photometry_parquet = '{session_path}/{task}/{session_id}/processed/photometry.parquet',
         # spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
     output:
         done = touch('{session_path}/{task}/{session_id}/processed/pycontrol_workflow.done')

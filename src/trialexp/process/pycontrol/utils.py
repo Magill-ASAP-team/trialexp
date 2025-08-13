@@ -1293,3 +1293,47 @@ def calculate_lick_rate(df_event, dataset, lick_bin_size=0.2):
     xa_lick_rate = xr.DataArray(lick_rate,
                                 coords={'time':dataset.time[:-1]},dims=['time'])
     return xa_lick_rate
+
+
+
+def add_events_to_time_series(df_pycontrol, df):
+    """
+    Adds event and state indicators to a time series DataFrame based on pyControl event/state logs.
+    Parameters
+    ----------
+    df_pycontrol : pandas.DataFrame
+        DataFrame containing pyControl logs with columns 'type', 'content', 'time', and 'duration'
+    df : pandas.DataFrame
+        Time series DataFrame with a 'time' column representing time points to annotate.
+    Returns
+    -------
+    pandas.DataFrame
+        The input time series DataFrame with additional columns for each event and state.
+        Event columns are named 'event:<event_name>' and contain 1 at time points where the event occurred, 0 otherwise.
+        State columns are named 'state:<state_name>' and contain 1 for time intervals where the state is active, 0 otherwise.
+    """
+    events = df_pycontrol[(df_pycontrol.type=='event') & (df_pycontrol.content!='rsync')]
+    states = df_pycontrol[df_pycontrol.type=='state']
+
+    # events
+    for i, evt in enumerate(events.content.unique()):
+        evt_data = np.zeros((len(df),))
+        evt_time = events[events.content==evt].time
+        idx = np.searchsorted(df.time, evt_time)
+        evt_data[idx-1] = i
+        df['event:'+evt] = evt_data
+
+    # states
+    for sts in states.content.unique():
+        state_data = np.zeros((len(df),))
+        state_start_time = states[states.content==sts].time
+        state_end_time = state_start_time + states[states.content==sts].duration 
+        state_start_idx = np.searchsorted(df.time, state_start_time)-1
+        state_end_idx = np.searchsorted(df.time, state_end_time)-1
+
+        for start, end in zip(state_start_idx, state_end_idx):
+            state_data[start:end] = 1
+        
+        df['state:'+sts] = state_data
+    
+    return df 
