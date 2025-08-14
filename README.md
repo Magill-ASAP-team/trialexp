@@ -29,3 +29,7 @@ Files to modify
 2. the `compute_success` function in `trialexp/process/pycontrol/session_analysis.py`
 3. `workflow/scripts/07_time_warping.py`
 4. the `compute_trial_outcome` function in `trialexp/process/pycontrol/session_analysis.py`
+
+
+## Inspecting raw photometry data
+We have phased out the export to spike2 file because `sonpy`, the package needed for the export, depends on very old Python version. Now the photometry raw data are exported to a `photometry.parquet` file which can be read by [plotJuggler](https://github.com/facontidavide/PlotJuggler).
