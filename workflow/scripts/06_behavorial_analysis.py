@@ -1,17 +1,9 @@
 #%%
 from snakehelper.SnakeIOHelper import getSnake
-from trialexp.process.pyphotometry.plotting_utils import annotate_trial_number, plot_and_handler_error, plot_pyphoto_heatmap
-from trialexp.process.pyphotometry.utils import *
-from glob import glob
-import xarray as xr
-from trialexp.utils.rsync import *
 import pandas as pd 
-from scipy.interpolate import interp1d
-import seaborn as sns 
 import numpy as np
-import os
 from trialexp import config
-from trialexp.process.pycontrol import event_filters
+from trialexp.process.pycontrol.processors import get_processor
 
 #%% Load inputs
 
@@ -20,39 +12,29 @@ from trialexp.process.pycontrol import event_filters
   'behavorial_analysis')
 
 
-# %%
+# %% Load processed data
 df_event = pd.read_pickle(sinput.event_dataframe)
 df_conditions = pd.read_pickle(sinput.condition_dataframe)
-# %% Time between the bar off and first spout touch
 
-# travel time
-first_reach_travel_time = df_event.groupby('trial_nb').apply(event_filters.get_reach_travel_time)
-xr_first_reach_travel_time = xr.DataArray(first_reach_travel_time)
+# Get processor configuration  
+tasks = pd.read_csv('params/tasks_params.csv', index_col=0)
+task_name = df_event.attrs.get('task_name', 'unknown_task')
+task_idx = tasks["task"] == task_name
+processor_class_name = str(tasks.loc[task_idx, 'processor_class'].iloc[0]) if 'processor_class' in tasks.columns and len(tasks.loc[task_idx]) > 0 else 'BaseTaskProcessor'
+processor = get_processor(processor_class_name)
 
-#reach time
-last_bar_off_time = df_event.groupby('trial_nb').apply(event_filters.get_last_bar_off_time)
-xr_last_bar_off_time = xr.DataArray(last_bar_off_time)
+#%% Compute behavioral metrics using processor
+xr_behaviour = processor.compute_behavioral_metrics(df_event)
 
+# Compute additional task-specific metrics
+additional_metrics = processor.compute_additional_behavioral_metrics(df_event, df_conditions)
 
-#%% trial time of the first siginificant bar off
+# Add any additional metrics to the dataset
+for metric_name, metric_data in additional_metrics.items():
+    if hasattr(metric_data, 'to_xarray') or isinstance(metric_data, (list, np.ndarray)):
+        import xarray as xr
+        xr_behaviour[metric_name] = xr.DataArray(metric_data)
 
-first_sig_bar_off_time = df_event.groupby('trial_nb').apply(event_filters.get_first_sig_bar_off_time)
-xr_first_sig_bar_off_time = xr.DataArray(first_sig_bar_off_time)
-
-# find the first bar off
-first_bar_off_time = df_event.groupby('trial_nb').apply(event_filters.get_first_bar_off_time)
-xr_first_bar_off_time = xr.DataArray(first_bar_off_time)
-
-# %%
-
-xr_behaviour = xr.Dataset({'first_reach_travel_time':xr_first_reach_travel_time,
-                           'last_bar_off_time': xr_last_bar_off_time,
-                           'first_sig_bar_off_trial_time': xr_first_sig_bar_off_time,
-                           'first_bar_off_trial_time': xr_first_bar_off_time})
-
-# %%
-xr_behaviour = xr_behaviour.expand_dims({'session_id':[df_event.attrs['session_id']]})
-
-# %%
+# %% Save behavioral analysis results
 xr_behaviour.to_netcdf(soutput.xr_behaviour, engine='h5netcdf')
 

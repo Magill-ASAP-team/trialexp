@@ -25,6 +25,20 @@ from trialexp.process.pycontrol.session_analysis import (
     add_trial_params
 )
 from trialexp.process.pycontrol.data_import import session_dataframe
+from trialexp.process.pycontrol.plot_utils import (
+    plot_event_distribution, 
+    style_event_distribution, 
+    reach_time
+)
+from trialexp.process.pycontrol.utils import (
+    get_windowed_discriminability_score,
+    discrminability_before_after
+)
+import matplotlib.pyplot as plt
+import seaborn as sns
+import xarray as xr
+from trialexp.process.pycontrol import event_filters
+from trialexp.process.pycontrol.utils import add_events_to_time_series
 
 
 class BaseTaskProcessor:
@@ -264,6 +278,231 @@ class BaseTaskProcessor:
         })
         
         return df_events_cond
+    
+    def generate_session_plots(self, df_events_cond: pd.DataFrame, df_pycontrol: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Generate standard session plots.
+        
+        Args:
+            df_events_cond: Events dataframe with conditions
+            df_pycontrol: PyControl dataframe
+            
+        Returns:
+            Dict containing matplotlib figures for different plots
+        """
+        plots = {}
+        
+        # Event distribution plot
+        plots['event_histogram'] = self.plot_event_distribution(df_events_cond)
+        
+        # Reach time histogram
+        plots['reach_histogram'] = self.plot_reach_histogram(df_events_cond)
+        
+        # Task-specific plots
+        task_name = df_pycontrol.attrs.get('task_name', '')
+        plots['discriminability'] = self.plot_task_specific_metrics(df_pycontrol, task_name)
+        
+        return plots
+    
+    def plot_event_distribution(self, df_events_cond: pd.DataFrame) -> Any:
+        """
+        Plot event distribution across trials.
+        
+        Args:
+            df_events_cond: Events dataframe with conditions
+            
+        Returns:
+            matplotlib figure object
+        """
+        trial_window = df_events_cond.attrs['trial_window']
+        triggers = df_events_cond.attrs['triggers']
+        
+        df2plot = df_events_cond.copy()
+        df2plot['trial_time'] = df2plot['trial_time'] / 1000
+        xlim = [trial_window[0] / 1000, np.percentile(df2plot['trial_time'], 95)]
+        
+        try:
+            g = plot_event_distribution(df2plot, 'trial_time', 'trial_nb', 
+                                      xbinwidth=1, ybinwidth=0, xlim=xlim)
+            trigger_text = triggers[0].replace('_', ' ')
+            style_event_distribution(g, 'Time (s)', 'Trial number', trigger_text)
+        except Exception as e:
+            # Fallback to simple scatter plot if main plotting fails
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(1, 1, dpi=200)
+            ax.scatter(df2plot['trial_time'], df2plot['trial_nb'], alpha=0.5)
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Trial number')
+            ax.set_title('Event Distribution')
+            g = fig
+        
+        return g
+    
+    def plot_reach_histogram(self, df_events_cond: pd.DataFrame) -> Any:
+        """
+        Plot reach time histogram.
+        
+        Args:
+            df_events_cond: Events dataframe with conditions
+            
+        Returns:
+            matplotlib figure object
+        """
+        fig, ax = plt.subplots(1, 1, dpi=200)
+        
+        try:
+            reach_t = df_events_cond.groupby('trial_nb').apply(reach_time)
+            reach_t = reach_t.dropna()
+            if len(reach_t) > 0:
+                sns.histplot(reach_t, bins=50, binrange=(0, 500), ax=ax)
+            else:
+                ax.text(0.5, 0.5, 'No reach time data', ha='center', va='center', transform=ax.transAxes)
+        except Exception as e:
+            ax.text(0.5, 0.5, f'Reach time analysis failed: {str(e)[:50]}...', 
+                   ha='center', va='center', transform=ax.transAxes)
+        
+        ax.set(xlabel='Reach time (ms)')
+        ax.set_title('Reach Time Distribution')
+        
+        return fig
+    
+    def plot_task_specific_metrics(self, df_pycontrol: pd.DataFrame, task_name: str) -> Any:
+        """
+        Plot task-specific metrics. Can be overridden by task-specific processors.
+        
+        Args:
+            df_pycontrol: PyControl dataframe
+            task_name: Name of the task
+            
+        Returns:
+            matplotlib figure object or None
+        """
+        fig, ax = plt.subplots(1, 1, dpi=200)
+        
+        # Default implementation for break2 and cued_and_cued_reward tasks
+        if 'break2' in task_name or 'cued_and_cued_reward' in task_name:
+            df_dprime = get_windowed_discriminability_score(df_pycontrol, window_sec=3*60)
+            sns.lineplot(df_dprime, x='time', y='dprime', ax=ax)
+            ax.axhline(0, ls='--', color='gray')
+            ax.set_title('Discriminability Score')
+        else:
+            # For other tasks, create empty plot
+            ax.text(0.5, 0.5, 'No task-specific metrics', 
+                   ha='center', va='center', transform=ax.transAxes)
+            ax.set_title('Task-specific Metrics')
+        
+        return fig
+    
+    def compute_behavioral_metrics(self, df_events: pd.DataFrame) -> xr.Dataset:
+        """
+        Compute behavioral metrics from event data.
+        
+        Args:
+            df_events: Events dataframe with trial information
+            
+        Returns:
+            xarray.Dataset: Behavioral metrics dataset
+        """
+        # Travel time between bar off and first spout touch
+        first_reach_travel_time = df_events.groupby('trial_nb').apply(event_filters.get_reach_travel_time)
+        xr_first_reach_travel_time = xr.DataArray(first_reach_travel_time)
+        
+        # Reach time (last bar off time)
+        last_bar_off_time = df_events.groupby('trial_nb').apply(event_filters.get_last_bar_off_time)
+        xr_last_bar_off_time = xr.DataArray(last_bar_off_time)
+        
+        # Trial time of first significant bar off
+        first_sig_bar_off_time = df_events.groupby('trial_nb').apply(event_filters.get_first_sig_bar_off_time)
+        xr_first_sig_bar_off_time = xr.DataArray(first_sig_bar_off_time)
+        
+        # First bar off time
+        first_bar_off_time = df_events.groupby('trial_nb').apply(event_filters.get_first_bar_off_time)
+        xr_first_bar_off_time = xr.DataArray(first_bar_off_time)
+        
+        # Create behavioral dataset
+        xr_behaviour = xr.Dataset({
+            'first_reach_travel_time': xr_first_reach_travel_time,
+            'last_bar_off_time': xr_last_bar_off_time,
+            'first_sig_bar_off_trial_time': xr_first_sig_bar_off_time,
+            'first_bar_off_trial_time': xr_first_bar_off_time
+        })
+        
+        # Add session metadata
+        session_id = df_events.attrs.get('session_id', 'unknown_session')
+        xr_behaviour = xr_behaviour.expand_dims({'session_id': [session_id]})
+        
+        return xr_behaviour
+    
+    def compute_additional_behavioral_metrics(self, df_events: pd.DataFrame, df_conditions: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Compute additional task-specific behavioral metrics.
+        Can be overridden by task-specific processors.
+        
+        Args:
+            df_events: Events dataframe
+            df_conditions: Conditions dataframe
+            
+        Returns:
+            Dict containing additional metrics
+        """
+        # Default implementation - empty metrics
+        # Task-specific processors can override this to add custom metrics
+        return {}
+    
+    def prepare_export_data(self, xr_photometry: xr.Dataset, df_pycontrol: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prepare data for export (e.g., to Parquet format for PlotJuggler).
+        
+        Args:
+            xr_photometry: Photometry dataset  
+            df_pycontrol: PyControl dataframe
+            
+        Returns:
+            pd.DataFrame: Combined dataset ready for export
+        """
+        # Extract photometry variables with time coordinates
+        var2extract = [v for v in xr_photometry.data_vars if 'time' in xr_photometry[v].coords]
+        df = xr_photometry[var2extract].to_dataframe().reset_index()
+        df = df.fillna(0)
+        
+        # Add PyControl events to the time series
+        df = add_events_to_time_series(df_pycontrol, df)
+        
+        return df
+    
+    def export_to_parquet(self, df: pd.DataFrame, output_path: str, **kwargs) -> None:
+        """
+        Export dataframe to Parquet format.
+        
+        Args:
+            df: DataFrame to export
+            output_path: Path for output file
+            **kwargs: Additional arguments for to_parquet()
+        """
+        default_kwargs = {'compression': 'gzip'}
+        default_kwargs.update(kwargs)
+        df.to_parquet(output_path, compression='gzip')
+    
+    def process_export_data(self, xr_photometry: xr.Dataset, df_pycontrol: pd.DataFrame, 
+                           output_path: str) -> pd.DataFrame:
+        """
+        Complete export processing pipeline.
+        
+        Args:
+            xr_photometry: Photometry dataset
+            df_pycontrol: PyControl dataframe  
+            output_path: Output file path
+            
+        Returns:
+            pd.DataFrame: Exported dataframe (also saved to file)
+        """
+        # Prepare export data
+        df_export = self.prepare_export_data(xr_photometry, df_pycontrol)
+        
+        # Export to file
+        self.export_to_parquet(df_export, output_path)
+        
+        return df_export
     
     def compute_success(self, df_events_trials: pd.DataFrame, df_conditions: pd.DataFrame,
                        task_config: Dict[str, Any]) -> pd.DataFrame:
