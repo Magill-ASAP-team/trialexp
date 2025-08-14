@@ -50,6 +50,8 @@ from trialexp.utils.pyphotometry_utilities import create_photo_sync
 from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_event_time
 import pickle
+import json
+import trialexp.process.pyphotometry.linear_modelling as lm
 
 
 class BaseTaskProcessor:
@@ -797,6 +799,272 @@ class BaseTaskProcessor:
                 pickle.dump(pycontrol_aligner, f)
         else:
             Path(output_path).touch()
+    
+    def process_time_warping(self, df_events_cond: pd.DataFrame, df_conditions: pd.DataFrame,
+                           xr_photometry: xr.Dataset, output_path: str, figure_dir: str) -> xr.Dataset:
+        """
+        Complete time warping processing pipeline.
+        
+        This method handles the entire time warping workflow that was in 07_time_warping.py,
+        including task-specific extraction specs, signal processing, and visualization.
+        
+        Args:
+            df_events_cond: Events dataframe with conditions
+            df_conditions: Conditions dataframe
+            xr_photometry: Photometry dataset
+            output_path: Path for output time-warped dataset
+            figure_dir: Directory for saving figures
+            
+        Returns:
+            xr.Dataset: Time-warped dataset with all signals and metadata
+        """
+        # Get task-specific configuration
+        extraction_specs, outcome2plot = self.get_timewarp_config(df_events_cond)
+        
+        # Determine signals to analyze
+        signal2analyze = ['zscored_df_over_f', 'zscored_df_over_f_analog_2', 'zscored_df_over_f_analog_3']
+        signal2analyze = [s for s in signal2analyze if s in xr_photometry.data_vars]
+        
+        trigger = df_events_cond.attrs['triggers'][0]
+        
+        # Time warp photometry signals
+        xa_list = self.time_warp_photometry_signals(
+            df_events_cond, xr_photometry, signal2analyze, extraction_specs, trigger
+        )
+        
+        # Time warp lick rate
+        xa_lick_rate = self.time_warp_lick_rate(
+            df_events_cond, xr_photometry, extraction_specs, trigger
+        )
+        xa_list.append(xa_lick_rate)
+        
+        # Create final dataset
+        xr_conditions = xr.Dataset.from_dataframe(df_conditions)
+        xr_warped = xr.merge([xr_conditions, *xa_list])
+        xr_warped.attrs['extraction_specs'] = json.dumps(extraction_specs)
+        
+        # Save dataset
+        xr_warped.to_netcdf(output_path, engine='h5netcdf')
+        
+        # Generate plots
+        self.generate_timewarp_plots(xr_warped, signal2analyze, outcome2plot, 
+                                   extraction_specs, trigger, figure_dir)
+        
+        # Validate results
+        self.validate_timewarp_results(xr_warped)
+        
+        return xr_warped
+    
+    def get_timewarp_config(self, df_events_cond: pd.DataFrame) -> Tuple[Dict[str, Any], List[Any]]:
+        """
+        Get task-specific time warping configuration.
+        
+        Args:
+            df_events_cond: Events dataframe with task metadata
+            
+        Returns:
+            Tuple of (extraction_specs, outcome2plot)
+        """
+        # Load time warp specifications
+        with open('params/timewarp_spec.json') as f:
+            specs = json.load(f)
+        
+        # Get task name
+        if 'task_name' in df_events_cond.attrs:
+            task_name = df_events_cond.attrs['task_name']
+        else:
+            task_name = df_events_cond.attrs['Task name']
+        
+        trigger = df_events_cond.attrs['triggers'][0]
+        
+        # Task-specific configuration
+        if task_name in ['pavlovian_spontanous_reaching_oct23',
+                         'pavlovian_reaching_Oct26',
+                         'pavlovian_spontanous_bar_Sep24',
+                         'pavlovian_spontanous_reaching_march23',
+                         'pavlovian_spontanous_reaching_oct23',
+                         'pavlovian_spontanous_reaching_April24']:
+            extraction_specs = specs['spontanous_reaching']
+            outcome2plot = df_events_cond.trial_outcome.unique() if hasattr(df_events_cond, 'trial_outcome') else ['success']
+            
+        elif task_name in ['reaching_go_spout_bar_VR_Dec23',
+                           'reaching_go_spout_bar_apr23',
+                           'reaching_go_spout_bar_mar23',
+                           'reaching_go_spout_bar_june05',
+                           'reaching_go_spout_bar_nov22']:
+            extraction_specs = specs['reaching_go_spout_bar_reward']
+            outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
+            
+        elif task_name in ['reaching_go_spout_bar_VR_April24',
+                           'reaching_go_spout_bar_VR_April24_silent',
+                           'reaching_go_spout_bar_VR_Feb25',
+                           'reaching_go_spout_bar_VR_cued_random_June25']:
+            extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
+            outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
+            
+        elif task_name in ['reaching_go_spout_incr_break2_nov22',
+                           'reaching_go_spout_incr_break2_April24',
+                           'reaching_go_spout_incr_break2_Feb25',
+                           'reaching_go_spout_incr_break2_June25',
+                           'cued_and_cued_reward_May25']:
+            extraction_specs = specs['break2']
+            outcome2plot = ['success', 'no_reach', 'late_reach']
+        else:
+            extraction_specs = specs['default']
+            # Update the trigger
+            extraction_specs[trigger] = extraction_specs.pop('trigger')
+            outcome2plot = df_events_cond.trial_outcome.unique() if hasattr(df_events_cond, 'trial_outcome') else ['success']
+        
+        return extraction_specs, outcome2plot
+    
+    def time_warp_photometry_signals(self, df_events_cond: pd.DataFrame, xr_photometry: xr.Dataset,
+                                   signal2analyze: List[str], extraction_specs: Dict[str, Any],
+                                   trigger: str) -> List[xr.DataArray]:
+        """
+        Time warp photometry signals using linear modeling.
+        
+        Args:
+            df_events_cond: Events dataframe
+            xr_photometry: Photometry dataset
+            signal2analyze: List of signal variable names
+            extraction_specs: Time warping specifications
+            trigger: Trigger event name
+            
+        Returns:
+            List of time-warped DataArrays
+        """
+        xa_list = []
+        interp_results_list = None
+        
+        for signal_var in signal2analyze:
+            xa, interp_results_list = lm.time_warp_data(
+                df_events_cond, 
+                xr_photometry[signal_var], 
+                extraction_specs, 
+                trigger,
+                xr_photometry.attrs['sampling_rate'],
+                verbose=False
+            )
+            xa_list.append(xa)
+        
+        # Add interpolation results for later plotting (from last signal)
+        if interp_results_list is not None:
+            df_interp_res = pd.DataFrame(interp_results_list)
+            df_interp_res['trial_nb'] = xa.trial_nb
+            df_interp_res = df_interp_res.set_index('trial_nb')
+            xr_interp_res = df_interp_res.to_xarray()
+            xa_list.append(xr_interp_res)
+        
+        return xa_list
+    
+    def time_warp_lick_rate(self, df_events_cond: pd.DataFrame, xr_photometry: xr.Dataset,
+                          extraction_specs: Dict[str, Any], trigger: str) -> xr.DataArray:
+        """
+        Time warp lick rate signal.
+        
+        Args:
+            df_events_cond: Events dataframe
+            xr_photometry: Photometry dataset
+            extraction_specs: Time warping specifications
+            trigger: Trigger event name
+            
+        Returns:
+            Time-warped lick rate DataArray
+        """
+        # Calculate lick rate
+        lick_on = df_events_cond[df_events_cond.content == 'lick'].time
+        lick_rate, _ = np.histogram(lick_on, xr_photometry.time)
+        
+        # Calculate rolling mean lick rate
+        lick_bin_size = 0.2  # in seconds
+        win_size = int(lick_bin_size * xr_photometry.attrs['sampling_rate'])
+        lick_rate = np.convolve(lick_rate, np.ones(win_size)/win_size, mode='same') * xr_photometry.attrs['sampling_rate']
+        
+        # Create DataArray
+        xa_lick_rate = xr.DataArray(
+            lick_rate, 
+            name='lick_rate',
+            coords={'time': xr_photometry.time[:-1]},
+            dims=['time']
+        )
+        
+        # Time warp the lick rate
+        xa, _ = lm.time_warp_data(
+            df_events_cond, 
+            xa_lick_rate, 
+            extraction_specs, 
+            trigger,
+            xr_photometry.attrs['sampling_rate'],
+            verbose=False
+        )
+        
+        return xa
+    
+    def generate_timewarp_plots(self, xr_warped: xr.Dataset, signal2analyze: List[str],
+                              outcome2plot: List[Any], extraction_specs: Dict[str, Any],
+                              trigger: str, figure_dir: str) -> None:
+        """
+        Generate time warping visualization plots.
+        
+        Args:
+            xr_warped: Time-warped dataset
+            signal2analyze: List of signal variables to plot
+            outcome2plot: List of outcomes to plot
+            extraction_specs: Time warping specifications
+            trigger: Trigger event name
+            figure_dir: Directory to save figures
+        """
+        from pathlib import Path
+        import matplotlib.pyplot as plt
+        
+        figure_path = Path(figure_dir)
+        
+        # Plot photometry signals
+        for var in signal2analyze:
+            fig, axes = plt.subplots(len(outcome2plot), 1, figsize=(10, 4*len(outcome2plot)))
+            
+            if not isinstance(axes, np.ndarray):
+                axes = [axes]
+            
+            for outcome, ax in zip(outcome2plot, axes):
+                xr2plot = xr_warped.sel(trial_nb=xr_warped.trial_outcome.isin(outcome))
+                lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax)
+            
+            fig.tight_layout()
+            fig.savefig(figure_path / f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
+            plt.close(fig)
+        
+        # Plot lick rate
+        var = 'lick_rate'
+        fig, axes = plt.subplots(len(outcome2plot), 1, figsize=(10, 4*len(outcome2plot)))
+        
+        if not isinstance(axes, np.ndarray):
+            axes = [axes]
+        
+        for outcome, ax in zip(outcome2plot, axes):
+            xr2plot = xr_warped.sel(trial_nb=xr_warped.trial_outcome.isin(outcome))
+            lm.plot_warpped_data(xr2plot, var, extraction_specs, trigger, ax=ax, 
+                               ylabel='Licking rate (per sec)', ylim=[0, 15])
+        
+        fig.tight_layout()
+        fig.savefig(figure_path / f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
+        plt.close(fig)
+    
+    def validate_timewarp_results(self, xr_warped: xr.Dataset) -> None:
+        """
+        Validate time warping results and print statistics.
+        
+        Args:
+            xr_warped: Time-warped dataset
+        """
+        # Check for valid trials
+        if 'zscored_df_over_f' in xr_warped.data_vars:
+            xr_success = xr_warped.sel(trial_nb=(xr_warped.trial_outcome == 'success'))
+            valid_trials = np.all(~np.isnan(xr_success['zscored_df_over_f'].data), axis=1)
+            valid_ratio = np.sum(valid_trials) / len(valid_trials)
+            print(f'Ratio of valid successful trials: {valid_ratio:.3f}')
+        else:
+            print('No zscored_df_over_f signal found for validation')
     
     def compute_success(self, df_events_trials: pd.DataFrame, df_conditions: pd.DataFrame,
                        task_config: Dict[str, Any]) -> pd.DataFrame:
