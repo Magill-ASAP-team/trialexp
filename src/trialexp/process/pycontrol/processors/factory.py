@@ -5,15 +5,18 @@ Provides a registry and factory for instantiating appropriate processor classes
 based on configuration. Supports both built-in and custom processor classes.
 """
 
-from typing import Dict, Type, Any
+from typing import Dict, Type, Any, Union
 from .base import BaseTaskProcessor
+from .pycontrol_processor import PyControlProcessor
+from .photometry_processor import PhotometryProcessor
+from .behavioral_processor import BehavioralProcessor
 
 
 # Global registry of processor classes
-_PROCESSOR_REGISTRY: Dict[str, Type[BaseTaskProcessor]] = {}
+_PROCESSOR_REGISTRY: Dict[str, Type[Union[BaseTaskProcessor, PyControlProcessor, PhotometryProcessor, BehavioralProcessor]]] = {}
 
 
-def register_processor(name: str, processor_class: Type[BaseTaskProcessor]) -> None:
+def register_processor(name: str, processor_class: Type[Any]) -> None:
     """
     Register a processor class in the global registry.
     
@@ -23,18 +26,19 @@ def register_processor(name: str, processor_class: Type[BaseTaskProcessor]) -> N
         
     Raises:
         ValueError: If name is already registered
-        TypeError: If processor_class is not a subclass of BaseTaskProcessor
+        TypeError: If processor_class is not a valid processor class
     """
     if name in _PROCESSOR_REGISTRY:
         raise ValueError(f"Processor '{name}' is already registered")
     
-    if not issubclass(processor_class, BaseTaskProcessor):
-        raise TypeError(f"Processor class must be a subclass of BaseTaskProcessor")
+    # Check if it's a valid processor class (has callable methods)
+    if not callable(processor_class):
+        raise TypeError(f"Processor class must be callable")
     
     _PROCESSOR_REGISTRY[name] = processor_class
 
 
-def get_processor(processor_name: str) -> BaseTaskProcessor:
+def get_processor(processor_name: str) -> Union[BaseTaskProcessor, PyControlProcessor, PhotometryProcessor, BehavioralProcessor]:
     """
     Get a processor instance by name from the registry.
     
@@ -75,5 +79,8 @@ def clear_registry() -> None:
     _PROCESSOR_REGISTRY.clear()
 
 
-# Register the base processor by default
+# Register all processor classes by default
 register_processor("BaseTaskProcessor", BaseTaskProcessor)
+register_processor("PyControlProcessor", PyControlProcessor)
+register_processor("PhotometryProcessor", PhotometryProcessor)
+register_processor("BehavioralProcessor", BehavioralProcessor)

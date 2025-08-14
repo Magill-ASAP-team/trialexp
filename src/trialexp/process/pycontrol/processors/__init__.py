@@ -6,6 +6,17 @@ behavioral task data, allowing task-specific customization through inheritance.
 """
 
 from .base import BaseTaskProcessor
+from .pycontrol_processor import PyControlProcessor
+from .photometry_processor import PhotometryProcessor
+from .behavioral_processor import BehavioralProcessor
 from .factory import get_processor, register_processor, list_processors
 
-__all__ = ['BaseTaskProcessor', 'get_processor', 'register_processor', 'list_processors']
+__all__ = [
+    'BaseTaskProcessor',
+    'PyControlProcessor',
+    'PhotometryProcessor', 
+    'BehavioralProcessor',
+    'get_processor', 
+    'register_processor',
+    'list_processors'
+]
