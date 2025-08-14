@@ -21,8 +21,8 @@ Triexap is a neuroscience data analysis pipeline for processing pycontrol (behav
 - `just find-data <pattern>` - Search for data files (.ppd, .tsv)
 
 ### Testing
-- `python -m pytest tests/` - Run test suite
-- Individual test files: `python -m pytest tests/test_trialexp.py`
+- `uv run python -m pytest tests/` - Run test suite
+- Individual test files: `uv run python -m pytest tests/test_trialexp.py`
 
 ### Direct Snakemake Usage
 - `uv run snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime` - PyControl workflow
@@ -61,14 +61,62 @@ Triexap is a neuroscience data analysis pipeline for processing pycontrol (behav
 
 ### Data Processing Flow
 1. **Session Creation**: `workflow/scripts/00_create_session_folders.py`
-2. **PyControl Processing**: Multiple scripts (01-07) for behavioral analysis
+2. **PyControl Processing**: Processor-based workflow scripts for behavioral analysis
+   - `01_process_pycontrol.py` - Complete session processing using `BehavioralProcessor.process_full_session()`
+   - `02_plot_pycontrol_data.py` - Session visualization using `BehavioralProcessor.generate_session_plots()`
+   - `03_export_parquet.py` - Data export using `BehavioralProcessor.process_export_data()`
+   - `04_import_pyphotometry.py` - Photometry processing using `BehavioralProcessor.process_photometry_session()`
+   - `06_behavorial_analysis.py` - Behavioral metrics using `BehavioralProcessor.compute_behavioral_metrics()`
+   - `07_time_warping.py` - Time warping analysis using `BehavioralProcessor.process_time_warping()`
 3. **Spike Sorting**: Scripts in `workflow/scripts/spike_sorting/`
 4. **DeepLabCut Integration**: Video analysis workflows
 5. **Data Export**: Parquet format for visualization with PlotJuggler
 
+### Processor Architecture (NEW)
+The pipeline uses a modular processor-based architecture for task-specific analysis:
+
+#### Processor Classes
+- **PyControlProcessor** (`src/trialexp/process/pycontrol/processors/pycontrol_processor.py`)
+  - Core behavioral data processing: session parsing, trial extraction, condition computation
+  - Task-specific success criteria and outcome computation
+  - Basic behavioral plotting and event distribution analysis
+
+- **PhotometryProcessor** (`src/trialexp/process/pycontrol/processors/photometry_processor.py`)
+  - Photometry data import, preprocessing, and alignment with PyControl
+  - Event-locked signal extraction and time warping analysis
+  - Photometry-specific visualization and validation
+
+- **BehavioralProcessor** (`src/trialexp/process/pycontrol/processors/behavioral_processor.py`)
+  - **DEFAULT PROCESSOR** - Combines PyControl and Photometry functionality via multiple inheritance
+  - Complete workflow orchestration for end-to-end analysis
+  - Session plotting, behavioral metrics, and data export
+
+#### Processor Usage
+```python
+# Load processor (typically done automatically by workflow scripts)
+from trialexp.process.pycontrol.processors import get_processor
+processor = get_processor('BehavioralProcessor')  # Default for all tasks
+
+# Available processor types
+processors = list_processors()  # ['BaseTaskProcessor', 'PyControlProcessor', 'PhotometryProcessor', 'BehavioralProcessor']
+```
+
+#### Task Configuration
+All tasks in `params/tasks_params.csv` are configured to use `BehavioralProcessor` by default. To use a different processor:
+1. Modify the `processor_class` column in `params/tasks_params.csv`
+2. Register custom processors using the factory system
+
+#### Key Processing Methods
+- `process_full_session()` - Complete PyControl session processing
+- `process_photometry_session()` - Photometry import, alignment, and processing  
+- `process_time_warping()` - Time warping analysis with task-specific configurations
+- `generate_session_plots()` - Comprehensive behavioral visualization
+- `compute_behavioral_metrics()` - Core behavioral analysis metrics
+
 ### Key Components
 - **Trial Dataset Classes**: Handle time-locked trial data with flexible filtering
-- **Session Analysis**: Compute trial outcomes and success metrics
+- **Processor Architecture**: Modular, inheritance-based system for task-specific analysis
+- **Session Analysis**: Compute trial outcomes and success metrics via processors
 - **Time Warping**: Synchronize data across different acquisition systems
 - **Multi-modal Integration**: Combine behavioral, photometry, and ephys data
 
@@ -82,9 +130,57 @@ Modify these files:
 
 ### New Task
 Modify these files:
-1. `params/tasks_params.csv` - Add task parameters
-2. `src/trialexp/process/pycontrol/session_analysis.py` - Update `compute_success()` and `compute_trial_outcome()` functions
-3. `workflow/scripts/07_time_warping.py` - Add time warping specifications
+1. `params/tasks_params.csv` - Add task parameters and specify `processor_class` (use `BehavioralProcessor` for standard tasks)
+2. For custom task logic, create a new processor class inheriting from `BehavioralProcessor` and override specific methods:
+   - `compute_trial_outcome()` - Custom outcome computation logic
+   - `compute_success()` - Custom success criteria  
+   - `get_timewarp_config()` - Custom time warping specifications
+3. `params/timewarp_spec.json` - Add time warping specifications for new task types
+
+## Development with Processor Architecture
+
+### Creating Custom Processors
+To create a task-specific processor:
+
+```python
+# Example: Custom processor for a new task type
+from trialexp.process.pycontrol.processors import BehavioralProcessor, register_processor
+
+class MyCustomProcessor(BehavioralProcessor):
+    def compute_trial_outcome(self, df_events, df_conditions, task_config):
+        # Custom outcome logic here
+        df_conditions = super().compute_trial_outcome(df_events, df_conditions, task_config)
+        # Add custom modifications
+        return df_conditions
+
+# Register the custom processor
+register_processor("MyCustomProcessor", MyCustomProcessor)
+```
+
+### Testing Processors
+```bash
+# Test processor functionality
+uv run python -c "
+from trialexp.process.pycontrol.processors import get_processor, list_processors
+print('Available processors:', list_processors())
+processor = get_processor('BehavioralProcessor')
+print('Processor loaded:', type(processor))
+"
+
+# Test specific processor methods
+uv run python -c "
+from trialexp.process.pycontrol.processors import get_processor
+processor = get_processor('BehavioralProcessor')
+print('Available methods:', [m for m in dir(processor) if not m.startswith('_')])
+"
+```
+
+### Processor Development Guidelines
+- Use `BehavioralProcessor` as base class for most custom processors
+- Override specific methods rather than rewriting entire workflows
+- Test processor registration and method inheritance
+- Update `params/tasks_params.csv` to specify custom processor class
+- Use `uv run python` for all testing commands
 
 ## Development Tools
 
