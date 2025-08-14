@@ -38,7 +38,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import xarray as xr
 from trialexp.process.pycontrol import event_filters
-from trialexp.process.pycontrol.utils import add_events_to_time_series
+from trialexp.process.pycontrol.utils import add_events_to_time_series, calculate_lick_rate
+from trialexp.process.pyphotometry.utils import (
+    import_ppd_auto, 
+    preprocess_photometry, 
+    photometry2xarray, 
+    add_event_data,
+    align_photometry_to_pycontrol
+)
+from trialexp.utils.pyphotometry_utilities import create_photo_sync
+from trialexp.process.pycontrol import event_filters
+from trialexp.process.pycontrol.event_filters import extract_event_time
+import pickle
 
 
 class BaseTaskProcessor:
@@ -503,6 +514,289 @@ class BaseTaskProcessor:
         self.export_to_parquet(df_export, output_path)
         
         return df_export
+    
+    def process_photometry_session(self, photometry_folder: str, df_pycontrol: pd.DataFrame,
+                                 df_events: pd.DataFrame, df_conditions: pd.DataFrame,
+                                 output_paths: Dict[str, str]) -> Tuple[xr.Dataset, Any]:
+        """
+        Complete photometry processing pipeline - the most complex processor method.
+        
+        This method handles the entire photometry import, processing, alignment, and 
+        integration workflow that was in 04_import_pyphotometry.py.
+        
+        Args:
+            photometry_folder: Path to folder containing .ppd files
+            df_pycontrol: PyControl dataframe
+            df_events: Events dataframe with trial information
+            df_conditions: Conditions dataframe
+            output_paths: Dict with keys 'xr_photometry', 'xr_session', 'pycontrol_aligner'
+            
+        Returns:
+            Tuple of (final_session_dataset, pycontrol_aligner)
+        """
+        from pathlib import Path
+        
+        trial_window = df_events.attrs['trial_window']
+        
+        # Try to import and process photometry data
+        has_photometry, dataset = self.import_and_preprocess_photometry(
+            photometry_folder, df_pycontrol
+        )
+        
+        if has_photometry:
+            # Align photometry data to PyControl timeline
+            dataset, pycontrol_aligner = self.align_photometry_data(
+                dataset, df_events, df_pycontrol
+            )
+            
+            # Add lick rate if lick events exist
+            if any(df_events.content == 'lick'):
+                xa_lick_rate = calculate_lick_rate(df_events, dataset)
+                dataset['lick_rate'] = xa_lick_rate
+            
+            # Add event-locked data for all variables
+            dataset = self.add_event_locked_data(dataset, df_events, trial_window)
+            
+            # Filter out pre-task data and add metadata
+            dataset = dataset.sel(time=dataset.trial >= 0)
+            dataset.attrs.update(df_pycontrol.attrs)
+            dataset.attrs.update(df_events.attrs)
+            
+            # Save photometry dataset
+            dataset.to_netcdf(output_paths['xr_photometry'], engine='h5netcdf')
+            
+        else:
+            # Handle case with no photometry data
+            dataset, pycontrol_aligner = self.create_no_photometry_dataset(
+                df_pycontrol, df_events, trial_window, output_paths['xr_photometry']
+            )
+        
+        # Create final session dataset with binning and condition merging
+        xr_session = self.create_session_dataset(dataset, df_conditions)
+        
+        # Save final session dataset
+        xr_session.to_netcdf(output_paths['xr_session'], engine='h5netcdf')
+        
+        # Save pycontrol aligner
+        self.save_pycontrol_aligner(pycontrol_aligner, output_paths['pycontrol_aligner'])
+        
+        return xr_session, pycontrol_aligner
+    
+    def import_and_preprocess_photometry(self, photometry_folder: str, 
+                                       df_pycontrol: pd.DataFrame) -> Tuple[bool, xr.Dataset]:
+        """
+        Import and preprocess photometry data from .ppd files.
+        
+        Args:
+            photometry_folder: Path to folder containing .ppd files
+            df_pycontrol: PyControl dataframe for preprocessing context
+            
+        Returns:
+            Tuple of (has_photometry: bool, dataset: xr.Dataset or None)
+        """
+        from pathlib import Path
+        
+        try:
+            pyphotometry_file = list(Path(photometry_folder).glob('*.ppd'))[0]
+            
+            # Import and preprocess photometry data
+            data_photometry = import_ppd_auto(pyphotometry_file)
+            data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
+            
+            # Convert to xarray, skipping intermediate processing variables
+            skip_var = ['analog_1_est_motion', 'time',
+                       'analog_1_corrected', 'analog_1_baseline_fluo', 
+                       'analog_2_baseline_fluo',
+                       'isos_bleach_baseline', 'analog_1_bleach_baseline',
+                       'analog_1_detrend', 'isos_detrended']
+            
+            dataset = photometry2xarray(data_photometry, skip_var=skip_var)
+            return True, dataset
+            
+        except (IndexError, FileNotFoundError):
+            return False, None
+    
+    def align_photometry_data(self, dataset: xr.Dataset, df_events: pd.DataFrame,
+                            df_pycontrol: pd.DataFrame) -> Tuple[xr.Dataset, Any]:
+        """
+        Align photometry data to PyControl timeline using sync pulses.
+        
+        Args:
+            dataset: Photometry dataset
+            df_events: Events dataframe
+            df_pycontrol: PyControl dataframe
+            
+        Returns:
+            Tuple of (aligned_dataset, pycontrol_aligner)
+        """
+        # Get photometry sync pulses
+        photo_rsync = dataset.attrs['pulse_times_2']
+        
+        # Create alignment object between photometry and PyControl
+        pycontrol_aligner = create_photo_sync(df_pycontrol, dataset)
+        
+        # Perform the alignment
+        dataset = align_photometry_to_pycontrol(dataset, df_events, pycontrol_aligner)
+        
+        return dataset, pycontrol_aligner
+    
+    def add_event_locked_data(self, dataset: xr.Dataset, df_events: pd.DataFrame,
+                            trial_window: List[float]) -> xr.Dataset:
+        """
+        Add event-locked data for multiple variables and events.
+        
+        This is the complex processing loop from the original script that adds
+        trial-locked data for different events and variables.
+        
+        Args:
+            dataset: Photometry dataset
+            df_events: Events dataframe
+            trial_window: Trial time window [start_ms, end_ms]
+            
+        Returns:
+            xr.Dataset: Dataset with event-locked data added
+        """
+        # Calculate event time coordinates
+        event_period = (trial_window[1] - trial_window[0]) / 1000
+        sampling_freq = dataset.attrs['sampling_rate']
+        event_time_coord = np.linspace(trial_window[0], trial_window[1], 
+                                     int(event_period * sampling_freq))
+        
+        # Determine which variables to process
+        var2add = ['zscored_df_over_f']
+        if 'zscored_df_over_f_analog_2' in dataset:
+            var2add.append('zscored_df_over_f_analog_2')
+        if 'zscored_df_over_f_analog_3' in dataset:
+            var2add.append('zscored_df_over_f_analog_3')
+        if 'lick_rate' in dataset:
+            var2add.append('lick_rate')
+        
+        # Process each variable
+        for var in var2add:
+            # Add trigger event data
+            trigger = df_events.attrs['triggers'][0]
+            add_event_data(df_events, event_filters.get_first_event_from_name,
+                         trial_window, dataset, event_time_coord, 
+                         var, trigger, dataset.attrs['sampling_rate'],
+                         filter_func_kwargs={'evt_name': trigger})
+            
+            # Add first bar off
+            add_event_data(df_events, event_filters.get_first_bar_off, 
+                         trial_window, dataset, event_time_coord, 
+                         var, 'first_bar_off', dataset.attrs['sampling_rate'])
+
+            # Add first spout
+            add_event_data(df_events, event_filters.get_first_spout, 
+                         trial_window, dataset, event_time_coord, 
+                         var, 'first_spout', dataset.attrs['sampling_rate'])
+
+            # Add last bar_off before first spout
+            add_event_data(df_events, event_filters.get_last_bar_off_before_first_spout, 
+                         trial_window, dataset, event_time_coord, 
+                         var, 'last_bar_off', dataset.attrs['sampling_rate'])
+            
+            # Add data from any additional event triggers
+            if 'extra_event_triggers' in df_events.attrs:
+                for evt_triggers in df_events.attrs['extra_event_triggers']:
+                    add_event_data(df_events, event_filters.get_events_from_name,
+                                 trial_window, dataset, event_time_coord, 
+                                 var, evt_triggers, dataset.attrs['sampling_rate'],
+                                 groupby_col=None,
+                                 filter_func_kwargs={'evt_name': evt_triggers})
+        
+        return dataset
+    
+    def create_no_photometry_dataset(self, df_pycontrol: pd.DataFrame, df_events: pd.DataFrame,
+                                   trial_window: List[float], output_path: str) -> Tuple[xr.Dataset, None]:
+        """
+        Create a minimal dataset when no photometry data is available.
+        
+        Args:
+            df_pycontrol: PyControl dataframe
+            df_events: Events dataframe
+            trial_window: Trial time window
+            output_path: Path for dummy photometry file
+            
+        Returns:
+            Tuple of (minimal_dataset, None)
+        """
+        from pathlib import Path
+        
+        # Create minimal dataset with PyControl data structure
+        dataset = xr.Dataset()
+        t = df_pycontrol.time.values
+        time_coords = np.arange(t[0], t[-1])
+        sampling_rate = 1000  # Default PyControl sampling rate
+        
+        event_period = (trial_window[1] - trial_window[0]) / 1000
+        event_time_coord = np.linspace(trial_window[0], trial_window[1], 
+                                     int(event_period * sampling_rate))
+
+        dataset = dataset.assign_coords(time=('time', time_coords))
+        dataset = dataset.assign_coords(event_time=('event_time', event_time_coord))
+        
+        # Add metadata
+        dataset.attrs.update(df_pycontrol.attrs)
+        dataset.attrs.update(df_events.attrs)
+        dataset.attrs['sampling_rate'] = sampling_rate
+        
+        # Create dummy photometry file for Snakemake
+        Path(output_path).touch()
+        
+        return dataset, None
+    
+    def create_session_dataset(self, dataset: xr.Dataset, df_conditions: pd.DataFrame) -> xr.Dataset:
+        """
+        Create final session dataset with binning and condition merging.
+        
+        Args:
+            dataset: Photometry dataset
+            df_conditions: Conditions dataframe
+            
+        Returns:
+            xr.Dataset: Final session dataset
+        """
+        # Bin the data (downsample from 1000Hz to 100Hz)
+        down_sample_ratio = int(dataset.attrs['sampling_rate'] / 100)
+        if down_sample_ratio > 0:
+            dataset_binned = dataset.coarsen(time=down_sample_ratio, 
+                                           event_time=down_sample_ratio, 
+                                           boundary='trim').mean()
+        else:
+            dataset_binned = dataset
+        
+        # Cast event_time to int to avoid floating point errors
+        dataset_binned['event_time'] = dataset_binned.event_time.astype(int)
+        dataset_binned.attrs.update(dataset.attrs)
+        
+        # Merge with conditions
+        df_condition = df_conditions[df_conditions.index > 0]
+        ds_condition = xr.Dataset.from_dataframe(df_condition)
+        xr_session = xr.merge([ds_condition, dataset_binned])
+        
+        # Add session dimension for multi-session analysis
+        session_id = dataset.attrs.get('session_id', 'unknown_session')
+        xr_session = xr_session.expand_dims({'session_id': [session_id]})
+        
+        xr_session.attrs.update(dataset_binned.attrs)
+        
+        return xr_session
+    
+    def save_pycontrol_aligner(self, pycontrol_aligner: Any, output_path: str) -> None:
+        """
+        Save PyControl aligner object or create dummy file.
+        
+        Args:
+            pycontrol_aligner: Alignment object or None
+            output_path: Output file path
+        """
+        from pathlib import Path
+        
+        if pycontrol_aligner is not None:
+            with open(output_path, 'wb') as f:
+                pickle.dump(pycontrol_aligner, f)
+        else:
+            Path(output_path).touch()
     
     def compute_success(self, df_events_trials: pd.DataFrame, df_conditions: pd.DataFrame,
                        task_config: Dict[str, Any]) -> pd.DataFrame:
