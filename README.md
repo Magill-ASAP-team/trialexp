@@ -12,7 +12,7 @@ This project manages its dependencis via uv
 The pipeline relies on a set of environmental variables for the directory location. Choose an example that is closest to your system under `env` folder, fill out the content and rename it to `.env`, and copy it to the project root e.g. as `trialexp\.env`.
 
 ## Usage
-This pipline uses [just](https://github.com/casey/just) to handle receipes to run the pipeline
+This pipline uses [just](https://github.com/casey/just) to handle recipes to run the pipeline
 1. Run `just run-pipeline` to run the full pipeline
 2. To force rerun a certain session use `just make-session <search term> -F`  
  e.g. `just make-session TT021-2025-06-04 -F`
