@@ -114,7 +114,6 @@ reports
 
 *.mp4
 *.gif
-*.png
 *.nc
 .env
 
