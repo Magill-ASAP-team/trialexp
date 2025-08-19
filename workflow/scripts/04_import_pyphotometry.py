@@ -17,6 +17,7 @@ from trialexp import config
 from pathlib import Path
 import pickle
 from datetime import datetime
+from trialexp.process.processor.BasePhotometryProcessor import BasePhotometryProcessor
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
@@ -32,39 +33,44 @@ trial_window = df_event.attrs['trial_window']
 
 df_dataformat = pd.read_csv('params/data_format.csv')
 
-
+processor = BasePhotometryProcessor()
 #%% Load pyphotometry file
 try:
     pyphotometry_file = list(Path(sinput.photometry_folder).glob('*.ppd'))[0]
     has_photometry = True
-    data_photometry = import_ppd_auto(pyphotometry_file)
-    data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
+    data_photometry = processor.import_photometry_file(pyphotometry_file)
+    data_photometry = processor.preprocess_photometry(data_photometry, df_pycontrol)
+    dataset = processor.convert2xarray(data_photometry)
+    
+    # data_photometry = import_ppd_auto(pyphotometry_file)
+    # data_photometry = preprocess_photometry(data_photometry, df_pycontrol)
     
     # Convert to xarray
-    skip_var = ['analog_1_est_motion','time',
-                'analog_1_corrected', 'analog_1_baseline_fluo', 
-                'analog_2_baseline_fluo',
-                'isos_bleach_baseline', 'analog_1_bleach_baseline',
-                'analog_1_detrend', 'isos_detrended']
+    # skip_var = ['analog_1_est_motion','time',
+    #             'analog_1_corrected', 'analog_1_baseline_fluo', 
+    #             'analog_2_baseline_fluo',
+    #             'isos_bleach_baseline', 'analog_1_bleach_baseline',
+    #             'analog_1_detrend', 'isos_detrended']
     
-    dataset = photometry2xarray(data_photometry, skip_var = skip_var)
+    # dataset = photometry2xarray(data_photometry, skip_var = skip_var)
 except IndexError:
     has_photometry = False
 
 #%% Align data
 if has_photometry:    
-    photo_rsync = dataset.attrs['pulse_times_2']
+    dataset = processor.align_data(dataset, df_pycontrol, df_event)
+    # photo_rsync = dataset.attrs['pulse_times_2']
 
-    #align pyphotometry time to pycontrol
-    pycontrol_aligner = create_photo_sync(df_pycontrol, data_photometry)
+    # #align pyphotometry time to pycontrol
+    # pycontrol_aligner = create_photo_sync(df_pycontrol, data_photometry)
 
-    dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
+    # dataset = align_photometry_to_pycontrol(dataset, df_event, pycontrol_aligner)
 
 
-    # Also add lick rate as another variables
-    if any(df_event.content == 'lick'):
-        xa_lick_rate = calculate_lick_rate(df_event, dataset)
-        dataset['lick_rate'] = xa_lick_rate
+    # # Also add lick rate as another variables
+    # if any(df_event.content == 'lick'):
+    #     xa_lick_rate = calculate_lick_rate(df_event, dataset)
+    #     dataset['lick_rate'] = xa_lick_rate
 
 #%% Add in the relative time to different events
 event_period = (trial_window[1] - trial_window[0])/1000
