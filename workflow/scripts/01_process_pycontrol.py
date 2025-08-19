@@ -32,17 +32,21 @@ if len(filename)==0:
     
 # Quick parse to get task name for processor selection
 df_session = session_dataframe(filename[0])
-df_temp = parse_session_dataframe(df_session)
-task_name = df_temp.attrs['task_name']
+df_pycontrol = parse_session_dataframe(df_session)
+
+session_id = Path(sinput.session_path).name
+task_name = df_pycontrol.attrs['task_name']
 
 # Get processor configuration
-task_idx = tasks["task"] == task_name
+task_idx = (tasks["task"] == task_name)
 processor_class_name = str(tasks.loc[task_idx, 'processor_class'].iloc[0]) if 'processor_class' in tasks.columns else 'BaseTaskProcessor'
 processor = get_processor(processor_class_name)
 
 #%% Process full session using processor
-df_pycontrol, df_events_cond, df_conditions, df_events_trials = processor.process_full_session(
-    sinput.session_path, tasks
+
+task_config = processor.get_task_configuration(tasks, task_name)
+df_events_cond, df_conditions, df_events_trials = processor.process_full_session(
+    df_pycontrol, task_config
 )
 
 # Save pycontrol dataframe (first save point)

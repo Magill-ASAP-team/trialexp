@@ -30,7 +30,7 @@ class BehavioralProcessor(PyControlProcessor, PhotometryProcessor):
         """Initialize the combined processor."""
         pass
     
-    def process_full_session(self, session_path: str, tasks_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def process_full_session(self, df_pycontrol, task_config: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Process complete PyControl session from file to analysis-ready data.
         
@@ -39,16 +39,17 @@ class BehavioralProcessor(PyControlProcessor, PhotometryProcessor):
             tasks_df: Tasks configuration dataframe
             
         Returns:
-            Tuple of (df_pycontrol, df_events, df_conditions, df_events_cond)
+            Tuple of (df_events_cond, df_conditions, df_events_trials)
         """
         # Load and parse session
-        df_pycontrol, task_name = self.load_and_parse_pycontrol(session_path, tasks_df)
         
         # Process lick events
+        subjectID = df_pycontrol.attrs['subject_id']
+
         df_pycontrol = self.process_lick_events(df_pycontrol)
         
         # Get task configuration
-        task_config = self.get_task_configuration(task_name, tasks_df)
+        # task_config = self.get_task_configuration(task_name, tasks_df)
         
         # Extract trial data
         df_events = self.extract_trial_data(df_pycontrol, task_config)
@@ -61,7 +62,11 @@ class BehavioralProcessor(PyControlProcessor, PhotometryProcessor):
         # Merge events with conditions
         df_events_cond = self.merge_events_with_conditions(df_events, df_conditions)
         
-        return df_pycontrol, df_events, df_conditions, df_events_cond
+        # Get df_events_trials from stored attributes
+        df_events_trials = df_events.attrs.get('df_events_trials')
+        
+        # The script expects (df_events_cond, df_conditions, df_events_trials)
+        return df_events_cond, df_conditions, df_events_trials
     
     def process_photometry_session(self, photometry_folder: str, df_pycontrol: pd.DataFrame,
                                  df_events: pd.DataFrame, df_conditions: pd.DataFrame,

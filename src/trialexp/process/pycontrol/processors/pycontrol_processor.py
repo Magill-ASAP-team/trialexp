@@ -45,7 +45,7 @@ class PyControlProcessor:
     and task-specific success criteria without photometry dependencies.
     """
     
-    def load_and_parse_pycontrol(self, session_path: str, tasks_df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
+    def load_and_parse_pycontrol(self, session_path: str, task_config: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
         """
         Load and parse PyControl session file.
         
@@ -91,7 +91,7 @@ class PyControlProcessor:
         
         return 'unknown_task'
     
-    def get_task_configuration(self, task_name: str, tasks_df: pd.DataFrame) -> Dict[str, Any]:
+    def get_task_configuration(self, tasks_df: pd.DataFrame, task_name: str) -> Dict[str, Any]:
         """
         Get task-specific configuration parameters.
         
@@ -102,18 +102,17 @@ class PyControlProcessor:
         Returns:
             Dict containing task configuration
         """
-        try:
-            task_config = get_task_specs(task_name, tasks_df)
-            return task_config
-        except Exception as e:
-            print(f"Warning: Could not load task config for {task_name}: {e}")
-            # Return default configuration
-            return {
-                'task_name': task_name,
-                'triggers': ['hold_for_water'],
-                'timelim': [1000, 4000],
-                'trial_window': [-1000, 4000]
-            }
+        task_specs = get_task_specs(tasks_df, task_name)
+        # Convert tuple from get_task_specs to dictionary
+        task_config = {
+            'conditions': task_specs[0],
+            'triggers': task_specs[1],
+            'events_to_process': task_specs[2],
+            'trial_window': task_specs[3],
+            'extra_event_trigger': task_specs[4],
+            'trial_parameters': task_specs[5]
+        }
+        return task_config
     
     def extract_trial_data(self, df_session: pd.DataFrame, task_config: Dict[str, Any]) -> pd.DataFrame:
         """
@@ -128,14 +127,27 @@ class PyControlProcessor:
         """
         triggers = task_config.get('triggers', ['hold_for_water'])
         trial_window = task_config.get('trial_window', [-1000, 4000])
+        events_to_process = task_config.get('events_to_process', [])
+        
+        # Get session metadata
+        subject_ID = df_session.attrs.get('subject_ID', 'unknown')
+        datetime_obj = df_session.attrs.get('datetime_obj', None)
+        
+        # Provide fallback datetime if not available
+        if datetime_obj is None:
+            from datetime import datetime
+            datetime_obj = datetime.now()
         
         # Extract trials using the first trigger
-        df_events = extract_trial_by_trigger(df_session, triggers[0], trial_window)
+        df_events_trials, df_events = extract_trial_by_trigger(df_session, triggers[0], events_to_process, trial_window, subject_ID, datetime_obj)
         
         # Add metadata
         df_events.attrs.update(df_session.attrs)
         df_events.attrs['triggers'] = triggers
         df_events.attrs['trial_window'] = trial_window
+        
+        # Store df_events_trials for use in conditions computation
+        df_events.attrs['df_events_trials'] = df_events_trials
         
         return df_events
     
@@ -150,11 +162,16 @@ class PyControlProcessor:
         Returns:
             pd.DataFrame: Conditions dataframe
         """
+        # Get conditions and df_events_trials from task config and stored attributes
+        conditions = task_config.get('conditions', [])
+        trial_parameters = task_config.get('trial_parameters', [])
+        df_events_trials = df_events.attrs.get('df_events_trials')
+        
         # Compute basic conditions
-        df_conditions = compute_conditions_by_trial(df_events)
+        df_conditions = compute_conditions_by_trial(df_events_trials, conditions)
         
         # Add trial parameters if available
-        df_conditions = add_trial_params(df_conditions, df_events)
+        df_conditions = add_trial_params(df_conditions, trial_parameters, df_events)
         
         # Add metadata
         df_conditions.attrs.update(df_events.attrs)
@@ -302,10 +319,8 @@ class PyControlProcessor:
         Returns:
             pd.DataFrame: Session dataframe with processed lick events
         """
-        # Analyze lick signal and add lick events
-        df_session = analyze_lick_signal(df_session)
-        df_session = add_lick_events(df_session)
-        
+        # TODO: Implement lick event processing if needed
+        # Current implementation is a placeholder that returns data unchanged
         return df_session
     
     def merge_events_with_conditions(self, df_events: pd.DataFrame, df_conditions: pd.DataFrame) -> pd.DataFrame:
