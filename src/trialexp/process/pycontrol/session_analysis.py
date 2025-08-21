@@ -618,6 +618,9 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
     ]:
         if 'US_end_timer_trial_time' in df_events.columns:
             df_conditions['success'] = ~df_events.US_end_timer_trial_time.isna()
+
+    elif task_name in['pavlovian_task_August25']:
+        df_conditions["success"] = False
         
     return df_conditions
 
