@@ -75,8 +75,8 @@ elif task_name in ['reaching_go_spout_incr_break2_nov22',
     extraction_specs = specs['break2']
     outcome2plot = ['success', 'no_reach', 'late_reach']
 
-elif task_name in ['pavlovian_task_August_25']:
-    extracion_specs = specs['pavlovian_go_reward_nogap']
+elif task_name in ['pavlovian_task_August25']:
+    extraction_specs = specs['pavlovian_go_reward_nogap']
     outcome2plot = ['standard','omission','jackpot']
     
 else:
