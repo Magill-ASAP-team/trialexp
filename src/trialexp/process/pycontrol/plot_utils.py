@@ -12,6 +12,7 @@ from loguru import logger
 default_palette = plt.cm.tab20.colors
 trial_outcome_palette = {
     'success': default_palette[0],
+    'standard': default_palette[0],
     'aborted' : default_palette[1],
     'button_press': default_palette[2],
     'late_reach': default_palette[3],
