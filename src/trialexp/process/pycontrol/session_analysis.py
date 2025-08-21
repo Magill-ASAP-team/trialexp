@@ -194,11 +194,13 @@ def get_task_specs(tasks_trig_and_events, task_name):
     extra_event_trigger = (
         extra_trigger_info.split(";") if type(extra_trigger_info) is str else []
     )
+    extra_event_trigger = [e.strip() for e in extra_event_trigger]
 
     trial_parameters = tasks_trig_and_events["trial_parameters"][task_idx].iloc[0]
     trial_parameters = (
         trial_parameters.split(";") if type(trial_parameters) is str else []
     )
+    trial_parameters = [e.strip() for e in trial_parameters]
 
     return (
         conditions,
