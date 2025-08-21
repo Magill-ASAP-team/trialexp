@@ -382,7 +382,7 @@ def compute_trial_outcome(row, task_name):
         else:
             return "undefined"
     elif task_name in [
-        "pavlovian_task_August_25"
+        "pavlovian_task_August25"
     ]:
         if row.US_delay_timer:
             return "standard"
