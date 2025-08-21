@@ -382,6 +382,21 @@ def compute_trial_outcome(row, task_name):
         else:
             return "undefined"
     elif task_name in [
+        "pavlovian_task_August_25"
+    ]:
+        if row.US_delay_timer:
+            return "standard"
+        elif row.button_press:
+            return "button_press"
+        elif row.US_jackpot:
+            return "jackpot"
+        elif row.US_omission:
+            return "omission"
+        else:
+            return "undefined"
+
+
+    elif task_name in [
         "reaching_go_spout_incr_break2_nov22",
         "reaching_go_spout_incr_break2_Feb25",
         "reaching_go_spout_incr_break2_April24",
