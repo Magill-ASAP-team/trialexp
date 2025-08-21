@@ -1,4 +1,4 @@
-# Triexap
+# Trialexp
 
 This repository contains the analysis pipeline for pycontrol, pyphotometry and Neuropixels data.
 
