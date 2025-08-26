@@ -194,11 +194,13 @@ def get_task_specs(tasks_trig_and_events, task_name):
     extra_event_trigger = (
         extra_trigger_info.split(";") if type(extra_trigger_info) is str else []
     )
+    extra_event_trigger = [e.strip() for e in extra_event_trigger]
 
     trial_parameters = tasks_trig_and_events["trial_parameters"][task_idx].iloc[0]
     trial_parameters = (
         trial_parameters.split(";") if type(trial_parameters) is str else []
     )
+    trial_parameters = [e.strip() for e in trial_parameters]
 
     return (
         conditions,
@@ -381,6 +383,21 @@ def compute_trial_outcome(row, task_name):
             return "success"
         else:
             return "undefined"
+    elif task_name in [
+        "pavlovian_task_August25"
+    ]:
+        if row.US_delay_timer:
+            return "standard"
+        elif row.button_press:
+            return "button_press"
+        elif row.US_jackpot:
+            return "jackpot"
+        elif row.US_omission:
+            return "omission"
+        else:
+            return "undefined"
+
+
     elif task_name in [
         "reaching_go_spout_incr_break2_nov22",
         "reaching_go_spout_incr_break2_Feb25",
@@ -603,6 +620,9 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
     ]:
         if 'US_end_timer_trial_time' in df_events.columns:
             df_conditions['success'] = ~df_events.US_end_timer_trial_time.isna()
+
+    elif task_name in['pavlovian_task_August25']:
+        df_conditions["success"] = False
         
     return df_conditions
 
