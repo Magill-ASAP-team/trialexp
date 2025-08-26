@@ -77,61 +77,61 @@ event_period = (trial_window[1] - trial_window[0])/1000
 
 
 if has_photometry:
-    sampling_freq = dataset.attrs['sampling_rate']
-    event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
+    # sampling_freq = dataset.attrs['sampling_rate']
+    # event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
        
-    var2add = ['zscored_df_over_f']
-    if 'zscored_df_over_f_analog_2' in  dataset:
-        var2add.append('zscored_df_over_f_analog_2')
+    # var2add = ['zscored_df_over_f']
+    # if 'zscored_df_over_f_analog_2' in  dataset:
+    #     var2add.append('zscored_df_over_f_analog_2')
         
-    if 'zscored_df_over_f_analog_3' in dataset:
-        var2add.append('zscored_df_over_f_analog_3')
+    # if 'zscored_df_over_f_analog_3' in dataset:
+    #     var2add.append('zscored_df_over_f_analog_3')
     
-    if 'lick_rate' in dataset:
-        var2add.append('lick_rate')
+    # if 'lick_rate' in dataset:
+    #     var2add.append('lick_rate')
 
 
 
-    for var in var2add:
-         # Add trigger
-        trigger = df_event.attrs['triggers'][0]
-        add_event_data(df_event, event_filters.get_first_event_from_name,
-                    trial_window, dataset, event_time_coord, 
-                    var, trigger, dataset.attrs['sampling_rate'],
-                    filter_func_kwargs={'evt_name':trigger})
+    # for var in var2add:
+    #      # Add trigger
+    #     trigger = df_event.attrs['triggers'][0]
+    #     add_event_data(df_event, event_filters.get_first_event_from_name,
+    #                 trial_window, dataset, event_time_coord, 
+    #                 var, trigger, dataset.attrs['sampling_rate'],
+    #                 filter_func_kwargs={'evt_name':trigger})
         
-        # Add first bar off
-        add_event_data(df_event, event_filters.get_first_bar_off, trial_window, dataset,event_time_coord, 
-                    var, 'first_bar_off', dataset.attrs['sampling_rate'])
+    #     # Add first bar off
+    #     add_event_data(df_event, event_filters.get_first_bar_off, trial_window, dataset,event_time_coord, 
+    #                 var, 'first_bar_off', dataset.attrs['sampling_rate'])
 
-        # Add first spout
-        add_event_data(df_event, event_filters.get_first_spout, trial_window, dataset, event_time_coord, 
-                    var, 'first_spout', dataset.attrs['sampling_rate'])
+    #     # Add first spout
+    #     add_event_data(df_event, event_filters.get_first_spout, trial_window, dataset, event_time_coord, 
+    #                 var, 'first_spout', dataset.attrs['sampling_rate'])
 
-        # Add last bar_off before first spout
+    #     # Add last bar_off before first spout
 
-        add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
-                    dataset,event_time_coord, 
-                    var, 'last_bar_off', dataset.attrs['sampling_rate'])
+    #     add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
+    #                 dataset,event_time_coord, 
+    #                 var, 'last_bar_off', dataset.attrs['sampling_rate'])
     
-        # Also add data from any additional event triggers
-        if 'extra_event_triggers' in df_event.attrs:
-            for evt_triggers in df_event.attrs['extra_event_triggers']:
-                #Note: df_event only contains event extract around the trigger
-                add_event_data(df_event, event_filters.get_events_from_name,
-                    trial_window, dataset, event_time_coord, 
-                    var, evt_triggers, dataset.attrs['sampling_rate'],
-                    groupby_col=None,
-                    filter_func_kwargs={'evt_name':evt_triggers})
+    #     # Also add data from any additional event triggers
+    #     if 'extra_event_triggers' in df_event.attrs:
+    #         for evt_triggers in df_event.attrs['extra_event_triggers']:
+    #             #Note: df_event only contains event extract around the trigger
+    #             add_event_data(df_event, event_filters.get_events_from_name,
+    #                 trial_window, dataset, event_time_coord, 
+    #                 var, evt_triggers, dataset.attrs['sampling_rate'],
+    #                 groupby_col=None,
+    #                 filter_func_kwargs={'evt_name':evt_triggers})
             
 
 
-    dataset = dataset.sel(time = dataset.trial>=0) #remove data outside of task
+    # dataset = dataset.sel(time = dataset.trial>=0) #remove data outside of task
 
-    # add in all metadata
-    dataset.attrs.update(df_pycontrol.attrs)
-    dataset.attrs.update(df_event.attrs)
-
+    # # add in all metadata
+    # dataset.attrs.update(df_pycontrol.attrs)
+    # dataset.attrs.update(df_event.attrs)
+    dataset = processor.process_events(dataset, df_event, df_pycontrol)
     dataset.to_netcdf(soutput.xr_photometry, engine='h5netcdf')
 
 else:
@@ -155,16 +155,17 @@ else:
     Path(soutput.xr_photometry).touch()
         
 #%% Bin the data such that we only have 1 data point per time bin
-down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
-if down_sample_ratio>0:
-    # bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz for continuous data
-    dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
-else:
-    # do not resample when sampling rate is lower than 100
-    dataset_binned = dataset
-dataset_binned['event_time'] = dataset_binned.event_time.astype(int) #cast to int to avoid floating point error later
-dataset_binned.attrs.update(dataset.attrs)
+# down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
+# if down_sample_ratio>0:
+#     # bin according to 10ms time bin (aka 100Hz), original sampling frequency is at 1000Hz for continuous data
+#     dataset_binned = dataset.coarsen(time=down_sample_ratio, event_time=down_sample_ratio, boundary='trim').mean()
+# else:
+#     # do not resample when sampling rate is lower than 100
+#     dataset_binned = dataset
+# dataset_binned['event_time'] = dataset_binned.event_time.astype(int) #cast to int to avoid floating point error later
+# dataset_binned.attrs.update(dataset.attrs)
 
+dataset_binned = processor.coarsen_data(dataset)
 #%% Merge conditions
 df_condition = df_condition[df_condition.index>0]
 ds_condition = xr.Dataset.from_dataframe(df_condition)
