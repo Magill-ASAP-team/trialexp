@@ -244,6 +244,7 @@ def window_subtraction(analog1, analog2, sampling_rate, win_size_s=30) -> dict:
             r_value = 0
             p_value = 0
             r_value = 0
+            intercept = 0
             slope = 0
             
         start_index_chunks.append(start_ind)
@@ -511,6 +512,7 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
         b, a = butter(2, low_pass / (0.5 * sampling_rate), "low")
     elif high_pass:
         b, a = butter(2, high_pass / (0.5 * sampling_rate), "high")
+
     if low_pass or high_pass:
         analog_1_filt = filtfilt(b, a, analog_1)
         analog_2_filt = filtfilt(b, a, analog_2)
@@ -547,6 +549,7 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
         )
     
     if n_analog_signals ==6:
+        # also filter the 
         data_dict.update(
             {
                 'bleedthrough_ch1': bleedthrough_ch1,
@@ -1479,6 +1482,87 @@ def motion_correction_multicolor(photometry_dict, motion_smooth_win=1001, baseli
 
     return photometry_dict
 
+    
+def motion_correction_opto(photometry_dict, motion_smooth_win=1001, baseline_method='lowpass'):
+    # analog1:  GFP
+    # analog2: RFP
+    # analog3: isosbestic
+    # bleedthrough_ch2: red channel when blue LED is on
+    # bleedhtrhough_ch1: green channel when orange LED is on
+    '''
+    Analysis notes:
+    - It will not do any motion correction
+    - use bleedthrough_ch2 to measure
+  
+    '''
+    sampling_rate = photometry_dict['sampling_rate']
+    
+    if any(['analog_1_filt' not in photometry_dict, 'analog_2_filt' not in photometry_dict]):
+        raise Exception('Analog 1 and Analog 2 must be filtered before motion correction')
+
+    try:
+
+        # method 2: correct motion after baseline removed from both analog1 and isosbestic
+        isos_bleach_baseline = lowpass_baseline(photometry_dict['analog_3_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+        analog_1_bleach_baseline = lowpass_baseline(photometry_dict['analog_1_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+
+        analog_1_detrend = photometry_dict['analog_1_filt'] - analog_1_bleach_baseline
+        isos_detrend = photometry_dict['analog_3_filt'] - isos_bleach_baseline
+        
+        photometry_dict['isos_bleach_baseline'] = isos_bleach_baseline
+        photometry_dict['analog_1_bleach_baseline'] = analog_1_bleach_baseline
+        photometry_dict['analog_1_detrend'] = analog_1_detrend
+        photometry_dict['isos_detrend'] = isos_detrend
+        
+        # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
+        photometry_dict['analog_1_est_motion'] = lowpass_baseline(isos_detrend, sampling_rate, 5) # only subtract the motion
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_detrend'] - photometry_dict['analog_1_est_motion']
+        
+        # method 3
+        # GFP_baseline = lowpass_baseline(photometry_dict['analog_1_filt'],sampling_rate)
+        # photometry_dict['analog_1_corrected']  = photometry_dict['analog_1_filt'] - GFP_baseline
+        
+        # For RFP, remove baseline
+        if baseline_method == 'lowpass':
+            RFP_baseline =  lowpass_baseline(photometry_dict['analog_2_filt'],sampling_rate)
+            isos_baseline = lowpass_baseline(photometry_dict['analog_3_filt'],sampling_rate)
+        else:
+            RFP_baseline = fit_exp_baseline(photometry_dict['analog_2_filt'], sampling_rate)
+            isos_baseline = fit_exp_baseline(photometry_dict['analog_3_filt'],sampling_rate)
+            
+        photometry_dict['analog_2_detrended']  = photometry_dict['analog_2_filt'] - RFP_baseline
+        photometry_dict['analog_3_detrended'] = photometry_dict['analog_3_filt'] - isos_baseline
+        
+        # we need to remove the shadow artifact first
+        photometry_dict['analog_2_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_2_detrended'],30)
+        photometry_dict['analog_3_deshadow'],_ = remove_outliner_mad(photometry_dict['analog_3_detrended'],30)
+
+        
+        analog_2_est_motion, analog_2_corrected = window_subtraction(photometry_dict['analog_2_deshadow'],
+                                                                     photometry_dict['analog_3_deshadow'],
+                                                                     sampling_rate)
+        
+        photometry_dict['analog_2_est_motion'] = analog_2_est_motion
+        photometry_dict['analog_2_corrected'] = analog_2_corrected
+
+        # process the bleedthrough channel
+        bleedthrough_ch2_detrend_baseline = lowpass_baseline(photometry_dict['bleedthrough_ch2_filt'], sampling_rate, 0.005) # low freq to only remove the baseline but not the motion artifact
+        bleedthrough_ch2_detrend = photometry_dict['bleedthrough_ch2_detrend'] - bleedthrough_ch2_detrend_baseline
+        photometry_dict['bleedthrough_ch2_corrected'] = bleedthrough_ch2_detrend
+
+        photometry_dict['motion_corrected'] = 1
+        
+        return photometry_dict
+    
+    except ValueError as e:
+        print(e)
+        print('Motion correction failed. Skipping motion correction')
+        # probably due to saturation , do not do motion correction
+        photometry_dict['analog_1_corrected'] = photometry_dict['analog_1_filt']
+        photometry_dict['motion_corrected'] = 0
+
+    return photometry_dict
+
 def lowpass_baseline(curve, sampling_rate, corner_freq = 0.02):
     # use an aggressive lowpass filter to find the baseline
     b,a = get_filt_coefs(low_pass=corner_freq, sampling_rate=sampling_rate)
@@ -1522,7 +1606,10 @@ def preprocess_photometry(data_photometry, df_pycontrol):
             data_photometry['motion_corrected'] = 0
 
         else:
-            if set(['Rdlight', 'rDA','tdTomato']) & set(injection):
+            if 'opto' in injection:
+                # do a special case for optogenetics 
+                data_photometry = motion_correction_opto(data_photometry)
+            elif set(['Rdlight', 'rDA','tdTomato']) & set(injection):
                 logger.debug('Processing multicolor photometry')
                 if not 'analog_3' in data_photometry:
                     baseline_correction_multicolor(data_photometry)
