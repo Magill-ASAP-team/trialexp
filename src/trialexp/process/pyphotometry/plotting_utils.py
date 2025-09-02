@@ -6,6 +6,7 @@ def plot_and_handler_error(plot_func, **kwargs):
     # helper function to handle the error when a certain facet is nil
     if len(kwargs['data'].dropna())>0:
         trial_outcome = kwargs['data']['trial_outcome'].iloc[0]
+        # if trial_outcome in trial_outcome_palette:
         kwargs['color'] = trial_outcome_palette[trial_outcome]
         plot_func(**kwargs)
   

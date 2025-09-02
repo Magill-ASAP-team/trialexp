@@ -93,7 +93,7 @@ def plot_variable(k, xr_session, figure_dir, skip_outcome):
     return f"Completed plotting for {k}"
 
 # Parallel execution
-n_jobs = min(len(var2plot), 3)  # Use all cores except one, or number of variables if fewer
+n_jobs = min(len(var2plot), 4)  # Use all cores except one, or number of variables if fewer
 print(f"Plotting {len(var2plot)} variables using {n_jobs} parallel jobs...")
 
 results = Parallel(n_jobs=n_jobs, verbose=1)(
@@ -104,3 +104,5 @@ results = Parallel(n_jobs=n_jobs, verbose=1)(
 print("All plots completed successfully!")
     
 xr_session.close()
+
+# %%

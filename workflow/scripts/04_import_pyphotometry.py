@@ -104,10 +104,19 @@ if has_photometry:
                     var, 'first_spout', dataset.attrs['sampling_rate'])
 
         # Add last bar_off before first spout
-
         add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
                     dataset,event_time_coord, 
                     var, 'last_bar_off', dataset.attrs['sampling_rate'])
+        
+        #get event to process
+        if 'opto' in df_event.attrs['task_name']:
+            # hard code for now, TODO: change the task param to yaml
+            for evt in df_event.attrs['events_to_process']:
+                add_event_data(df_event, event_filters.get_first_event_from_name,
+                        trial_window, dataset, event_time_coord, 
+                        var, f'first_{evt}', dataset.attrs['sampling_rate'],
+                        filter_func_kwargs={'evt_name':evt})
+                
     
         # Also add data from any additional event triggers
         if 'extra_event_triggers' in df_event.attrs:

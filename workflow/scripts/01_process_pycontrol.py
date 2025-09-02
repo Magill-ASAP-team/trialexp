@@ -70,12 +70,10 @@ df_pycontrol  = print2event(df_pycontrol, conditions, trial_parameters)
 df_events_trials, df_events = extract_trial_by_trigger(df_pycontrol, triggers[0], 
                                                        conditions+events_to_process+triggers+trial_parameters, 
                                             trial_window, subjectID, session_time)
-
 df_conditions = compute_conditions_by_trial(df_events_trials, conditions)
-df_conditions = add_trial_params(df_conditions, trial_parameters, df_events)
+df_conditions = add_trial_params(df_conditions, df_events)
 df_conditions = compute_success(df_events_trials, df_conditions,
                                   task_name, triggers, timelim)
-
 
 #%%
 
