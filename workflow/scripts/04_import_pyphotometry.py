@@ -84,7 +84,8 @@ if has_photometry:
     if 'lick_rate' in dataset:
         var2add.append('lick_rate')
 
-
+    if 'zscored_df_over_f_bleedthrough_ch2' in dataset:
+        var2add.append('zscored_df_over_f_bleedthrough_ch2')
 
     for var in var2add:
          # Add trigger
@@ -179,3 +180,5 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
+
+# %%
