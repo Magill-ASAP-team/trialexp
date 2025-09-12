@@ -1930,7 +1930,7 @@ def preprocess_photometry(data_photometry, df_pycontrol):
             data_photometry["motion_corrected"] = 0
 
         else:
-            if "opto" in injection and sum(data_photometry["digital_1"]) > 100:
+            if(("opto" in injection) or ('opto' in data_photometry['mode'])) and sum(data_photometry["digital_1"]) > 100:
                 logger.debug("I am processing data with optogenetics")
                 # do a special case for optogenetics
                 data_photometry = motion_correction_opto(data_photometry)
