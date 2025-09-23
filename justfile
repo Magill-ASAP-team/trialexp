@@ -42,3 +42,8 @@ sort SEARCH_TERM *FLAGS:
     fi
     targets=$(echo "$target" | awk '{printf "%s/processed/spike_workflow.done ", $0}')
     uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 -k {{FLAGS}}
+
+
+run-aligner:
+  uv run fastapi dev apps/atlasaligner/backend/main.py &
+  npm --prefix apps/atlasaligner/frontend run dev &

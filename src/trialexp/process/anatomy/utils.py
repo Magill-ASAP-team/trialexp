@@ -394,6 +394,8 @@ def get_trajectory_areas(df_session, shift, root_path):
     atlas, structure_tree = load_ccf_data(Path(root_path)/'allenccf')
     channel_position = np.load(df.path/'processed/kilosort4/ProbeA/channel_positions.npy')
     
+    # print('probe_idx', probe_idx)
+    # print('probe_ccdf', probe_ccf)
     probe_coords = trajectory2probe_coords(probe_ccf[probe_idx[0]], channel_position)
     shifted_coords = shift_trajectory_depth(probe_coords, shift)
     trajectory_areas = get_region_boundaries(shifted_coords, atlas, structure_tree)
