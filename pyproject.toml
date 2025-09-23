@@ -53,7 +53,7 @@ dependencies = [
     "exceptiongroup==1.2.1",
     "executing==2.0.1",
     "faiss-cpu==1.8.0",
-    "fastapi==0.115.5",
+    "fastapi[standard]==0.115.5",
     "fastdtw==0.3.4",
     "fasteners==0.19",
     "fastjsonschema==2.20.0",
