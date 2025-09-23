@@ -11,14 +11,14 @@ import pandas as pd
 import numpy as np
 from trialexp.process.pycontrol import event_filters
 from trialexp.process.pycontrol.event_filters import extract_clean_trigger_event
-import settings
+from trialexp import config
 from pathlib import Path
 import pickle 
 import seaborn as sns
 
 #%% Load inputs
 (sinput, soutput) = getSnake(locals(), 'workflow/pycontrol.smk',
-    [settings.debug_folder + '/processed/log/task_specific_analysis.done'],
+    [config.debug_folder + '/processed/log/task_specific_analysis.done'],
     'task_specifc_analysis')
 
 # %% load data

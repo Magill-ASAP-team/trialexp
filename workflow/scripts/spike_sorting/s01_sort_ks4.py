@@ -16,7 +16,7 @@ import spikeinterface.extractors as se
 import spikeinterface.sorters as ss
 from spikeinterface.core import select_segment_recording
 from kilosort import run_kilosort
-import settings
+from trialexp import config
 import torch
 from trialexp.process.ephys.artifact_removal import filter_artifact_sensor
 from kilosort.io import BinaryFiltered
@@ -28,7 +28,7 @@ from loguru import logger
 from trialexp.process.ephys.artifact_removal import plot_spectrogram
 
 #%% Load inputs
-spike_sorting_done_path = str(Path(settings.debug_folder) / 'processed' / 'spike_sorting.done')
+spike_sorting_done_path = str(Path(config.debug_folder) / 'processed' / 'spike_sorting.done')
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
  [spike_sorting_done_path], 'spike_sorting')
 
@@ -45,16 +45,16 @@ rec_properties['sorting_error'] = False
 # Only select longest syncable recordings to sort
 idx_to_sort = rec_properties[(rec_properties.syncable == True) & (rec_properties.longest==True)].index.values
 
-root_data_path = os.environ['SORTING_ROOT_DATA_PATH']
-temp_sorter_folder = Path(os.environ['TEMP_DATA_PATH']) /session_id
+root_data_path = config.SORTING_ROOT_DATA_PATH
+temp_sorter_folder = Path(config.TEMP_DATA_PATH) /session_id
 output_si_sorted_folder = Path(soutput.si_output_folder)
 
 #%% plot spectrogram to check for artifacts
 
-if skip_sorted_session and not Path(soutput.spectrogram).exists():
-    fig,ax =plot_spectrogram(rec_properties.iloc[idx_to_sort[0]], 30000, freq_pool_ratio=100);
-    fig.suptitle(session_id)
-    fig.savefig(soutput.spectrogram, dpi=300)
+# if skip_sorted_session and not Path(soutput.spectrogram).exists():
+#     fig,ax =plot_spectrogram(rec_properties.iloc[idx_to_sort[0]], 30000, freq_pool_ratio=100);
+#     fig.suptitle(session_id)
+#     fig.savefig(soutput.spectrogram, dpi=300)
 # %%
 for idx_rec in idx_to_sort:
 
@@ -91,7 +91,6 @@ for idx_rec in idx_to_sort:
     settings = {'data_dir': recording_path, 
                 'n_chan_bin': 384, 
                 'batch_size' : 30000*4, # 8*Fs for speeding up, for bad session, use a smaller batch_size
-                'save_extra_vars': True,
                 # 'tmax':900, #for bad session, set the tmax manually
                 'results_dir': output_si_sorted_folder/probe_name}
     
@@ -99,7 +98,9 @@ for idx_rec in idx_to_sort:
     # artifact removal. Only activate this on bad session
     # BinaryFiltered.filter = filter_artifact_sensor 
     
-    run_kilosort(settings=settings, probe_name='neuropixPhase3B1_kilosortChanMap.mat', device=device)
+    run_kilosort(settings=settings, 
+                 save_extra_vars=True,
+                probe_name='neuropixPhase3B1_kilosortChanMap.mat', device=device)
     
         
     rec2save = rec_properties.iloc[[idx_rec]].copy()
@@ -113,7 +114,7 @@ torch.cuda.empty_cache()
 Path(soutput.sorting_complete).touch() # for use during manual pipeline run
 
 # %% Manual clean up of unsorted sessions
-# base_search_folder = os.path.join(os.environ['SESSION_ROOT_DIR'], 
+# base_search_folder = os.path.join(config.SESSION_ROOT_DIR, 
 #                             '2024_August_cohort',
 #                             'by_sessions',
 #                             'reaching_go_spout_bar_VR_April24')

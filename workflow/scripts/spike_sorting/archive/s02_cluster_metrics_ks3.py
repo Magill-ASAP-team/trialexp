@@ -8,12 +8,12 @@ import shutil
 import matlab.engine
 from snakehelper.SnakeIOHelper import getSnake
 
-import settings
+from trialexp import config
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/spike_metrics.done'],
+  [config.debug_folder + r'/processed/spike_metrics.done'],
   'spike_metrics_ks3')
 
 
@@ -30,7 +30,7 @@ session_id = rec_properties_path.parents[1].stem
 # use the temporary folder for processing with Cell Explorer
 # Doing processong in local file should be much faster than over the network, 
 # since Cell Explorer probably does very frequent disk I/O via memmap
-sorter_specific_path = Path(os.environ['TEMP_DATA_PATH']) /session_id/ sorter_name
+sorter_specific_path = Path(config.TEMP_DATA_PATH) /session_id/ sorter_name
 assert sorter_specific_path.exists(), 'Sorted data do not exist!'
 probe_folders = [str(sorter_specific_path / probe_folder/'sorter_output') for probe_folder in os.listdir(sorter_specific_path)]
 

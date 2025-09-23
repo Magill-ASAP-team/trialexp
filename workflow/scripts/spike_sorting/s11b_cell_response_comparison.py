@@ -16,11 +16,11 @@ from trialexp.process.group_analysis.plot_utils import style_plot
 import trialexp.process.figures.plot_utils as plot_utils
 from joblib import Parallel, delayed
 import warnings
-import settings
+from trialexp import config
 #%%
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/cell_response_comparison.done'],
+  [config.debug_folder + r'/processed/cell_response_comparison.done'],
   'cell_response_comparison')
 
 #%% Load inputs

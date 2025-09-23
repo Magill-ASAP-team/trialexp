@@ -2,6 +2,7 @@ from glob import glob
 from pathlib import Path
 import os 
 from dotenv import load_dotenv
+from trialexp.config import SESSION_ROOT_DIR
 
 load_dotenv()
 
@@ -25,7 +26,7 @@ def session2analyze(tasks:list=None, cohort:list = None):
 
     for c in cohort:
         for t in tasks:
-            total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(os.environ.get('SESSION_ROOT_DIR')).glob(f'{c}/by_sessions/{t}/*'))        
+            total_sessions+=expand('{sessions}/processed/spike_workflow.done', sessions = Path(SESSION_ROOT_DIR).glob(f'{c}/by_sessions/{t}/*'))        
 
     return total_sessions
 
@@ -39,7 +40,7 @@ rule spike_sorting:
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
         si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
-        spectrogram = '{sessions}/{task_path}/{session_id}/processed/figures/spectrogram.png',
+        # spectrogram = '{sessions}/{task_path}/{session_id}/processed/figures/spectrogram.png',
     threads: 96
     script:
         "scripts/spike_sorting/s01_sort_ks4.py"

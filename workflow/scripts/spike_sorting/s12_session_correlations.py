@@ -19,7 +19,7 @@ from snakehelper.SnakeIOHelper import getSnake
 from trialexp.process.ephys.utils import calculate_pearson_lags
 from trialexp.process.group_analysis.plot_utils import style_plot
 from trialexp.process.pyphotometry.utils import *
-import settings
+from trialexp import config
 import itertools
 from tqdm.auto import tqdm
 from loguru import logger
@@ -29,12 +29,12 @@ from trialexp.process.ephys.photom_correlation import plot_extrem_corr, get_corr
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/xr_corr.nc'],
+  [config.debug_folder + r'/processed/xr_corr.nc'],
   'session_correlations')
 
 #%% Path definitions
 verbose = True
-root_path = Path(os.environ['SESSION_ROOT_DIR'])
+root_path = Path(config.SESSION_ROOT_DIR)
 
 #%% Loading files
 xr_spike_trial = xr.open_dataset(sinput.xr_spikes_trials) #file is huge, use lazy loading
@@ -77,12 +77,13 @@ xr_session.close()
 for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success','aborted']):
     # only plot successful trials
     idx = xr_session.isel(session_id=0).trial_outcome ==outcome
-    xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
-    xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
-    xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
-    
-    fig = plot_extrem_corr(xr_corr2plot, xr_spike2plot, xr_session2plot, evt_name, sig_name)
-    fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}_{outcome}.png',dpi=200)
+    if sum(idx)>0:
+        xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
+        xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
+        xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
+        
+        fig = plot_extrem_corr(xr_corr2plot, xr_spike2plot, xr_session2plot, evt_name, sig_name)
+        fig.savefig(Path(soutput.corr_plots)/f'corr_{evt_name}_{sig_name}_{outcome}.png',dpi=200)
 
 # %% plot the overall distribution
 sig_names = ['_zscored_df_over_f','_zscored_df_over_f_analog_2']

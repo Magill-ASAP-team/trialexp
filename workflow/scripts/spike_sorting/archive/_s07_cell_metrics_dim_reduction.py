@@ -12,12 +12,12 @@ from sklearn import manifold
 from sklearn.preprocessing import StandardScaler
 
 from snakehelper.SnakeIOHelper import getSnake
-import settings
+from trialexp import config
 #%% Load inputs
 
 
 (sinput, soutput) = getSnake(locals(), 'workflow/spikesort.smk',
-  [settings.debug_folder + r'/processed/cell_metrics_aggregation.done'],
+  [config.debug_folder + r'/processed/cell_metrics_aggregation.done'],
   'cell_metrics_aggregation')
 
 
@@ -26,7 +26,7 @@ import settings
 sorter_name = 'kilosort3'
 verbose = True
 
-root_path = Path(os.environ['SESSION_ROOT_DIR'])
+root_path = Path(config.SESSION_ROOT_DIR)
 # Where to store globally computed figures
 clusters_figure_path = Path(os.environ['CLUSTERS_FIGURES_PATH'])
 # where to store global processed data
