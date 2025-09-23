@@ -13,7 +13,9 @@ import scipy.io as sio
 from datetime import datetime
 from pydantic import BaseModel
 import os 
+from dotenv import load_dotenv
 #%%
+load_dotenv()
 root_path = os.environ['SESSION_ROOT_DIR']
 df_session_info = build_session_info_cohort(root_path)
 
