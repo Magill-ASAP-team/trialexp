@@ -145,8 +145,10 @@ def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration
     trial_data = np.empty((num_trials, num_time_points, num_clusters))
 
     for i, timestamp in enumerate(evt_timestamps):
-        if np.isnan(timestamp):  # Skip NaN timestamps
+        
+        if timestamp is None or np.isnan(timestamp):  # Skip NaN timestamps
             continue
+
         
         start_time = timestamp + trial_window[0]
 
