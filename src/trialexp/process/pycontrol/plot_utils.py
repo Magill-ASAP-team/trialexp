@@ -25,7 +25,7 @@ trial_outcome_palette = {
     'jackpot': default_palette[10],
     'omission': default_palette[11],
 }
-trial_outcome_palette.update({f'stim_duration:{x}':default_palette[i] for i,x in enumerate([0,1000,2000,3000,4000])})
+trial_outcome_palette.update({f'stim_duration:{x}':default_palette[i] for i,x in enumerate([0,1000,2000,3000,4000,6000,8000])})
 
 def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=None, **kwargs):
     # kwargs: keyword argument that will be passed to the underlying sns.scatterplot function

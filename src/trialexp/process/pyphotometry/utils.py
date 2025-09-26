@@ -427,7 +427,20 @@ def compute_df_over_f(photometry_dict: dict, low_pass_cutoff: float = 0.001) -> 
             photometry_dict["bleedthrough_ch2_baseline_fluo"],
         ) = _compute_df_over_f(
             photometry_dict["bleedthrough_ch2_filt"],
-            photometry_dict["bleedthrough_ch2_detrend"], fs, low_pass_cutoff
+            photometry_dict["bleedthrough_ch2_detrend"],
+            fs,
+            low_pass_cutoff,
+        )
+
+    if "bleedthrough_ch1_detrend" in photometry_dict:
+        (
+            photometry_dict["bleedthrough_ch1_df_over_f"],
+            photometry_dict["bleedthrough_ch1_baseline_fluo"],
+        ) = _compute_df_over_f(
+            photometry_dict["bleedthrough_ch1_filt"],
+            photometry_dict["bleedthrough_ch1_detrend"],
+            fs,
+            low_pass_cutoff,
         )
 
     return photometry_dict
@@ -454,6 +467,10 @@ def compute_zscore(photometry_dict):
     if "bleedthrough_ch2_df_over_f" in photometry_dict:
         photometry_dict["zscored_df_over_f_bleedthrough_ch2"] = zscore(
             photometry_dict["bleedthrough_ch2_df_over_f"]
+        )
+    if "bleedthrough_ch1_df_over_f" in photometry_dict:
+        photometry_dict["zscored_df_over_f_bleedthrough_ch1"] = zscore(
+            photometry_dict["bleedthrough_ch1_df_over_f"]
         )
 
     return photometry_dict
@@ -1765,11 +1782,14 @@ def motion_correction_multicolor(
 def motion_correction_opto(
     photometry_dict, motion_smooth_win=1001, baseline_method="lowpass"
 ):
+    # some opto data also stored the raw baseline
     # analog1:  GFP
-    # analog2: RFP
-    # analog3: isosbestic
+    # analog2: baseline
+    # analog3: raw signal
     # bleedthrough_ch2: red channel when blue LED is on
-    # bleedhtrhough_ch1: green channel when orange LED is on
+    # bleedthrhough_ch1: bleedthrough baseline
+    # bleedthrough_ch3: bleedthrough baseline
+                
     """
     Analysis notes:
     - It will not do any motion correction
@@ -1863,6 +1883,15 @@ def motion_correction_opto(
             photometry_dict["bleedthrough_ch2_filt"] - bleedthrough_ch2_detrend_baseline
         )
         photometry_dict["bleedthrough_ch2_detrend"] = bleedthrough_ch2_detrend
+
+        # process bleedthrough_ch1 similarly
+        bleedthrough_ch1_detrend_baseline = lowpass_baseline(
+            photometry_dict["bleedthrough_ch1_filt"], sampling_rate, 0.005
+        )
+        bleedthrough_ch1_detrend = (
+            photometry_dict["bleedthrough_ch1_filt"] - bleedthrough_ch1_detrend_baseline
+        )
+        photometry_dict["bleedthrough_ch1_detrend"] = bleedthrough_ch1_detrend
 
         photometry_dict["motion_corrected"] = 1
 

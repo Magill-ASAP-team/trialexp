@@ -74,18 +74,21 @@ if has_photometry:
     sampling_freq = dataset.attrs['sampling_rate']
     event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
        
-    var2add = ['zscored_df_over_f']
-    if 'zscored_df_over_f_analog_2' in  dataset:
-        var2add.append('zscored_df_over_f_analog_2')
+    # var2add = ['zscored_df_over_f']
+    # if 'zscored_df_over_f_analog_2' in  dataset:
+    #     var2add.append('zscored_df_over_f_analog_2')
         
-    if 'zscored_df_over_f_analog_3' in dataset:
-        var2add.append('zscored_df_over_f_analog_3')
+    # if 'zscored_df_over_f_analog_3' in dataset:
+    #     var2add.append('zscored_df_over_f_analog_3')
+
+    var2add = [v for v in dataset.data_vars if v.startswith('zscored')]
     
     if 'lick_rate' in dataset:
         var2add.append('lick_rate')
 
-    if 'zscored_df_over_f_bleedthrough_ch2' in dataset:
-        var2add.append('zscored_df_over_f_bleedthrough_ch2')
+    # if 'zscored_df_over_f_bleedthrough_ch2' in dataset:
+    #     var2add.append('zscored_df_over_f_bleedthrough_ch2')
+
 
     for var in var2add:
          # Add trigger
