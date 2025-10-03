@@ -145,8 +145,10 @@ def extract_trial_data(xr_inst_rates, evt_timestamps, trial_window, bin_duration
     trial_data = np.empty((num_trials, num_time_points, num_clusters))
 
     for i, timestamp in enumerate(evt_timestamps):
-        if np.isnan(timestamp):  # Skip NaN timestamps
+        
+        if timestamp is None or np.isnan(timestamp):  # Skip NaN timestamps
             continue
+
         
         start_time = timestamp + trial_window[0]
 
@@ -268,10 +270,22 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
         evt_col = df.groupby('trial_nb')['time'].agg(list)
         df_aggregated = pd.concat([df_aggregated, evt_col], axis=1)
 
+    # add additional events
+    additiona_events= []
+    if 'events_to_process' in df_events_cond.attrs:
+        df_evt_list = []
+        additiona_events = df_events_cond.attrs['events_to_process']
+        for evt in additiona_events:
+            df = event_filters.extract_event_time(df_events_cond, event_filters.get_first_event_from_name, {'evt_name':evt})
+            df_evt_list.append(df)
+
+            # # combine dataframe
+        df_aggregated = pd.concat([df_aggregated, *df_evt_list], axis=1)
     
     # rename the columns
     trigger = df_events_cond.attrs['triggers'][0]
-    df_aggregated.columns = ['trial_outcome', trigger,  *behav_phases_filters.keys(), *extra_event_triggers]
+    df_aggregated.columns = ['trial_outcome', trigger,  *behav_phases_filters.keys(),
+                              *extra_event_triggers, *([f'first_{evt}' for evt in additiona_events])]
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
 
     return df_aggregated

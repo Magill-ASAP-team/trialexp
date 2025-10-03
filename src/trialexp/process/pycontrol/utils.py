@@ -73,6 +73,8 @@ def parse_session_dataframe(df_session):
                                             
     df_events.attrs.update(info)
 
+    # attempt to convert any dictionary contained in print statio
+
     return df_events
 
 def parse_trial_param(s):
@@ -93,21 +95,30 @@ def print2event(df_events, conditions, trial_parameters):
     
     #Extract print event matched by conditions and turn them into events for later analysis
     for idx, row in df.iterrows():
-        if row.type == 'print':
-            # check if the value column match with condition
-            # if so then assign the condition to the event column
-            matched_con = [c for c in conditions if c == row.content]
-            if len(matched_con)>0:
-                if len(matched_con)>1:
-                    warnings.warn(f'Warning: more than one conditionas found {matched_con}')  
-                df.loc[idx,'name'] = matched_con[0]
-                
-            # Note: row and index are fixed during iterrows(), they will only be updated outside the
-            # loop
-            param_dict = parse_trial_param(row.content)
-            param_dict = {k:v for k,v in param_dict.items() if k in trial_parameters}
+        if row.type == 'print' or row.subtype=='print':
+            param_dict = {}
+            # try to see if we can directly parse the str as a dictionary
+            try:
+                content_dict = (row.content)
+                if isinstance(content_dict, dict):
+                    param_dict = content_dict
+            except (SyntaxError, NameError, TypeError):
+                # process it as simple text
+                # check if the value column match with condition
+                # if so then assign the condition to the event column
+                matched_con = [c for c in conditions if c == row.content]
+                if len(matched_con)>0:
+                    if len(matched_con)>1:
+                        warnings.warn(f'Warning: more than one conditionas found {matched_con}')  
+                    df.loc[idx,'name'] = matched_con[0]
+                    
+                # Note: row and index are fixed during iterrows(), they will only be updated outside the
+                # loop
+                param_dict = parse_trial_param(row.content) # in the foram param1:<value> param2:<value>
+                param_dict = {k:v for k,v in param_dict.items() if k in trial_parameters}
+
+            # add extract row to the dataframe per paramter
             for k,v in param_dict.items():
-                # add extract row to the dataframe per paramter
                 df.loc[df.index[-1]+extra_row_count] = {
                     'type': 'trial_param',
                     'subtype': k,

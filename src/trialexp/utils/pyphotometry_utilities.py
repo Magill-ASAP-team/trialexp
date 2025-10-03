@@ -61,15 +61,23 @@ def parse_pyhoto_fn(fn):
     pattern = r'(\w+)-(.*)\.ppd'
     m = search(pattern, fn.name)
     if m:
-        subject_id = m.group(1)
-        date_string = m.group(2)
-        expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
-        
-        return {
-                'subject_id': subject_id, 
+        try:
+            subject_id = m.group(1)
+            date_string = m.group(2)
+            expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
+            
+            return {
+                    'subject_id': subject_id, 
+                    'path':fn, 
+                    'filename':fn.stem, 
+                    'timestamp':expt_datetime}    
+        except Exception as e:
+            print(e)
+            return {
+                'subject_id': '00', 
                 'path':fn, 
                 'filename':fn.stem, 
-                'timestamp':expt_datetime}    
+                'timestamp':0} 
 
 #----------------------------------------------------------------------------------
 # Plotting

@@ -74,16 +74,20 @@ if has_photometry:
     sampling_freq = dataset.attrs['sampling_rate']
     event_time_coord= np.linspace(trial_window[0], trial_window[1], int(event_period*sampling_freq)) #TODO
        
-    var2add = ['zscored_df_over_f']
-    if 'zscored_df_over_f_analog_2' in  dataset:
-        var2add.append('zscored_df_over_f_analog_2')
+    # var2add = ['zscored_df_over_f']
+    # if 'zscored_df_over_f_analog_2' in  dataset:
+    #     var2add.append('zscored_df_over_f_analog_2')
         
-    if 'zscored_df_over_f_analog_3' in dataset:
-        var2add.append('zscored_df_over_f_analog_3')
+    # if 'zscored_df_over_f_analog_3' in dataset:
+    #     var2add.append('zscored_df_over_f_analog_3')
+
+    var2add = [v for v in dataset.data_vars if v.startswith('zscored')]
     
     if 'lick_rate' in dataset:
         var2add.append('lick_rate')
 
+    # if 'zscored_df_over_f_bleedthrough_ch2' in dataset:
+    #     var2add.append('zscored_df_over_f_bleedthrough_ch2')
 
 
     for var in var2add:
@@ -103,10 +107,19 @@ if has_photometry:
                     var, 'first_spout', dataset.attrs['sampling_rate'])
 
         # Add last bar_off before first spout
-
         add_event_data(df_event, event_filters.get_last_bar_off_before_first_spout, trial_window,
                     dataset,event_time_coord, 
                     var, 'last_bar_off', dataset.attrs['sampling_rate'])
+        
+        #get event to process
+        if 'opto' in df_event.attrs['task_name']:
+            # hard code for now, TODO: change the task param to yaml
+            for evt in df_event.attrs['events_to_process']:
+                add_event_data(df_event, event_filters.get_first_event_from_name,
+                        trial_window, dataset, event_time_coord, 
+                        var, f'first_{evt}', dataset.attrs['sampling_rate'],
+                        filter_func_kwargs={'evt_name':evt})
+                
     
         # Also add data from any additional event triggers
         if 'extra_event_triggers' in df_event.attrs:
@@ -179,3 +192,5 @@ if has_photometry:
         pickle.dump(pycontrol_aligner, f)
 else:
     Path(soutput.pycontrol_aligner).touch()
+
+# %%

@@ -22,6 +22,7 @@ from trialexp.process.pycontrol.utils import (
 )
 import logging
 from loguru import logger
+from collections.abc import Hashable
 
 def add_time_rel_trigger(df_events, trigger_time, trigger_name, col_name, trial_window):
     # Add new time column to the event data, aligned to the trigger time
@@ -249,23 +250,20 @@ def extract_trial_by_trigger(
     df_events.dropna(subset=["trial_time"], inplace=True)
 
     # Filter out events we don't want
-    df_events = df_events[df_events.content.isin(event2analysis)]
+    # df_events = df_events[df_events.content.isin(event2analysis)]
 
     # # group events according to trial number and event name
-    df_events_trials = df_events.groupby(["trial_nb", "content"]).agg(list)
-    df_events_trials = df_events_trials.loc[:, ["trial_time"]]
-    df_events_trials = df_events_trials.unstack(
-        "content"
-    )  # convert the event names to columns
-    df_events_trials.columns = (
-        df_events_trials.columns.droplevel()
-    )  # dropping the multiindex of the columns
-    df_events_trials = df_events_trials.reindex(
-        np.arange(1, len(trigger_time) + 1)
-    )  # make sure we include every trial
-    assert len(df_events_trials) == len(
-        trigger_time
-    ), f"Error: trigger time does not match {df_events_trials.index} {len(trigger_time)}"
+    hashableIdx = df_events.content.apply(lambda x: isinstance(x, Hashable)) #skip dictionaries
+    valid_idx = (df_events.type!='trial_param') # trial_param has a different format
+
+    df_events_trials = df_events[hashableIdx & valid_idx].groupby(["trial_nb", "content"]).agg(list)
+    df_events_trials = (df_events_trials.loc[:, ["trial_time"]]
+                       .unstack("content") #expand content into 
+                       .droplevel(0, axis=1) #convert the unique events into its own column
+                       .reindex(np.arange(1, len(trigger_time) + 1)))
+    
+    assert len(df_events_trials) == len(trigger_time), \
+        f"Error: trigger time does not match {df_events_trials.index} {len(trigger_time)}"
 
     # rename the column for compatibility
     df_events_trials.columns = [col + "_trial_time" for col in df_events_trials.columns]
@@ -294,8 +292,38 @@ def extract_trial_by_trigger(
     # return df_events_trials, df_events
     return df_events_trials, df_events
 
-
 def compute_conditions_by_trial(df_events_trials, conditions):
+    """
+    Compute boolean conditions for each trial based on the presence of events.
+    
+    This function creates a DataFrame indicating whether specific conditions (events)
+    occurred in each trial. A condition is marked as True if the corresponding event
+    was found in that particular trial, False otherwise.
+    
+    Parameters
+    ----------
+    df_events_trials : pandas.DataFrame
+        DataFrame containing trial data with columns including 'uid', 'trigger', 
+        'valid', and potentially condition-specific trial time columns 
+        (formatted as '{condition}_trial_time').
+    conditions : list of str
+        List of condition names to check for in each trial. For each condition,
+        the function looks for a corresponding column named '{condition}_trial_time'.
+    
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with columns ['uid', 'trigger', 'valid'] plus one boolean column
+        for each condition in the conditions list. Each condition column contains
+        True if the event occurred in that trial (i.e., the corresponding 
+        trial_time column is not null), False otherwise.
+    
+    Examples
+    --------
+    >>> conditions = ['reward', 'punishment']
+    >>> df_result = compute_conditions_by_trial(df_events_trials, conditions)
+    >>> # df_result will have columns: uid, trigger, valid, reward, punishment
+    """
     # if a condition (usually some event) is found in a particular trial, then it is marked as true
 
     df_conditions = df_events_trials[["uid", "trigger", "valid"]].copy()
@@ -311,16 +339,18 @@ def compute_conditions_by_trial(df_events_trials, conditions):
 
 
 # %%
-def add_trial_params(df_conditions, trial_parameters, df_events):
+def add_trial_params(df_conditions, df_events):
     # Add trial parameters to df_conditions
 
     df = df_conditions.copy()
 
     # extract the parameters from df_events
     df_parameters = df_events[df_events.type == "trial_param"]
-    df_parameters = df_parameters.groupby(["trial_nb", "content"]).last()
+    parameter_list = df_parameters.subtype.unique()
+    df_parameters = df_parameters.groupby(["trial_nb", "subtype"]).last()
+    
     # add trial parameters information to df_condition
-    for param in trial_parameters:
+    for param in parameter_list:
         df[param] = None
         for trial_nb in df_conditions.index:
             try:
@@ -464,6 +494,10 @@ def compute_trial_outcome(row, task_name):
             return "success"
         else:
             return "no_reach"
+    elif task_name in [
+        'opto_sweep_pavlovian_July25'
+    ]:
+        return f'stim_duration:{row.stim_duration}'
     else:
         if row.success:
             return "success"
