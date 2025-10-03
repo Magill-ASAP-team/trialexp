@@ -609,7 +609,7 @@ def combine2dataframe(result):
 def get_cell_mean_cv(x, coarsen_factor = 5):
     # Get the mean coefficient of variation for a cell
     cv_list = []
-    x = x.coarsen(spk_event_time=5,boundary="trim").mean()
+    x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
     for id in x.cluID:
         x_cell = x.sel(cluID=id)
         mean_cv = np.mean(variation(x_cell,axis=0,nan_policy='omit'))
