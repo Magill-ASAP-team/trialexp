@@ -30,11 +30,11 @@ def parse_pycontrol_fn(fn):
     m = search(pattern, fn.name)
     
     if m:
-        subject_id = m.group(1)
-        date_string = m.group(2)
-        expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
-        
         try:
+            subject_id = m.group(1)
+            date_string = m.group(2)
+            expt_datetime = datetime.strptime(date_string, "%Y-%m-%d-%H%M%S")
+
             df = session_dataframe(fn) #note: this may run into error
             df = parse_session_dataframe(df)
 
@@ -55,7 +55,7 @@ def parse_pycontrol_fn(fn):
                     'path': fn,                 
                     'session_id': fn.stem,
                     'filename': fn.stem, 
-                    'timestamp': expt_datetime,
+                    'timestamp': 0,
                     'session_length': 0,
                     'task_name': 'unknown'}
     else:

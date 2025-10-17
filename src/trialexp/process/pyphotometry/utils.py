@@ -1509,6 +1509,8 @@ def preprocess_photometry(data_photometry, df_pycontrol):
         animal_id = df_pycontrol.attrs['subject_id'] 
     else:
         animal_id = df_pycontrol.attrs['Subject ID'] 
+    
+    animal_id = animal_id.replace('-','') #clean up the animal name
         
     if animal_id in animal_info.index:
         injection = animal_info.loc[animal_id].injection.strip().split(';')
