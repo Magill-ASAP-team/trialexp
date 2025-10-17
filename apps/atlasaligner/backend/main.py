@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
     
-@app.get('/sessions/')
+@app.get('/sessions')
 async def get_sessions(cohort: Optional[str] = None, animal_id: Optional[str] = None):
     query_str = ''
     

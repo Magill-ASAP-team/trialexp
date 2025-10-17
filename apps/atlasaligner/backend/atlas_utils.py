@@ -14,7 +14,7 @@ from datetime import datetime
 #%%
 
 root_path = '/mnt/Magill_Lab/Julien/ASAP/Data'
-df_session_info = build_session_info_cohort(root_path)
+df_session_info = build_session_info_cohort(root_path, load_pycontrol=False)
 # %%
 df_sesssion_info = df_session_info.query('neuropixels_sorted==True')
 #%%
