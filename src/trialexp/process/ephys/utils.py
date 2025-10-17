@@ -606,16 +606,41 @@ def combine2dataframe(result):
     
     return df_tuning
 
-def get_cell_mean_cv(x, coarsen_factor = 5):
+def get_cell_mean_cv(x, coarsen_factor = 5, axis=0):
     # Get the mean coefficient of variation for a cell
     cv_list = []
     x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
-    for id in x.cluID:
+    for id in tqdm(x.cluID):
         x_cell = x.sel(cluID=id)
-        mean_cv = np.mean(variation(x_cell,axis=0,nan_policy='omit'))
+        mean_cv = np.mean(variation(x_cell,axis=axis,nan_policy='omit'))
         cv_list.append(mean_cv)
 
     return cv_list
+
+def get_cell_mean_fr(x, coarsen_factor = 5, axis=0):
+    # Get the mean firing rate of th cell
+    cv_list = []
+    x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
+    for id in tqdm(x.cluID):
+        x_cell = x.sel(cluID=id)
+        mean_cv = np.mean(x_cell)
+        cv_list.append(mean_cv)
+
+    return cv_list
+
+def get_cell_mean_fano(x, coarsen_factor = 5, axis=0):
+    # Get the mean fano factor for a cell
+    cv_list = []
+    x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
+    for id in tqdm(x.cluID):
+        x_cell = x.sel(cluID=id).data
+        v = np.nanvar(x_cell, axis=axis)
+        m = np.nanmean(x_cell, axis=axis)
+        mean_cv = np.mean(v/m)
+        cv_list.append(mean_cv)
+
+    return cv_list
+
 
 def std_score(w,axis):
     return np.max(np.std(w,axis=1),axis=1)
@@ -679,7 +704,7 @@ def match2center(s_center, s, k=10):
 
 def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4, 
                   use_dtw_average=False, align_to_average=False, 
-                  alpha=0.7, aspect=1, error_band=None):
+                  alpha=0.7, aspect=1, error_band=None, return_centre=False):
     # align_to_average: whether to align the individual curves to the average by DTW first
 
     labels_unique = np.unique(labels)
@@ -695,7 +720,8 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4,
             return softdtw_barycenter(curves, gamma=1, max_iter=20, tol=1e-3)  
         
         mean_curves = Parallel(n_jobs=10,verbose=10)(delayed(compute_mean_curve)(data_norm[labels==lbl,:]) for lbl in labels_unique)
-        
+    
+    mean_curve_list =[]
     for idx,lbl in enumerate(labels_unique):
         ax = fig.add_subplot(nrow, ncol, idx+1)
         ax.set_title(f'Cluster {lbl} (n={np.sum(labels==lbl)} units)')
@@ -705,6 +731,7 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4,
             mean_curve = curves.mean(axis=1)
         else:
             mean_curve = mean_curves[idx].ravel()
+            mean_curve_list.append(mean_curve)
             # use soft-DTW Barycenter for the average, it is smoother than original Barycenter
         
         if align_to_average:
@@ -740,14 +767,17 @@ def plot_clusters(data_norm, labels, spk_event_time, var_name, ncol=4,
         ax.axvline(x=0,ls='--', color='gray')
     
     
-    fig.suptitle(var_name)
-    fig.tight_layout()
-    return fig
+    if return_centre:
+        fig.suptitle(var_name)
+        fig.tight_layout()
+        return (fig, np.stack(mean_curve_list), np.array(labels_unique))
+    else:
+        return fig
 
-def smooth_response(da_sel):
+def smooth_response(da_sel, window_length=51):
     #smooth the resopnse curve
     data = da_sel.data.T
-    data_smooth = signal.savgol_filter(data,51,1)
+    data_smooth = signal.savgol_filter(data,window_length,1)
     data_norm = preprocessing.minmax_scale(data_smooth,axis=1) 
     return data_norm
 
@@ -1009,3 +1039,76 @@ def get_clus_at_level(node, lvl):
     get_clusters_at_level_(node,lvl)
             
     return clus_list
+
+def extract_valid_subarray(x):
+    # extract a subarray without NaN valid
+    # x is assumed to be symmetric
+    valid_idx = ~np.isnan(np.diag(x))
+    x = x[~np.isnan(x)]
+    n = np.sum(valid_idx)
+    x = x.reshape((n,n))
+    return x, valid_idx
+
+def select_cluster_cells(clus_centroid, clus_lbls, da_norm, labels, df_clus, 
+                         cluster_label, time_tolerance=3, plot=True):
+    """
+    Select cells from a cluster based on temporal alignment of peak responses.
+    
+    Parameters
+    ----------
+    clus_centroid : ndarray
+        Array of cluster centroids with shape (n_clusters, n_timepoints)
+    clus_lbls : ndarray
+        Cluster labels corresponding to centroids
+    da_norm : ndarray
+        Normalized firing rate curves with shape (n_cells, n_timepoints)
+    labels : ndarray
+        Cluster assignment for each cell
+    df_clus : DataFrame
+        DataFrame with 'cluID' and 'label' columns mapping cells to clusters
+    cluster_label : int
+        The cluster label to analyze
+    time_tolerance : int, optional
+        Maximum time offset (in bins) from centroid peak, by default 3
+    plot : bool, optional
+        Whether to plot the results, by default True
+    
+    Returns
+    -------
+    clus_sel : ndarray
+        Array of selected cell IDs (cluID values)
+    """
+    # Find the centroid for this cluster
+    idx = np.flatnonzero(clus_lbls == cluster_label)
+    
+    if plot:
+        plt.plot(clus_centroid[idx[0], :])
+        plt.title(f'Cluster {cluster_label} centroid')
+        plt.show()
+    
+    # Find critical time point (peak) in the centroid
+    c = clus_centroid[idx[0], :].argmax()
+    
+    # Get all cells in this cluster
+    clus_idx = np.flatnonzero(labels == cluster_label)
+    
+    # Find peak time for each cell
+    min_pt = np.argmax(da_norm[clus_idx, :], axis=1)
+    
+    # Select cells where peak is within tolerance of centroid peak
+    ingroup = (np.abs(c - min_pt) < time_tolerance)
+    
+    print(f"Selected {sum(ingroup)} cells out of {len(ingroup)} in cluster {cluster_label}")
+    
+    if plot:
+        plt.plot(da_norm[clus_idx[ingroup], :].T)
+        plt.title(f'Selected cells from cluster {cluster_label}')
+        plt.xlabel('Time bin')
+        plt.ylabel('Normalized firing rate')
+        plt.show()
+    
+    # Get the cluID values for selected cells
+    cluID_idx = np.flatnonzero(labels == cluster_label)[ingroup]
+    clus_sel = df_clus.iloc[cluID_idx]['cluID'].values
+    
+    return clus_sel
