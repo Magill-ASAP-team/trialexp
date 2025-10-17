@@ -262,6 +262,7 @@ def get_region_boundaries(coords,  atlas, structure_tree):
     # the trajectory is between the starting and end point of the coords
     # the end point is not the ending of the probe. Neuropixel probe is about 4000um long if only the tip is used
     # depth is defined from the tip of the probe
+    
     trajectory_depth = np.linalg.norm(np.diff(coords, axis=0)) * 10 # axis unit is in 10um, so we convert it back to 1um
     n_coords = int(trajectory_depth) # sample every 1um
     trajector_depth_list = np.linspace(0,trajectory_depth, n_coords)
