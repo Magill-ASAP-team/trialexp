@@ -33,7 +33,7 @@ def session2analyze(tasks:list=None, cohort:list = None, animals:list = None):
     return total_sessions
 
 rule pycontrol_all:
-    input: session2analyze(cohort=['2025_June_cohort','2025_July_cohort','2025_October_cohort'])
+    input: session2analyze(cohort=['2025_June_cohort','2025_July_cohort','2025_October_cohort','2025_September_cohort'])
 
 '''
 Ach/DA cohort
