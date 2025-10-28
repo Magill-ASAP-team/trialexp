@@ -3,7 +3,7 @@ set dotenv-load	:= true #load the .env file for folder paths
 # Run the full pipeline
 run-pipeline: copy-data
     # Run the Python file
-    uv run snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime
+    uv run snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime --rerun-incomplete
 
 # Copy raw data into session folders
 copy-data:
