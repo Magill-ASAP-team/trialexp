@@ -31,8 +31,7 @@ if df_pycontrol.attrs['framework_version'] in ['1.8.1','1.8']:
 else:
     session_time = datetime.strptime(df_pycontrol.attrs['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
 
-
-subjectID = df_pycontrol.attrs['subject_id']
+subjectID = Path(filename[0]).name.split('-')[0]
 task_name = df_pycontrol.attrs['task_name']
 session_id = Path(sinput.session_path).name
 
