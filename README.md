@@ -23,6 +23,9 @@ Files to modify:
 2. `workflow/scripts/00_create_session_folders.py`
 3. `workflow/pycontrol.smk`
 
+Note: If you want to add suffix to animal ID, please make sure it doesn't not have special characters, use
+`TT001DLS` instead of `TT001_DLS` or `TT001-DLS`.
+
 ## Adding new task
 Files to modify
 1.  `params/tasks_params.csv`
