@@ -271,13 +271,20 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
         df_aggregated = pd.concat([df_aggregated, evt_col], axis=1)
 
     # add additional events
+    # events in the `events` columns of the task_params.csv will not be automaticaly extracted by default
+    # they will only be included when we create the df_pycontrol dataframe
+    # here it provides a way to extract the first event in the `events` columns
     additiona_events= []
     if 'events_to_process' in df_events_cond.attrs:
         df_evt_list = []
+        additional_events2add = []
         additiona_events = df_events_cond.attrs['events_to_process']
         for evt in additiona_events:
-            df = event_filters.extract_event_time(df_events_cond, event_filters.get_first_event_from_name, {'evt_name':evt})
-            df_evt_list.append(df)
+            if f'first_{evt}' not in behav_phases_filters.keys():
+                # prevent duplicate extraction
+                df = event_filters.extract_event_time(df_events_cond, event_filters.get_first_event_from_name, {'evt_name':evt})
+                df_evt_list.append(df)
+                additional_events2add.append(f'first_{evt}')
 
             # # combine dataframe
         df_aggregated = pd.concat([df_aggregated, *df_evt_list], axis=1)
@@ -285,7 +292,7 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
     # rename the columns
     trigger = df_events_cond.attrs['triggers'][0]
     df_aggregated.columns = ['trial_outcome', trigger,  *behav_phases_filters.keys(),
-                              *extra_event_triggers, *([f'first_{evt}' for evt in additiona_events])]
+                              *extra_event_triggers, *additional_events2add]
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
 
     return df_aggregated
