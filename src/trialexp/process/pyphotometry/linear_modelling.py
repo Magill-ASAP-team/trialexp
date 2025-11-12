@@ -120,13 +120,15 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
 
         # TODO: handle this gracefully
         if (cur_time) > (t_event+specs['event_window'][0]):
-            raise ValueError(f'\nEvent:  {evt}.\n'
-                              'Error: no enough time to warp. \n'
-                            f'Last event: {last_event} \n'
-                            f'Time different from last event: {t_event-last_event_time}\n'
-                            f'Available time for warping: {t_event-cur_time} \n'
-                            f'Required min pre-event window: {-specs["event_window"][0]} \n'
-                            f'trial outcome: {df_trial.iloc[0].trial_outcome} \n')
+            raise ValueError(
+                f'Not enough time to warp to next event.\n'
+                f'  Previous event: {last_event} at {last_event_time:.1f} ms\n'
+                f'  Current event: {evt} at {t_event:.1f} ms\n'
+                f'  Time between events: {t_event-last_event_time:.1f} ms\n'
+                f'  Available time for warping: {t_event-cur_time:.1f} ms\n'
+                f'  Required pre-event window for {evt}: {-specs["event_window"][0]:.1f} ms\n'
+                f'  Trial outcome: {df_trial.iloc[0].trial_outcome}'
+            )
 
         # warp the signal in the padding_len region
         t[cur_idx:(cur_idx+padding_len)] = np.linspace(cur_time, t_event+specs['event_window'][0], padding_len)
@@ -148,10 +150,24 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
         last_event_time = t_event
         # Here both cur_idx and cur_time are right post event window but pre-padding
         # print(f'cur_idx: {cur_idx}, padding_len: {padding_len}, event_window_len: {event_window_len} total:{total_len}')
-        
+
+    # Check if the interpolation time points extend beyond available data
+    # This happens when trials are too close together or at the end of recording
+    trial_data_start = trial_data.time.min().values
+    trial_data_end = trial_data.time.max().values
+    t_min = t.min()
+    t_max = t.max()
+
+    if t_min < trial_data_start or t_max > trial_data_end:
+        raise ValueError(
+            f'Interpolation time range [{t_min:.1f}, {t_max:.1f}] ms extends beyond '
+            f'available trial data range [{trial_data_start:.1f}, {trial_data_end:.1f}] ms. '
+            f'This usually means the next trial starts too soon or recording ended.'
+        )
+
     # use linear interpolation to warp them
     data_interp  = trial_data.interp(time=t)
-    
+
     assert cur_idx == total_len, 'time array not totally filled'
     data_interp['time'] = np.arange(total_len)/sampling_rate*1000 + trigger_specs['event_window'][0]
 
@@ -164,7 +180,7 @@ def extract_data(dataArray, start_time, end_time):
     end_idx = np.searchsorted(ref_time, end_time)
     return dataArray[np.arange(start_idx, end_idx)]
 
-def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verbose=False):
+def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs, verbose=False):
     """
     Time warps the data between events so that they can be aligned together.
 
@@ -173,22 +189,38 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
     - xr_signal (xarray DataArray): DataArray containing the signal data.
     - extraction_specs (dict): Dictionary containing extraction specifications.
     - Fs (int): Sampling frequency.
+    - verbose (bool): Whether to print detailed information about skipped trials.
 
     Returns:
     - xa (xarray DataArray): DataArray containing the time-warped data.
+    - interp_results_list (list): List of interpolation results for each trial.
+
+    Notes:
+    - If there is insufficient data (e.g., trials too close together), the entire trial
+      will be filled with NaN to avoid partial NaN values which complicate analysis.
+    - The detection of insufficient data is handled by interp_data(), which raises
+      ValueError when the interpolation range extends beyond available data.
     """
     data_list = []
     interp_results_list = []
-    
+
+    # Calculate expected warped data length (for creating NaN trials if needed)
+    event_window_len = sum([int((v['event_window'][1]-v['event_window'][0])/1000*Fs)
+                            for k, v in extraction_specs.items()])
+    total_padding_len = sum([int(v['padding']/1000*Fs)
+                             for k, v in extraction_specs.items()])
+    total_len = total_padding_len + event_window_len
+
     for i in df_events_cond.trial_nb.unique():
         df_trial = df_events_cond[df_events_cond.trial_nb==i]
-    
+
         pre_time = extraction_specs[trigger]['event_window'][0]-500
         post_time = list(extraction_specs.values())[-1]['event_window'][1]
-        # extract photometry data around trial
+
+        # Extract photometry data around trial
         trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time)
-        
-        #time wrap it
+
+        # Try to time warp it
         try:
             data_p, interp_results = interp_data(trial_data, df_trial, trigger, extraction_specs, Fs)
             interp_results_list.append(interp_results)
@@ -197,10 +229,37 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs,verb
         except NotImplementedError as e:
             print(e)
         except ValueError as e:
+            # Create NaN trial when interpolation fails
+            error_msg = str(e)
+
+            # Print detailed reason
             if verbose:
-                print(f'Skipping trial {i}', e)
-            
-    if len(data_list)>0: 
+                print(f'\nTrial {i}: Setting entire trial to NaN.')
+                print(f'  Reason: {error_msg}')
+
+            # Create time axis same as would be created by interp_data
+            trigger_window = extraction_specs[trigger]['event_window']
+            time_axis = np.arange(total_len)/Fs*1000 + trigger_window[0]
+
+            # Create all-NaN data
+            nan_data = np.full(total_len, np.nan)
+            data_p = xr.DataArray(
+                nan_data,
+                dims=['time'],
+                coords={'time': time_axis},
+                attrs=xr_signal.attrs,
+                name=xr_signal.name
+            )
+            data_p = data_p.expand_dims({'trial_nb':[i]})
+            data_list.append(data_p)
+
+            # Record that interpolation was not successful AND store the reason
+            interp_results = {f'interp_{evt}': False for evt in extraction_specs.keys()}
+            interp_results['insufficient_data'] = True
+            interp_results['nan_reason'] = error_msg
+            interp_results_list.append(interp_results)
+
+    if len(data_list)>0:
         xa = xr.concat(data_list,dim='trial_nb')
     else:
         xa = xr.DataArray(
@@ -718,7 +777,7 @@ def normalize_signal(data_array, baseline_period:list):
 
     Parameters:
     data_array (xarray.DataArray): The input data array containing the signal to be normalized.
-    baseline_period (list): A list containing two elements [start_time, end_time] that define the period 
+    baseline_period (list): A list containing two elements [start_time, end_time] that define the period
                             over which the baseline mean is calculated.
 
     Returns:
@@ -728,3 +787,190 @@ def normalize_signal(data_array, baseline_period:list):
     baseline = data_array.sel(time=slice(baseline_period[0],baseline_period[1])).mean(dim='time',skipna=True)
     da_norm = data_array-baseline
     return da_norm
+
+
+def plot_timewarp_nan_debug(xr_warped, signal_var, extraction_specs, trigger,
+                            trial_indices=None, max_trials=5, output_file=None,
+                            figsize=(14, 3.5)):
+    """
+    Create diagnostic plots to visualize partial NaN patterns in time-warped data.
+
+    This function helps debug why some trials have NaN values only at the end (or beginning)
+    rather than the entire trial. It visualizes the valid data regions, NaN regions, and
+    event boundaries to understand where interpolation is failing.
+
+    Parameters:
+    -----------
+    xr_warped : xarray.Dataset
+        The time-warped dataset containing the signal and trial metadata
+    signal_var : str
+        Name of the signal variable to plot (e.g., 'zscored_df_over_f')
+    extraction_specs : dict
+        Dictionary of extraction specifications defining event windows and padding
+    trigger : str
+        Name of the trigger event
+    trial_indices : list, optional
+        List of trial indices to plot. If None, will automatically find trials with partial NaN
+    max_trials : int, default=5
+        Maximum number of trials to plot (if trial_indices not specified)
+    output_file : str, optional
+        Path to save the figure. If None, returns the figure object without saving
+    figsize : tuple, default=(14, 3.5)
+        Figure size per subplot (width, height per trial)
+
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The created figure object
+    trial_info : list of dict
+        Information about each plotted trial including NaN statistics
+
+    Examples:
+    ---------
+    >>> fig, info = plot_timewarp_nan_debug(xr_warped, 'zscored_df_over_f',
+    ...                                      extraction_specs, 'hold_for_water',
+    ...                                      output_file='debug_nan.png')
+    >>> print(f"Found {len(info)} trials with partial NaN")
+    """
+
+    data = xr_warped[signal_var].data
+
+    # Find trials with partial NaN if not specified
+    if trial_indices is None:
+        trials_with_partial_nan = []
+        for trial_idx in range(data.shape[0]):
+            trial_data = data[trial_idx, :]
+            nan_mask = np.isnan(trial_data)
+            # Partial NaN: some but not all values are NaN
+            if np.any(nan_mask) and not np.all(nan_mask):
+                trials_with_partial_nan.append(trial_idx)
+
+        trial_indices = trials_with_partial_nan[:max_trials]
+
+        if len(trial_indices) == 0:
+            print("No trials with partial NaN found!")
+            return None, []
+
+    # Prepare figure
+    n_trials = len(trial_indices)
+    fig, axes = plt.subplots(n_trials, 1, figsize=(figsize[0], figsize[1] * n_trials))
+    if n_trials == 1:
+        axes = [axes]
+
+    trial_info = []
+
+    for i, trial_idx in enumerate(trial_indices):
+        trial_nb = xr_warped.trial_nb.data[trial_idx]
+        trial_outcome = xr_warped.trial_outcome.data[trial_idx] if 'trial_outcome' in xr_warped else 'unknown'
+        trial_data = data[trial_idx, :]
+        time_data = xr_warped.time.data
+
+        ax = axes[i]
+
+        # Calculate NaN statistics
+        nan_mask = np.isnan(trial_data)
+        valid_mask = ~nan_mask
+        nan_indices = np.where(nan_mask)[0]
+        valid_indices = np.where(valid_mask)[0]
+
+        first_nan_idx = nan_indices[0] if len(nan_indices) > 0 else None
+        last_valid_idx = valid_indices[-1] if len(valid_indices) > 0 else None
+
+        trial_info.append({
+            'trial_nb': trial_nb,
+            'trial_idx': trial_idx,
+            'trial_outcome': trial_outcome,
+            'n_valid': np.sum(valid_mask),
+            'n_nan': np.sum(nan_mask),
+            'first_nan_idx': first_nan_idx,
+            'first_nan_time': time_data[first_nan_idx] if first_nan_idx is not None else None,
+            'last_valid_idx': last_valid_idx,
+            'last_valid_time': time_data[last_valid_idx] if last_valid_idx is not None else None,
+        })
+
+        # Plot valid data
+        ax.plot(time_data[valid_mask], trial_data[valid_mask], 'b-',
+               linewidth=1.5, label='Valid data', zorder=2)
+
+        # Highlight NaN regions
+        if np.any(nan_mask):
+            nan_start = time_data[nan_mask][0]
+            nan_end = time_data[nan_mask][-1]
+            ax.axvspan(nan_start, nan_end, alpha=0.3, color='red',
+                      label='NaN region', zorder=1)
+            ax.axvline(nan_start, color='red', linestyle='--',
+                      linewidth=2, alpha=0.7, zorder=3)
+
+        # Mark event boundaries from extraction specs
+        cur_time = extraction_specs[trigger]['event_window'][0]
+        colors = plt.cm.tab10.colors
+        for j, (evt, spec) in enumerate(extraction_specs.items()):
+            pre, post = spec['event_window']
+            padding = spec['padding']
+
+            ax.axvline(cur_time + pre, color=colors[j], linestyle=':',
+                      alpha=0.5, zorder=3)
+            label = spec.get('label', evt.replace('_', ' '))
+            ax.text(cur_time + pre, ax.get_ylim()[1], label, rotation=90,
+                   ha='right', va='top', fontsize=8, alpha=0.7)
+
+            cur_time += (post - pre) + padding
+
+        # Set title with trial info
+        title = f'Trial {trial_nb} (index {trial_idx})'
+        if trial_outcome != 'unknown':
+            title += f' - Outcome: {trial_outcome}'
+        title += f' - {signal_var}'
+        ax.set_title(title, fontweight='bold', fontsize=10)
+
+        ax.set_xlabel('Time (ms)')
+        ax.set_ylabel('Signal')
+        ax.legend(loc='upper right', fontsize=8)
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if output_file is not None:
+        fig.savefig(output_file, dpi=150, bbox_inches='tight')
+        print(f"Debug plot saved: {output_file}")
+
+    return fig, trial_info
+
+def print_time_warping_summary(xr_warped, signal_var):
+    """Print summary statistics of time warping results.
+    
+    Parameters
+    ----------
+    xr_warped : xr.Dataset
+        Time-warped dataset containing signal variables
+    signal2analyze : list
+        List of signal variable names to analyze
+    """
+    print(f'\n{"="*70}')
+    print("TIME WARPING SUMMARY")
+    print('='*70)
+
+    # Check each signal variable
+    if signal_var in xr_warped.data_vars:
+        data = xr_warped[signal_var].data
+
+        # Count different types of trials
+        fully_valid = np.sum(np.all(~np.isnan(data), axis=1))
+        fully_nan = np.sum(np.all(np.isnan(data), axis=1))
+        partial_nan = np.sum(np.any(np.isnan(data), axis=1) & ~np.all(np.isnan(data), axis=1))
+        total = data.shape[0]
+
+        print(f'\n{signal_var}:')
+        print(f'  Total trials: {total}')
+        print(f'  Fully valid trials: {fully_valid} ({fully_valid/total*100:.1f}%)')
+        print(f'  Fully NaN trials: {fully_nan} ({fully_nan/total*100:.1f}%)')
+        print(f'  Partial NaN trials: {partial_nan} ({partial_nan/total*100:.1f}%)')
+
+        # Check successful trials specifically
+        if 'trial_outcome' in xr_warped:
+            xr_success = xr_warped.sel(trial_nb=(xr_warped.trial_outcome=='success'))
+            if len(xr_success.trial_nb) > 0:
+                success_data = xr_success[signal_var].data
+                valid_success = np.sum(np.all(~np.isnan(success_data), axis=1))
+                total_success = success_data.shape[0]
+                print(f'  Valid successful trials: {valid_success}/{total_success} ({valid_success/total_success*100:.1f}%)')

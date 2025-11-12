@@ -132,7 +132,7 @@ xa, interp_results_list = lm.time_warp_data(df_events_cond,
                         extraction_specs, 
                         trigger,
                         xr_photometry.attrs['sampling_rate'],
-                        verbose=False)
+                        verbose=True)
 
 xa_list.append(xa)
 
@@ -146,6 +146,9 @@ xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 xr_success  = xr_warped.sel(trial_nb=(xr_warped.trial_outcome=='success'))
 valid_trials = np.all(~np.isnan(xr_success['zscored_df_over_f'].data),axis=1)
 print('Ratio of valid successful trials:', np.sum(valid_trials)/len(valid_trials))
+
+lm.print_time_warping_summary(xr_warped, signal2analyze[0])
+
 
 #%% Plot the time wrapped data
 for var in signal2analyze:
