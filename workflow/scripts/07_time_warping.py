@@ -132,7 +132,7 @@ xa, interp_results_list = lm.time_warp_data(df_events_cond,
                         extraction_specs, 
                         trigger,
                         xr_photometry.attrs['sampling_rate'],
-                        verbose=True)
+                        verbose=False)
 
 xa_list.append(xa)
 
