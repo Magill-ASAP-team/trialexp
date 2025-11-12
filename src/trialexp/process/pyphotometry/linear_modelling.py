@@ -237,27 +237,6 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs, ver
                 print(f'\nTrial {i}: Setting entire trial to NaN.')
                 print(f'  Reason: {error_msg}')
 
-            # Create time axis same as would be created by interp_data
-            trigger_window = extraction_specs[trigger]['event_window']
-            time_axis = np.arange(total_len)/Fs*1000 + trigger_window[0]
-
-            # Create all-NaN data
-            nan_data = np.full(total_len, np.nan)
-            data_p = xr.DataArray(
-                nan_data,
-                dims=['time'],
-                coords={'time': time_axis},
-                attrs=xr_signal.attrs,
-                name=xr_signal.name
-            )
-            data_p = data_p.expand_dims({'trial_nb':[i]})
-            data_list.append(data_p)
-
-            # Record that interpolation was not successful AND store the reason
-            interp_results = {f'interp_{evt}': False for evt in extraction_specs.keys()}
-            interp_results['insufficient_data'] = True
-            interp_results['nan_reason'] = error_msg
-            interp_results_list.append(interp_results)
 
     if len(data_list)>0:
         xa = xr.concat(data_list,dim='trial_nb')
