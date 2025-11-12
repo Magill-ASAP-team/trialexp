@@ -64,6 +64,12 @@ xr_interp_res = df_interp_res.to_xarray()
 
 #%% Save data
 xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
+
+# add additional info to xr_warped
+xr_warped.attrs['extraction_specs'] = str(extraction_specs)
+xr_warped.attrs.update(xr_spike_fr.attrs)
+xr_warped.attrs.update(df_events_cond.attrs)
+
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
 #%% check for valid trials
