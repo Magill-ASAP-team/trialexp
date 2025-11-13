@@ -94,7 +94,6 @@ df_events_cond.attrs.update(
      'extra_event_triggers': extra_trigger_events, # used to average over additional events without considering the trial structure
      'events_to_process': events_to_process}
 )
-
 # %% save
 
 df_events_cond.to_pickle(soutput.event_dataframe)

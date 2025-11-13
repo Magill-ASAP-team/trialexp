@@ -55,6 +55,8 @@ rule process_pycontrol:
         condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
         pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
         trial_dataframe = '{session_path}/{task}/{session_id}/processed/df_trials.pkl',
+    log:
+        '{session_path}/{task}/{session_id}/processed/log/process_pycontrol.log'
     script:
         'scripts/01_process_pycontrol.py'
 
@@ -91,6 +93,8 @@ rule export_parquet:
         pycontrol_dataframe = '{session_path}/{task}/{session_id}/processed/df_pycontrol.pkl',
     output:
         photometry_parquet = '{session_path}/{task}/{session_id}/processed/photometry.parquet'
+    log:            
+        '{session_path}/{task}/{session_id}/processed/log/export_parquet.log'
     script:
         'scripts/03_export_parquet.py'
 
@@ -102,6 +106,8 @@ rule import_pyphotometry:
         event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
         condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
         photometry_folder = '{session_path}/{task}/{session_id}/pyphotometry'
+    log:
+        '{session_path}/{task}/{session_id}/processed/log/import_pyphotometry.log'
     output:
         xr_photometry = '{session_path}/{task}/{session_id}/processed/xr_photometry.nc',
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
@@ -125,6 +131,8 @@ rule photometry_figure:
     output:
         trigger_photo_dir= directory('{session_path}/{task}/{session_id}/processed/figures/photometry'),
         done = touch('{session_path}/{task}/{session_id}/processed/log/photometry_figure.done'),
+    log:
+        '{session_path}/{task}/{session_id}/processed/log/photometry_figure.log'
     script:
         'scripts/05_plot_pyphotometry.py'
 
@@ -141,6 +149,8 @@ rule behavorial_analysis:
     input:
         condition_dataframe = '{session_path}/{task}/{session_id}/processed/df_conditions.pkl',
         event_dataframe = '{session_path}/{task}/{session_id}/processed/df_events_cond.pkl',
+    log:
+        '{session_path}/{task}/{session_id}/processed/log/behavorial_analysis.log'  
     output:
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
     script:
@@ -155,6 +165,8 @@ rule time_warping:
     output:
         xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
         figure_dir= directory('{session_path}/{task}/{session_id}/processed/figures/timewarp'),
+    log:
+        '{session_path}/{task}/{session_id}/processed/log/time_warping.log'  
     script:
         'scripts/07_time_warping.py'
 
