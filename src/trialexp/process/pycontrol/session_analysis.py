@@ -97,7 +97,7 @@ def add_trial_nb(df_events, trigger_time, trial_window):
     df["trial_nb"] = np.nan
 
     trial_nb = 1
-    last_idx = [False] * len(df_events)
+    last_idx = np.array([False] * len(df_events))
     valid_trigger_time = []
     skip_trials = 0
 
@@ -120,11 +120,11 @@ def add_trial_nb(df_events, trigger_time, trial_window):
         end = trigger_time[i + 1] + trial_window[0]
 
         if end < start:
-            logging.warn(f"Error: trial shorter than trial_window for Trial {i}")
+            logging.warning(f"Error: trial shorter than trial_window for Trial {i}")
             trial_nb += 1
             continue
         elif end <= trigger_time[i]:
-            logging.warn(
+            logging.warning(
                 f"Error: trial end earlier than trigger end:{end} trigger_time{trigger_time[i]} for Trial {i}"
             )
             trial_nb += 1
@@ -140,13 +140,14 @@ def add_trial_nb(df_events, trigger_time, trial_window):
 
         trial_nb += 1
 
-        if any(last_idx & idx):
-            logging.warn("Overlapping trials detected.")
+        # check if there is any overlapping time points
+        if any(np.array(last_idx) & np.array(idx)):
+            logging.warning("Overlapping trials detected.")
 
         last_idx = idx
 
     if skip_trials > 0:
-        logging.warn(f"{skip_trials} have been skipped because no event is found")
+        logging.warning(f"{skip_trials} have been skipped because no event is found")
 
     assert (
         len(df.trial_nb.unique()) == len(valid_trigger_time) + 1
