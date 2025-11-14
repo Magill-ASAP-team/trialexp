@@ -147,6 +147,9 @@ xr_success  = xr_warped.sel(trial_nb=(xr_warped.trial_outcome=='success'))
 valid_trials = np.all(~np.isnan(xr_success['zscored_df_over_f'].data),axis=1)
 logger.info('Ratio of valid successful trials:', np.sum(valid_trials)/len(valid_trials))
 
+lm.print_time_warping_summary(xr_warped, signal2analyze[0])
+
+
 #%% Plot the time wrapped data
 for var in signal2analyze:
     unique_outcome = np.unique(xr_warped.trial_outcome)

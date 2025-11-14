@@ -606,10 +606,11 @@ def combine2dataframe(result):
     
     return df_tuning
 
-def get_cell_mean_cv(x, coarsen_factor = 5, axis=0):
+def get_cell_mean_cv(x, coarsen_factor = None, axis=0):
     # Get the mean coefficient of variation for a cell
     cv_list = []
-    x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
+    if coarsen_factor is not None and 'spk_event_time' in x.dims:
+        x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
     for id in tqdm(x.cluID):
         x_cell = x.sel(cluID=id)
         mean_cv = np.mean(variation(x_cell,axis=axis,nan_policy='omit'))
@@ -617,10 +618,11 @@ def get_cell_mean_cv(x, coarsen_factor = 5, axis=0):
 
     return cv_list
 
-def get_cell_mean_fr(x, coarsen_factor = 5, axis=0):
+def get_cell_mean_fr(x, coarsen_factor = None, axis=0):
     # Get the mean firing rate of th cell
     cv_list = []
-    x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
+    if coarsen_factor is not None and 'spk_event_time' in x.dims:
+        x = x.coarsen(spk_event_time=coarsen_factor,boundary="trim").mean()
     for id in tqdm(x.cluID):
         x_cell = x.sel(cluID=id)
         mean_cv = np.mean(x_cell)

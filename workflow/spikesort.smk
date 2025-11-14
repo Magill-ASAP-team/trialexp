@@ -148,6 +148,7 @@ rule spikesort_done:
         corr_plot = session_correlations_input, 
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
         cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
+        time_warp = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
     priority: 20
     output:
         spike_sort_done = touch('{sessions}/{task_path}/{session_id}/processed/spikesort.done'),

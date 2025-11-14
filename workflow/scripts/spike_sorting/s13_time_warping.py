@@ -16,6 +16,7 @@ from trialexp import config
 import trialexp.process.pyphotometry.linear_modelling as lm
 from pathlib import Path
 import itertools
+from joblib import Parallel, delayed
 import trialexp.process.ephys.photom_correlation as pc
 #%% Load inputs
 
@@ -63,6 +64,12 @@ xr_interp_res = df_interp_res.to_xarray()
 
 #%% Save data
 xr_warped = xr.merge([xr_conditions, xr_interp_res, *xa_list])
+
+# add additional info to xr_warped
+xr_warped.attrs['extraction_specs'] = str(extraction_specs)
+xr_warped.attrs.update(xr_spike_fr.attrs)
+xr_warped.attrs.update(df_events_cond.attrs)
+
 xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 
 #%% check for valid trials
@@ -76,13 +83,18 @@ photom_vars = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
 event2plot = [v.replace('_'+photom_vars[0],'') for v in xr_session.data_vars.keys() if v.endswith(photom_vars[0]) and not (v in photom_vars)]
 
 #plot
-for photom_signal_name, evt_name in itertools.product(photom_vars, event2plot):
-
+def plot_timewarp(photom_signal_name, evt_name, figure_dir):
+    print(f'Plotting time warp for {photom_signal_name} at {evt_name}')
     fig = pc.plot_extrem_corr_timewarp(extraction_specs, trigger, 
                                        xr_corr, xr_warped, xr_photom_timewarpped, photom_signal_name, 
                             'spikes_FR_session', 
                             evt_name, mode='abs')
+    fig.savefig(Path(figure_dir)/f'timewarp_{evt_name}_{photom_signal_name}.png',dpi=200)
+    plt.close(fig)
 
-    fig.savefig(Path(soutput.figure_dir)/f'timewarp_{evt_name}_{photom_signal_name}.png',dpi=200)
+Parallel(n_jobs=4)(
+    delayed(plot_timewarp)(photom_signal_name, evt_name, str(soutput.figure_dir))
+    for photom_signal_name, evt_name in itertools.product(photom_vars, event2plot)
+)
 # %%
 xr_spike_fr.close()
