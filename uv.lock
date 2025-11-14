@@ -3415,7 +3415,7 @@ wheels = [
 [[package]]
 name = "snakehelper"
 version = "0.2.1"
-source = { git = "https://github.com/teristam/snakehelper.git#413fed20ee1f9844aa944f39f25e39edad6e6ae2" }
+source = { git = "https://github.com/teristam/snakehelper.git#9ad08ada7264702b019a5dab55de32c2847830d3" }
 dependencies = [
     { name = "ipykernel" },
     { name = "loguru" },

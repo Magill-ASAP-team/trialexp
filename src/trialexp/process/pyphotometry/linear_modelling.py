@@ -229,7 +229,7 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs, ver
 
         # Extract photometry data around trial
         # extract the data based on the last ITI
-        iti_state = df_trial[df_trial.content.str.contains('break_after')].iloc[-1]
+        iti_state = df_trial[df_trial.content.str.contains('break_after', na=False)].iloc[-1]
         trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, iti_state.time+iti_state.duration+100) # add a slight padding
 
         # Try to time warp it
