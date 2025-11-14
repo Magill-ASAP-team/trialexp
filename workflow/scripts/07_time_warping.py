@@ -98,7 +98,7 @@ for signal_var in signal2analyze:
                            extraction_specs, 
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
-                           verbose=False)
+                           verbose=True)
                         
                         
     
@@ -145,7 +145,11 @@ xr_warped.to_netcdf(soutput.xr_timewarpped, engine='h5netcdf')
 #%% check for valid trials
 xr_success  = xr_warped.sel(trial_nb=(xr_warped.trial_outcome=='success'))
 valid_trials = np.all(~np.isnan(xr_success['zscored_df_over_f'].data),axis=1)
-logger.info('Ratio of valid successful trials:', np.sum(valid_trials)/len(valid_trials))
+if len(valid_trials)>0:
+    ratio = np.sum(valid_trials)/len(valid_trials)
+else:
+    ratio = 0
+logger.info('Ratio of valid successful trials:', ratio)
 
 lm.print_time_warping_summary(xr_warped, signal2analyze[0])
 
@@ -181,4 +185,5 @@ for outcome, ax in zip(outcome2plot, axes):
 fig.tight_layout()
 fig.savefig(Path(soutput.figure_dir)/f'{var}_timewarp.png', bbox_inches='tight', dpi=200)
 
+xr_warped.close()
 # %%

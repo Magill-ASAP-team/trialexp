@@ -91,8 +91,8 @@ def interp_data(trial_data, df_trial, trigger, extraction_specs, sampling_rate):
     #copy the signal around the trigger
     t_trigger = t_trigger_event.iloc[0].time
     event_window_len = int((trigger_specs['event_window'][1] - trigger_specs['event_window'][0])/1000*sampling_rate)
-    t[cur_idx:(cur_idx+event_window_len)] = np.arange(t_trigger+trigger_specs['event_window'][0], 
-                                                      t_trigger+trigger_specs['event_window'][1], 1/sampling_rate*1000)
+    t[cur_idx:(cur_idx+event_window_len)] = np.linspace(t_trigger+trigger_specs['event_window'][0], 
+                                                      t_trigger+trigger_specs['event_window'][1], event_window_len, endpoint=False)
     cur_idx += event_window_len
     cur_time = t_trigger+trigger_specs['event_window'][1] #the trial time corresponding to cur_idx
     padding = trigger_specs['padding']
@@ -229,9 +229,10 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs, ver
 
         # Extract photometry data around trial
         # extract the data based on the last ITI
-        iti_state = df_trial[df_trial.content.str.contains('break_after', na=False)].iloc[-1]
-        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, iti_state.time+iti_state.duration+100) # add a slight padding
-
+        if len(iti_state := df_trial[df_trial.content.str.contains('break_after', na=False)])>0:
+            trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, iti_state.time+iti_state.duration+100) # add a slight padding
+        else:
+            trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time) # add a slight padding
         # Try to time warp it
         try:
             data_p, interp_results = interp_data(trial_data, df_trial, trigger, extraction_specs, Fs)

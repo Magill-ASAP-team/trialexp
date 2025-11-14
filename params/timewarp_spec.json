@@ -220,21 +220,10 @@
         }
     },
     "spontanous_reaching": {
-        "bar_off": {
-            "event_window": [
-                0,
-                50
-            ],
-            "order": "last_before_first",
-            "dependent_event": "spout",
-            "padding": 100,
-            "label": "last bar off"
-
-        },
         "spout": {
             "event_window": [
                 -50,
-                0
+                1000
             ],
             "order": "first",
             "padding": 0,
