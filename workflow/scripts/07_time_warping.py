@@ -98,7 +98,7 @@ for signal_var in signal2analyze:
                            extraction_specs, 
                            trigger,
                            xr_photometry.attrs['sampling_rate'],
-                           verbose=True)
+                           verbose=False)
                         
                         
     
