@@ -115,9 +115,18 @@
             ],
             "alternative": ["US_jackpot","US_omission"],
             "order": "first",
-            "padding": 0,
+            "padding": 300,
             "label": "reward\ndelivery"
-        }
+        },
+        "end":{
+            "event_window": [
+                0,
+                0
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "end"
+        }       
     },
     "pavlovian_go_reward_nogap": {
         "hold_for_water": {

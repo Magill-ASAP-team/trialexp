@@ -20,12 +20,22 @@ def extract_event(df_events, event, order, dependent_event=None, alternative=Non
     # result is a pandas series
     # optionally, you can match multiple events using the alterantive argument
     
+    if event == 'end':
+        # special case for the end of trials
+        # get the end of trials
+        last_state = df_events[df_events.content.str.contains('break_after', na=False)].iloc[-1]
+        # create a pseudo event to be compatible with downstream processing
+        last_state['time'] += last_state['duration']
+        last_state['content'] = 'end'
+        return last_state
+    
+
     if alternative is None:
         events = df_events[(df_events.content==event) & (df_events.trial_time>0)]
     else:
         events = df_events[(df_events.content.isin([event, *alternative])) & (df_events.trial_time>0)]
 
-
+    
     if len(events) == 0:
         return None
 
@@ -218,7 +228,9 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs, ver
         post_time = list(extraction_specs.values())[-1]['event_window'][1]
 
         # Extract photometry data around trial
-        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time)
+        # extract the data based on the last ITI
+        iti_state = df_trial[df_trial.content.str.contains('break_after')].iloc[-1]
+        trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, iti_state.time+iti_state.duration+100) # add a slight padding
 
         # Try to time warp it
         try:
@@ -347,6 +359,9 @@ def compute_ticks(extraction_specs):
     continue_count = False
 
     for k,v in extraction_specs.items():
+        if k=='end':
+            # don't draw anything for the end of trial
+            continue
         if cur_time is None:
             cur_time = v['event_window'][0]
         win_len = v['event_window'][1] - v['event_window'][0]
