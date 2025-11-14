@@ -111,7 +111,7 @@
         "US_delay_timer": {
             "event_window": [
                 0,
-                1000
+                2000
             ],
             "alternative": ["US_jackpot","US_omission"],
             "order": "first",
