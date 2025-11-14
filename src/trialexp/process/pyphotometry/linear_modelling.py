@@ -23,12 +23,13 @@ def extract_event(df_events, event, order, dependent_event=None, alternative=Non
     if event == 'end':
         # special case for the end of trials
         # get the end of trials
-        last_state = df_events[df_events.content.str.contains('break_after', na=False)].iloc[-1]
-        # create a pseudo event to be compatible with downstream processing
-        last_state['time'] += last_state['duration']
-        last_state['content'] = 'end'
-        return last_state
-    
+        if len(last_state := df_events[df_events.content.str.contains('break_after', na=False)])>0:
+            last_state = last_state.iloc[-1]
+            # create a pseudo event to be compatible with downstream processing
+            last_state['time'] += last_state['duration']
+            last_state['content'] = 'end'
+            return last_state
+        
 
     if alternative is None:
         events = df_events[(df_events.content==event) & (df_events.trial_time>0)]
