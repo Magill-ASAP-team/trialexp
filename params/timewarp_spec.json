@@ -220,7 +220,7 @@
         }
     },
     "spontanous_reaching": {
-        "spout": {
+        "US_timer": {
             "event_window": [
                 -50,
                 1000
