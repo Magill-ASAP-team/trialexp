@@ -559,12 +559,16 @@ def import_ppd_auto(file_path, cutoff_date=datetime(2023, 10, 23)):
         data_header = f.read(header_size)
     # Extract header information
     header_dict = json.loads(data_header)
-
     if header_dict["version"] == "1.0.2":
         return import_ppd_v2(file_path, low_pass=None, high_pass=None)
     else:
         # parse the datetime to determine the correct file format to use
-        start_date = datetime.strptime(header_dict["date_time"], "%Y-%m-%dT%H:%M:%S.%f")
+        header_dict["date_time"]
+        try:
+            start_date = datetime.strptime(header_dict["date_time"], "%Y-%m-%dT%H:%M:%S.%f")
+        except ValueError:
+            start_date = datetime.strptime(header_dict["date_time"], "%Y-%m-%dT%H:%M:%S")
+
         if start_date > cutoff_date:
             data_format = "v2"
         else:
@@ -1361,10 +1365,22 @@ def extract_event_data(
 
     for t in ts:
         if t is not None:
-            d = abs((ref_time - t).data)
-            # Find the most close matched time stamp and extend it both ends
-            min_idx = np.argmin(d)
-            min_time = d[min_idx]
+            # Use binary search to find closest timestamp 
+            idx = np.searchsorted(ref_time.data, t)
+
+            # Check both neighbors to find the closest match
+            if idx == 0:
+                min_idx = 0
+            elif idx == len(ref_time):
+                min_idx = len(ref_time) - 1
+            else:
+                # Compare distances to both neighbors
+                if abs(ref_time.data[idx] - t) < abs(ref_time.data[idx-1] - t):
+                    min_idx = idx
+                else:
+                    min_idx = idx - 1
+
+            min_time = abs(ref_time.data[min_idx] - t)
             start_idx = min_idx + int(window[0] / 1000 * sampling_rate)
             end_idx = min_idx + int(window[1] / 1000 * sampling_rate)
 
@@ -1373,7 +1389,6 @@ def extract_event_data(
                 and (start_idx > 0)
                 and (end_idx < len(dataArray.time))
             ):
-                min_idx = np.argmin(d)
                 if dataArray.data.ndim == 1:
                     data.append(dataArray.data[start_idx:end_idx])
                 else:
