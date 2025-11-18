@@ -140,6 +140,7 @@ rule photometry_pipline:
     input:
         xr_timewarpped = '{session_path}/{task}/{session_id}/processed/xr_photom_timewarped.nc',
         trigger_photo_dir= '{session_path}/{task}/{session_id}/processed/log/photometry_figure.done',
+        photometry_parquet = '{session_path}/{task}/{session_id}/processed/photometry.parquet',
     output:
         rule_complete = touch('{session_path}/{task}/{session_id}/processed/log/photometry.done')
 
@@ -184,7 +185,5 @@ rule pycontrol_final:
         xr_session = '{session_path}/{task}/{session_id}/processed/xr_session.nc',
         pycontrol_done = '{session_path}/{task}/{session_id}/processed/log/pycontrol.done',
         xr_behaviour = '{session_path}/{task}/{session_id}/processed/xr_behaviour.nc',
-        photometry_parquet = '{session_path}/{task}/{session_id}/processed/photometry.parquet',
-        # spike2='{session_path}/{task}/{session_id}/processed/spike2_export.done',
     output:
         done = touch('{session_path}/{task}/{session_id}/processed/pycontrol_workflow.done')
