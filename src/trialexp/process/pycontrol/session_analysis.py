@@ -123,7 +123,7 @@ def add_trial_nb(df_events, trigger_time, trial_window):
             continue
         elif end <= trigger_time[i]:
             logger.warning(
-                f"Error: trial end earlier than trigger end:{end} trigger_time{trigger_time[i]} for Trial {i}"
+                f"Trial end earlier than trigger end:{end} trigger_time{trigger_time[i]} for Trial {i}"
             )
             continue
 
@@ -266,7 +266,7 @@ def extract_trial_by_trigger(
         f"Error: trial_nb is not sequential {df_events_trials.index}"
 
     # rename the column for compatibility
-    df_events_trials.columns = [col + "_trial_time" for col in df_events_trials.columns]
+    df_events_trials.columns = [str(col) + "_trial_time" for col in df_events_trials.columns]
 
     # add uuid
     df_events_trials["trial_nb"] = df_events_trials.index.values
