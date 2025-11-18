@@ -120,13 +120,11 @@ def add_trial_nb(df_events, trigger_time, trial_window):
 
         if end < start:
             logger.warning(f"Error: trial shorter than trial_window for Trial {i}")
-            trial_nb += 1
             continue
         elif end <= trigger_time[i]:
             logger.warning(
                 f"Error: trial end earlier than trigger end:{end} trigger_time{trigger_time[i]} for Trial {i}"
             )
-            trial_nb += 1
             continue
 
         idx = (df.time >= start) & (df.time < end)
@@ -134,10 +132,9 @@ def add_trial_nb(df_events, trigger_time, trial_window):
         if np.sum(idx) > 0:
             df.loc[idx, ["trial_nb"]] = trial_nb
             valid_trigger_time.append(trigger_time[i])
+            trial_nb += 1  # Only increment when trial is assigned
         else:
             skip_trials += 1
-
-        trial_nb += 1
 
         # check if there is any overlapping time points
         if any(np.array(last_idx) & np.array(idx)):
@@ -221,6 +218,7 @@ def get_rel_time(df, trigger_name):
             f"Warning: not exactly 1 trigger found. I will only take the first trigger"
         )
         t0 = t0[0]
+        df['trial_time'] = df.time - t0
     elif len(t0) == 0:
         logger.warning('No trigger can be found in trial. Trial time is made relative to the beginning')
         df['trial_time'] = df.time - df.time[0]
@@ -258,12 +256,14 @@ def extract_trial_by_trigger(
 
     df_events_trials = df_events[hashableIdx & valid_idx].groupby(["trial_nb", "content"]).agg(list)
     df_events_trials = (df_events_trials.loc[:, ["trial_time"]]
-                       .unstack("content") #expand content into 
-                       .droplevel(0, axis=1) #convert the unique events into its own column
-                       .reindex(np.arange(1, len(trigger_time) + 1)))
-    
+                       .unstack("content") #expand content into
+                       .droplevel(0, axis=1)) #convert the unique events into its own column
+
+    # Verify trial_nb is sequential and matches expected count
     assert len(df_events_trials) == len(trigger_time), \
         f"Error: trigger time does not match {df_events_trials.index} {len(trigger_time)}"
+    assert all(df_events_trials.index == np.arange(1, len(trigger_time) + 1)), \
+        f"Error: trial_nb is not sequential {df_events_trials.index}"
 
     # rename the column for compatibility
     df_events_trials.columns = [col + "_trial_time" for col in df_events_trials.columns]
