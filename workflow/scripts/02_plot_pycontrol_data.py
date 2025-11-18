@@ -26,7 +26,7 @@ g = plot_event_distribution(df2plot, 'trial_time', 'trial_nb', xbinwidth=0.1, yb
 trigger_text = triggers[0].replace('_', ' ')
 style_event_distribution(g, 'Time (s)', 'Trial number', trigger_text)
 
-# %% save
+
 g.savefig(soutput.event_histogram, dpi=100)
 
 # %% Plot the reach time

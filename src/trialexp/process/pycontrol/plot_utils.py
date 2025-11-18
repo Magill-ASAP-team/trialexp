@@ -69,15 +69,17 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
     
     #plot aborted bar off
     df_baroff = df2plot[(df2plot.content=='bar_off') & (df2plot.trial_outcome =='aborted')]
-    ax = sns.scatterplot(y=y, x=x, marker='.' , hue='trial_outcome', palette=trial_outcome_palette,
-                       data= df_baroff, ax = g.ax_joint, legend=False, **kwargs)
+    if len(df_baroff)>0:
+        ax = sns.scatterplot(y=y, x=x, marker='.' , hue='trial_outcome', palette=trial_outcome_palette,
+                           data= df_baroff, ax = g.ax_joint, legend=False, **kwargs)
 
     
     # indicate the no reach condition
     df_trial = df2plot.groupby('trial_nb').first()
     df_noreach = df_trial[df_trial.trial_outcome.str.contains('no_reach')]
-    ax = sns.scatterplot(y=y, x=0, marker='x' , hue='trial_outcome', palette=trial_outcome_palette,
-                    data= df_noreach, ax = g.ax_joint, **kwargs)
+    if len(df_noreach):
+        ax = sns.scatterplot(y=y, x=0, marker='x' , hue='trial_outcome', palette=trial_outcome_palette,
+                        data= df_noreach, ax = g.ax_joint, **kwargs)
     
     if xlim is not None:
         ax.set(xlim=xlim)
