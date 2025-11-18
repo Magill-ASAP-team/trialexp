@@ -165,7 +165,7 @@ dependencies = [
     "pyct==0.5.0",
     "pydantic==2.10.2",
     "pydantic-core==2.27.1",
-    "pygments==2.18.0",
+    "pygments>=2.18.0",
     "pymer4==0.9.2",
     "pyparsing==3.1.2",
     "pyproject-hooks==1.2.0",
