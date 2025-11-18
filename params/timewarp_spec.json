@@ -220,14 +220,14 @@
         }
     },
     "spontanous_reaching": {
-        "US_timer": {
+        "spout": {
             "event_window": [
                 -50,
                 1000
             ],
             "order": "first",
             "padding": 0,
-            "label": "Reward"
+            "label": "spout"
 
         }
     },
