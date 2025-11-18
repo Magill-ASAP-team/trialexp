@@ -20,12 +20,14 @@ df_pycontrol = pd.read_pickle(sinput.df_pycontrol)
 df2plot = df_events_cond.copy()
 df2plot['trial_time'] = df2plot['trial_time']/1000
 xlim = [trial_window[0]/1000, np.percentile(df2plot['trial_time'],95)]
+
+#%%
 g = plot_event_distribution(df2plot, 'trial_time', 'trial_nb', xbinwidth=0.1, ybinwidth=0, xlim=xlim)
 trigger_text = triggers[0].replace('_', ' ')
 style_event_distribution(g, 'Time (s)', 'Trial number', trigger_text)
 
 # %% save
-g.savefig(soutput.event_histogram, dpi=300)
+g.savefig(soutput.event_histogram, dpi=100)
 
 # %% Plot the reach time
 fig,ax = plt.subplots(1,1,dpi=200)
@@ -44,3 +46,5 @@ if 'break2' in task_name or 'cued_and_cued_reward' in task_name:
     ax.axhline(0,ls='--', color='gray')
 
 fig.savefig(soutput.discrim_scores)
+
+# %%

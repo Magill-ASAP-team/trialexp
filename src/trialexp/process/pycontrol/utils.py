@@ -1331,6 +1331,7 @@ def add_events_to_time_series(df_pycontrol, df):
         evt_data = np.zeros((len(df),))
         evt_time = events[events.content==evt].time
         idx = np.searchsorted(df.time, evt_time)
+        # print(evt_data)
         evt_data[idx-1] = i
         df['event:'+evt] = evt_data
 

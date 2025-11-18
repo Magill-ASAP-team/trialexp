@@ -13,6 +13,7 @@ from matplotlib.path import Path
 import matplotlib.patches as patches
 from sklearn import preprocessing
 import json
+from loguru import logger
 
 def extract_event(df_events, event, order, dependent_event=None, alternative=None):
     # extract the required event according to order, which can be one of 'first','last','last_before_first'
@@ -225,24 +226,25 @@ def time_warp_data(df_events_cond, xr_signal, extraction_specs, trigger, Fs, ver
     for i in df_events_cond.trial_nb.unique():
         df_trial = df_events_cond[df_events_cond.trial_nb==i]
 
-        pre_time = extraction_specs[trigger]['event_window'][0]-500
-        post_time = list(extraction_specs.values())[-1]['event_window'][1]
-
-        # Extract photometry data around trial
-        # extract the data based on the last ITI
-        if len(iti_state := df_trial[df_trial.content.str.contains('break_after', na=False)])>0:
-            s = iti_state.iloc[-1]
-            trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, s.time+s.duration+100) # add a slight padding
-        else:
-            trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time) # add a slight padding
-        # Try to time warp it
+    
         try:
+            pre_time = extraction_specs[trigger]['event_window'][0]-500
+            post_time = list(extraction_specs.values())[-1]['event_window'][1]
+
+            # Extract photometry data around trial
+            # extract the data based on the last ITI
+            if len(iti_state := df_trial[df_trial.content.str.contains('break_after', na=False)])>0:
+                s = iti_state.iloc[-1]
+                trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, s.time+s.duration+100) # add a slight padding
+            else:
+                trial_data = extract_data(xr_signal, df_trial.iloc[0].time+pre_time, df_trial.iloc[-1].time+post_time) # add a slight padding
+            # Try to time warp it
             data_p, interp_results = interp_data(trial_data, df_trial, trigger, extraction_specs, Fs)
             interp_results_list.append(interp_results)
             data_p = data_p.expand_dims({'trial_nb':[i]})
             data_list.append(data_p)
-        except NotImplementedError as e:
-            print(e)
+        except KeyError as e:
+            logger.warning(f'Cannot find event {e}. Skipping')
         except ValueError as e:
             # Create NaN trial when interpolation fails
             error_msg = str(e)
