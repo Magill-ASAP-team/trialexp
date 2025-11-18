@@ -157,9 +157,9 @@ else:
     dataset.attrs.update(df_event.attrs)
     
     dataset.attrs['sampling_rate'] = sampling_rate
-    
-    # save a dummpy photometry file to satisfy snakemake
-    Path(soutput.xr_photometry).touch()
+
+    # save an empty photometry dataset (no photometry data available)
+    dataset.to_netcdf(soutput.xr_photometry, engine='h5netcdf')
         
 #%% Bin the data such that we only have 1 data point per time bin
 down_sample_ratio = int(dataset.attrs['sampling_rate']/100)
