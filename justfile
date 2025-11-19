@@ -3,7 +3,7 @@ set dotenv-load	:= true #load the .env file for folder paths
 # Run the full pipeline
 run-pipeline: copy-data
     # Run the Python file
-    uv run snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime --rerun-incomplete -q progress
+    uv run snakemake --snakefile workflow/pycontrol.smk -k -c20 --rerun-triggers mtime --rerun-incomplete -q rules
 
 # Copy raw data into session folders
 copy-data:
@@ -28,7 +28,7 @@ make-session SEARCH_TERM *FLAGS:
   fi
   targets=$(echo "$target" | awk '{printf "%s/processed/pycontrol_workflow.done ", $0}')
   echo $targets
-  uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 -k {{FLAGS}} -q progress --rerun-incomplete
+  uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 -k {{FLAGS}} -q rules --rerun-incomplete
 
 #Search for and execute the sorting workflow in a session folder
 sort SEARCH_TERM *FLAGS:
@@ -41,7 +41,7 @@ sort SEARCH_TERM *FLAGS:
         echo "Aborted."; exit 1; \
     fi
     targets=$(echo "$target" | awk '{printf "%s/processed/spike_workflow.done ", $0}')
-    uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 -k {{FLAGS}} --rerun-incomplete -q progress
+    uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 -k {{FLAGS}} --rerun-incomplete -q rules
 
 
 run-aligner:
