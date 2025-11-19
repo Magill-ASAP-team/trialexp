@@ -20,18 +20,8 @@ def extract_event(df_events, event, order, dependent_event=None, alternative=Non
     # if order is 'last_before', you need to specify the depedent_event as well, it will always be
     # result is a pandas series
     # optionally, you can match multiple events using the alterantive argument
-    
-    # if event == 'end':
-    #     # special case for the end of trials
-    #     # get the end of trials
-    #     if len(last_state := df_events[df_events.content.str.contains('break_after', na=False)])>0:
-    #         last_state = last_state.iloc[-1]
-    #         # create a pseudo event to be compatible with downstream processing
-    #         last_state['time'] += last_state['duration']
-    #         last_state['content'] = 'end'
-    #         return last_state
-        
 
+    
     if alternative is None:
         events = df_events[(df_events.content==event) & (df_events.trial_time>0)]
     else:
@@ -945,9 +935,9 @@ def print_time_warping_summary(xr_warped, signal_var):
     signal2analyze : list
         List of signal variable names to analyze
     """
-    print(f'\n{"="*70}')
-    print("TIME WARPING SUMMARY")
-    print('='*70)
+    logger.debug(f'\n{"="*70}')
+    logger.debug("TIME WARPING SUMMARY")
+    logger.debug('='*70)
 
     # Check each signal variable
     if signal_var in xr_warped.data_vars:
@@ -959,11 +949,11 @@ def print_time_warping_summary(xr_warped, signal_var):
         partial_nan = np.sum(np.any(np.isnan(data), axis=1) & ~np.all(np.isnan(data), axis=1))
         total = data.shape[0]
 
-        print(f'\n{signal_var}:')
-        print(f'  Total trials: {total}')
-        print(f'  Fully valid trials: {fully_valid} ({fully_valid/total*100:.1f}%)')
-        print(f'  Fully NaN trials: {fully_nan} ({fully_nan/total*100:.1f}%)')
-        print(f'  Partial NaN trials: {partial_nan} ({partial_nan/total*100:.1f}%)')
+        logger.debug(f'\n{signal_var}:')
+        logger.debug(f'  Total trials: {total}')
+        logger.debug(f'  Fully valid trials: {fully_valid} ({fully_valid/total*100:.1f}%)')
+        logger.debug(f'  Fully NaN trials: {fully_nan} ({fully_nan/total*100:.1f}%)')
+        logger.debug(f'  Partial NaN trials: {partial_nan} ({partial_nan/total*100:.1f}%)')
 
         # Check successful trials specifically
         if 'trial_outcome' in xr_warped:
@@ -972,4 +962,4 @@ def print_time_warping_summary(xr_warped, signal_var):
                 success_data = xr_success[signal_var].data
                 valid_success = np.sum(np.all(~np.isnan(success_data), axis=1))
                 total_success = success_data.shape[0]
-                print(f'  Valid successful trials: {valid_success}/{total_success} ({valid_success/total_success*100:.1f}%)')
+                logger.debug(f'  Valid successful trials: {valid_success}/{total_success} ({valid_success/total_success*100:.1f}%)')

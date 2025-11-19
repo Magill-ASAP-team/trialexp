@@ -125,7 +125,7 @@
             ],
             "order": "first",
             "padding": 0,
-            "label": "end"
+            "label": "trial end"
         }       
     },
     "pavlovian_go_reward_nogap": {
