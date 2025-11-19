@@ -109,7 +109,8 @@ def add_trial_nb(df_events, trigger_time, trial_window):
             df_events.iloc[-1].time,
         ]  # make sure we have enough data to extract
 
-    
+    end_event_list = []
+       
     for i in range(
         len(trigger_time) - 1
     ):  # skip the last trial because it can be incomplete
@@ -131,6 +132,17 @@ def add_trial_nb(df_events, trigger_time, trial_window):
 
         if np.sum(idx) > 0:
             df.loc[idx, ["trial_nb"]] = trial_nb
+            
+            # inject an end event
+            end_event_list.append({
+                'time': end,
+                'type': 'event',
+                'subtype': 'virtual',
+                'content': 'trial_end',
+                'trial_nb': trial_nb,
+                'duration': 0
+            })
+            
             valid_trigger_time.append(trigger_time[i])
             trial_nb += 1  # Only increment when trial is assigned
         else:
@@ -148,7 +160,16 @@ def add_trial_nb(df_events, trigger_time, trial_window):
     assert (
         len(df.trial_nb.unique()) == len(valid_trigger_time) + 1
     ), f"Error: trigger number mismatch {df.trial_nb.unique()} {len(trigger_time)}"
-    return df, np.array(valid_trigger_time)
+    
+    #append the end_event_list to df
+    if len(end_event_list)>0:
+        df_end_events = pd.DataFrame(end_event_list)
+        df_final = pd.concat([df, df_end_events], ignore_index=True).sort_values(by='time').reset_index(drop=True)
+    else:
+        df_final = df
+        
+    df_final.attrs.update(df.attrs) 
+    return df_final, np.array(valid_trigger_time)
 
 
 def get_task_specs(tasks_trig_and_events, task_name):

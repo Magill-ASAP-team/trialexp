@@ -118,7 +118,7 @@
             "padding": 300,
             "label": "reward\ndelivery"
         },
-        "end":{
+        "trial_end":{
             "event_window": [
                 0,
                 0
