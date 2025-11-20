@@ -354,7 +354,7 @@ def compute_ticks(extraction_specs):
     continue_count = False
 
     for k,v in extraction_specs.items():
-        if k=='end':
+        if k=='trial_end':
             # don't draw anything for the end of trial
             continue
         if cur_time is None:
@@ -375,6 +375,8 @@ def compute_ticks(extraction_specs):
         continue_count = (v['padding'] == 0) # continue contining if no warping needs to be performed
         last_tlab = tlab
     
+    # set the label to empty if it is zero, for better visualiztion
+    ticks_labels = [f'{lbl}' if lbl!=0 else '' for lbl in ticks_labels]
     return ticks, ticks_labels
 
 
