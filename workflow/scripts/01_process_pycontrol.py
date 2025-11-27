@@ -5,6 +5,7 @@ import seaborn as sns
 import numpy as np
 from trialexp.process.pycontrol.session_analysis import *
 from trialexp.process.pycontrol.utils import *
+from trialexp.process.pycontrol.utils import analyze_lick_signal
 from trialexp.process.pycontrol.plot_utils import *
 from trialexp.process.pycontrol.session_analysis import Session # do not look used
 from trialexp.process.pycontrol.data_import import session_dataframe
@@ -49,6 +50,8 @@ if len(lick_events)<10 and len(lick_signal_path)>0:
     lick_on, lick_off, lick = analyze_lick_signal(lick_signal_path, lick_ts_path)
     # add lick back to pycontrol
     df_pycontrol = add_lick_events(df_pycontrol, lick_on, lick_off)
+
+#%%
 
     
 df_pycontrol.to_pickle(soutput.pycontrol_dataframe)

@@ -24,6 +24,7 @@ from loguru import logger
 import scipy
 from scipy.stats import norm
 import xarray as xr
+from scipy.signal import find_peaks
 
 Event = namedtuple('Event', ['time','name'])
 State = namedtuple('State', ['time','name'])
@@ -1146,9 +1147,9 @@ def analyze_lick_signal(lick_signal_path, lick_ts_path, lick_fs=200):
         print('Warning: Lick signal is too short')
         return ([],[],[])
 
-    [b,a]  = scipy.signal.butter(5, 10/(lick_fs/2))
+    [b,a]  = scipy.signal.butter(5, 20/(lick_fs/2))
     lick = scipy.signal.filtfilt(b,a,lick_signal)
-    lick = scipy.signal.savgol_filter(lick, 51,1)
+    # lick = scipy.signal.savgol_filter(lick, 21,1)
     
     
     # check if the signal is inverted or not
@@ -1162,12 +1163,17 @@ def analyze_lick_signal(lick_signal_path, lick_ts_path, lick_fs=200):
     else:
         lick = lick - mean_lick
         
-    thres = 2*np.std(lick)
-    lick_on = lick>thres
-    
-    lick_on_t = lick_ts[np.diff(lick_on, append=[0])==1] *1000 # be consistent in ms unit
-    lick_off_t = lick_ts[np.diff(lick_on, append=[0])==-1] *1000
-    
+    # Use MAD (Median Absolute Deviation) for robust threshold estimation
+    median_lick = np.median(lick)
+    mad = np.median(np.abs(lick - median_lick))
+    thres = median_lick + 3*1.4826 * mad  # 1.4826 is the scaling factor for normal distribution
+
+    # use a more sophisticated method for lick detection during neuropixel
+    peaks = find_peaks(lick,height=thres, distance=lick_fs/20, prominence=10)[0]
+
+    lick_on_t = lick_ts[peaks]*1000
+    lick_off_t = (lick_ts[peaks]+1)*1000 #off detection is not reliable, so just add 1
+
     # plt.plot(lick_ts*1000, lick)
     # plt.plot(lick_on_t, np.ones((len(lick_on_t),))*100, '^')
     # plt.plot(lick_off_t, np.ones((len(lick_off_t),))*100, 'rv')
