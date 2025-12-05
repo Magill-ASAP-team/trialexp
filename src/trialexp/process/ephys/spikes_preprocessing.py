@@ -66,11 +66,10 @@ def add_ks_metadata(ks_results, df_metrics, good_only=False):
     if good_only:
         sel_idx = good_idx
             
-    templates = ks_results['templates']
-    max_chans = np.array([np.argmax(np.max(np.abs(te),axis=0)) for te in templates])
+    # Note: templates from kilosort is alredy whitened
+    # so its spatial feature may not match the original signal
     chan_pos = np.stack([ks_results['channel_positions'][ch] for ch in max_chans])
     
-    df_metrics['maxWaveformCh'] = max_chans[sel_idx]
     df_metrics['ks_chan_pos_x'] = chan_pos[sel_idx,0]
     df_metrics['ks_chan_pos_y'] = chan_pos[sel_idx,1]
     df_metrics['ks_labels'] = ks_labels[sel_idx]
