@@ -91,7 +91,7 @@ class ComputeFiringProperties(AnalyzerExtension):
         # Add all metrics to DataFrame
         df_firing_properties['long_isi_portion'] = pd.Series(long_isi_portion)
         df_firing_properties['post_spike_suppression_ms'] = pd.Series(post_spike_suppression)
-        df_firing_properties['spatial_extent_um'] = pd.Series(spatial_extent)
+        df_firing_properties['spatial_footprint_um'] = pd.Series(spatial_extent)
 
         self.data['firing_properties'] = df_firing_properties
 
