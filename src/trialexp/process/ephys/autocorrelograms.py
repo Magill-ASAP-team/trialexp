@@ -328,157 +328,11 @@ def _compute_correlograms_on_sorting(sorting, window_ms, bin_ms, method="auto"):
     bins : np.array
         The bins edges in ms
     """
-    assert method in ("auto", "numba", "numpy"), "method must be 'auto', 'numba' or 'numpy'"
-
-    if method == "auto":
-        method = "numba" if HAVE_NUMBA else "numpy"
-
     bins, window_size, bin_size = _make_bins(sorting, window_ms, bin_ms)
 
     correlograms = _compute_autocorrelograms_parallel(sorting, window_size, bin_size)
 
     return correlograms, bins
-
-
-# # LOW-LEVEL IMPLEMENTATIONS
-# def _compute_correlograms_numpy(sorting, window_size, bin_size):
-#     """
-#     Computes correlograms for all units in a sorting object.
-
-#     This very elegant implementation is copied from phy package written by Cyrille Rossant.
-#     https://github.com/cortex-lab/phylib/blob/master/phylib/stats/ccg.py
-
-#     The main modification is the way positive and negative are handled
-#     explicitly for rounding reasons.
-
-#     Other slight modifications have been made to fit the SpikeInterface
-#     data model (e.g. adding the ability to handle multiple segments).
-
-#     Adaptation: Samuel Garcia
-#     """
-#     num_seg = sorting.get_num_segments()
-#     num_units = len(sorting.unit_ids)
-#     spikes = sorting.to_spike_vector(concatenated=False)
-
-#     num_bins, num_half_bins = _compute_num_bins(window_size, bin_size)
-
-#     correlograms = np.zeros((num_units, num_units, num_bins), dtype="int64")
-
-#     for seg_index in range(num_seg):
-#         spike_times = spikes[seg_index]["sample_index"]
-#         spike_unit_indices = spikes[seg_index]["unit_index"]
-
-#         c0 = correlogram_for_one_segment(spike_times, spike_unit_indices, window_size, bin_size)
-
-#         correlograms += c0
-
-#     return correlograms
-
-
-# def correlogram_for_one_segment(spike_times, spike_unit_indices, window_size, bin_size):
-#     """
-#     A very well optimized algorithm for the cross-correlation of
-#     spike trains, copied from the Phy package, written by Cyrille Rossant.
-
-#     Parameters
-#     ----------
-#     spike_times : np.ndarray
-#         An array of spike times (in samples, not seconds).
-#         This contains spikes from all units.
-#     spike_unit_indices : np.ndarray
-#         An array of labels indicating the unit of the corresponding
-#         spike in `spike_times`.
-#     window_size : int
-#         The window size over which to perform the cross-correlation, in samples
-#     bin_size : int
-#         The size of which to bin lags, in samples.
-
-#     Returns
-#     -------
-#     correlograms : np.array
-#         A (num_units, num_units, num_bins) array of correlograms
-#         between all units at each lag time bin.
-
-#     Notes
-#     -----
-#     For all spikes, time difference between this spike and
-#     every other spike within the window is directly computed
-#     and stored as a count in the relevant lag time bin.
-
-#     Initially, the spike_times array is shifted by 1 position, and the difference
-#     computed. This gives the time differences between the closest spikes
-#     (skipping the zero-lag case). Next, the differences between
-#     spikes times in samples are converted into units relative to
-#     bin_size ('binarized'). Spikes in which the binarized difference to
-#     their closest neighbouring spike is greater than half the bin-size are
-#     masked.
-
-#     Finally, the indices of the (num_units, num_units, num_bins) correlogram
-#     that need incrementing are done so with `ravel_multi_index()`. This repeats
-#     for all shifts along the spike_train until no spikes have a corresponding
-#     match within the window size.
-#     """
-#     num_bins, num_half_bins = _compute_num_bins(window_size, bin_size)
-#     num_units = len(np.unique(spike_unit_indices))
-
-#     correlograms = np.zeros((num_units, num_units, num_bins), dtype="int64")
-
-#     # At a given shift, the mask precises which spikes have matching spikes
-#     # within the correlogram time window.
-#     mask = np.ones_like(spike_times, dtype="bool")
-
-#     # The loop continues as long as there is at least one
-#     # spike with a matching spike.
-#     shift = 1
-#     while mask[:-shift].any():
-#         # Number of time samples between spike i and spike i+shift.
-#         spike_diff = spike_times[shift:] - spike_times[:-shift]
-
-#         for sign in (-1, 1):
-#             # Binarize the delays between spike i and spike i+shift for negative and positive
-#             # the operator // is np.floor_divide
-#             spike_diff_b = (spike_diff * sign) // bin_size
-
-#             # Spikes with no matching spikes are masked.
-#             # remove spike outside the window
-#             if sign == -1:
-#                 mask[:-shift][spike_diff_b < -num_half_bins] = False
-#             else:
-#                 mask[:-shift][spike_diff_b >= num_half_bins] = False
-
-#             m = mask[:-shift]
-
-#             # Find the indices in the raveled correlograms array that need
-#             # to be incremented, taking into account the spike unit labels.
-#             if sign == 1:
-#                 indices = np.ravel_multi_index(
-#                     (spike_unit_indices[+shift:][m], spike_unit_indices[:-shift][m], spike_diff_b[m] + num_half_bins),
-#                     correlograms.shape,
-#                 )
-#             else:
-#                 indices = np.ravel_multi_index(
-#                     (spike_unit_indices[:-shift][m], spike_unit_indices[+shift:][m], spike_diff_b[m] + num_half_bins),
-#                     correlograms.shape,
-#                 )
-
-#             # Increment the matching spikes in the correlograms array.
-#             bbins = np.bincount(indices)
-#             correlograms.ravel()[: len(bbins)] += bbins
-
-#             if sign == 1:
-#                 # For positive sign, the end bin is < num_half_bins (e.g.
-#                 # bin = 29, num_half_bins = 30, will go to index 59 (i.e. the
-#                 # last bin). For negative sign, the first bin is == num_half_bins
-#                 # e.g. bin = -30, with num_half_bins = 30 will go to bin 0. Therefore
-#                 # sign == 1 must mask spike_diff_b <= num_half_bins but sign == -1
-#                 # must count all (possibly repeating across units) cases of
-#                 # spike_diff_b == num_half_bins. So we turn it back on here
-#                 # for the next loop that starts with the -1 case.
-#                 mask[:-shift][spike_diff_b == num_half_bins] = True
-
-#         shift += 1
-
-#     return correlograms
 
 def _compute_autocorrelograms_parallel(sorting, window_size, bin_size):
     import concurrent.futures
@@ -502,9 +356,9 @@ def _compute_autocorrelograms_parallel(sorting, window_size, bin_size):
     
     # Reassemble into the expected 3D shape (N, N, Bins)
     # The off-diagonals will remain 0
-    correlograms = np.zeros((num_units, num_units, num_bins), dtype="int64")
+    correlograms = np.zeros((num_units, num_bins), dtype="int64")
     for i, acg in enumerate(results):
-        correlograms[i, i, :] = acg
+        correlograms[i, :] = acg
         
     return correlograms
 
@@ -513,6 +367,7 @@ def _compute_single_acg(spike_times, window_size, bin_size):
     Simplified worker function for a single unit.
     Removes multi-index overhead.
     """
+    # spike_times here belongs to a single cell
     num_bins, num_half_bins = _compute_num_bins(window_size, bin_size)
     acg = np.zeros(num_bins, dtype="int64")
     

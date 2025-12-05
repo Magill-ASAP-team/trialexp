@@ -42,18 +42,21 @@ def denest_string_cell(cell):
             return str(cell[0])
 
 
-def analyzer2dataframe(analyzer):
+def analyzer2dataframe(analyzer, extension2skip=['waveforms']):
     # Convert the sorting analyzer object in spikeinterface to dataframe
     units_ids = analyzer.unit_ids
     metrics = {}
     df2join=[]
     other_metrics = {}
     for extension in analyzer.get_loaded_extension_names():
+        if extension in extension2skip:
+            continue
+        
         wv = analyzer.get_extension(
             extension_name=extension
         )
         data = wv.get_data()
-
+        # print(extension, type(data))
         if type(data) is np.ndarray and data.shape[0] == len(units_ids):
             metrics[extension] = data.tolist()
         elif type(data) is pd.core.frame.DataFrame:
@@ -71,12 +74,15 @@ def analyzer2dataframe(analyzer):
         
     #Special processing for correlogram
     # only extract the auto-correlogram
-    if 'correlograms' in other_metrics.keys():
-        df_metrics['acg'] = [other_metrics['correlograms'][0][i,i] for i in range(len(df_metrics))]
+    if 'autocorrelograms' in other_metrics.keys():
+        df_metrics['acg'] = [other_metrics['autocorrelograms'][0][i,i] for i in range(len(df_metrics))]
+        
+    
         
     df_metrics.attrs.update(other_metrics)
     
     return df_metrics
+
 def session_and_probe_specific_uid(session_ID: str, probe_name: str, uid: int):
     '''
     Build unique cluster identifier string of cluster (UID),

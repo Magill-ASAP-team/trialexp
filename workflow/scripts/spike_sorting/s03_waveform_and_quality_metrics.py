@@ -23,6 +23,8 @@ from trialexp.process.ephys.utils import denest_string_cell, session_and_probe_s
 import shutil
 from trialexp import config
 import time
+from spikeinterface.core.template_tools import get_template_extremum_channel  
+from trialexp.process.ephys import extremum_channel, autocorrelograms, firing_properties
 #%% Load inputs
 
 
@@ -43,6 +45,7 @@ kilosort_folder = Path(sinput.kilosort_folder)
 # Get the location of the recording
 root_data_path = Path(config.SORTING_ROOT_DATA_PATH)
 
+si.set_global_job_kwargs(n_jobs=20)
 
 #%%
 df_quality_metrics = []
@@ -65,12 +68,14 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # remove MUA to speed up processing later
     units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
     sorting = sorting.remove_units(units2remove)
+    # Truncate sorting to 30s for testing
+    sorting = sorting.frame_slice(start_frame=0, end_frame=int(30 * sorting.get_sampling_frequency()))
     
     # load the correct recording
     recording = se.read_openephys(recording_path, stream_name=stream)
     recording = recording.select_segments([segment_num])
     recording.annotate(is_filtered=True)  # Neuropixel already highpass the signal at 300Hz in hardware
-
+    gains = recording.get_channel_gains() 
     # double check we have the correct recording
     assert int(recording.get_total_duration()) == int(duration), 'Error: recording durations do not match!'
 
@@ -83,29 +88,40 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     analyzer = si.create_sorting_analyzer(sorting=sorting, recording=recording
                                           )
     
-    analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=500)
-    analyzer.compute("waveforms")
+    analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=1000)
+    analyzer.compute("waveforms", n_jobs=-1)
     analyzer.compute("templates")
-    analyzer.compute("unit_locations")
-    analyzer.compute("template_metrics")
-    analyzer.compute("noise_levels")
-    analyzer.compute(input="correlograms",
-                        window_ms=50.0,
-                        bin_ms=1.0,
-                        method="auto")
-    isi =  analyzer.compute(input="isi_histograms",
-                         window_ms=1000.0,
-                         bin_ms=1.0,
-                         method="auto")
-
-    print('I am now calculating the quality metrics of the sorting')
-    # analyzer.compute("principal_components")
+    # analyzer.compute("unit_locations")
     
-    metric_names=['firing_rate', 'presence_ratio', 'snr', 'isi_violation', 'amplitude_cutoff']
-
-    amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
-    analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
+    # print('I will calculate the template metrics')
+    # analyzer.compute("template_metrics", n_jobs=-1)
     
+    # print('I will calculate the noise levels')
+    # analyzer.compute("noise_levels")
+    
+    print('I will calculate the autocorrelogram')
+    analyzer.compute(input="autocorrelograms",
+                        window_ms=2000.0,
+                        bin_ms=1.0)
+    analyzer.compute(input='extremum_channel')
+
+    # print('I will calculate the ISI histogram')
+    # isi =  analyzer.compute(input="isi_histograms",
+    #                      window_ms=50.0,
+    #                      bin_ms=1.0,
+    #                      method="auto")
+
+    # print('I am now calculating the quality metrics of the sorting')
+    # # analyzer.compute("principal_components")
+    
+    # metric_names=['firing_rate', 'presence_ratio', 'snr', 'isi_violation', 'amplitude_cutoff']
+
+    # amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
+    # analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
+    
+    # # also find the extremum channel
+    # extremum_channels = get_template_extremum_channel(analyzer, peak_sign="neg", outputs='index')  
+
     
     df_metrics = analyzer2dataframe(analyzer)
     df_metrics['session_ID'] = session_ID
@@ -113,20 +129,31 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     df_metrics['cluster_id'] = df_metrics['unit_id']
     df_metrics['cluID'] = df_metrics['unit_id'].apply(lambda i: session_and_probe_specific_uid(session_ID = session_ID, probe_name = probe_name, uid = i))
     
-    # Calculate the unit position
-    # unit_positions from spikeinterface is calculated using monopolar interpolation (Boussard 2021, NeurIPS)
-    # but sometimes it may gives us some crazy locations
-    # ks_chan_pos is just calculated using the location of the channel with the largest amplitude
-    # the two positions in general align with each other except for MUA neurons
-    ks_results = load_kilosort(probe_folder)
-    add_ks_metadata(ks_results, df_metrics, good_only=True)
+    # # Calculate the unit position
+    # # unit_positions from spikeinterface is calculated using monopolar interpolation (Boussard 2021, NeurIPS)
+    # # but sometimes it may gives us some crazy locations
+    # # ks_chan_pos is just calculated using the location of the channel with the largest amplitude
+    # # the two positions in general align with each other except for MUA neurons
+    # ks_results = load_kilosort(probe_folder)
+    # add_ks_metadata(ks_results, df_metrics, good_only=True)
 
-    df_quality_metrics.append(df_metrics)
+    # df_quality_metrics.append(df_metrics)
+#%%
+property2test = 'firing_properties'
+analyzer.compute(input=property2test)
+analyze_data = analyzer.get_extension(property2test).get_data()
+display(analyze_data)
+
+#%%
+# df_metrics = analyzer2dataframe(analyzer)
 
 
-#%% save output
-if len(df_quality_metrics):
-    df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
-    df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
-else:
-    logger.warning('Cannot find any sorting results to process')
+# #%% save output
+# if len(df_quality_metrics):
+#     df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
+#     df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
+# else:
+#     logger.warning('Cannot find any sorting results to process')
+    
+#%%
+

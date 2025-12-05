@@ -143,6 +143,14 @@ rule spike_timewarp:
     script:
         "scripts/spike_sorting/s13_time_warping.py"
 
+rule cell_classification:
+    input: 
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
+    output:
+        df_cell_types = '{sessions}/{task_path}/{session_id}/processed/df_celltypes.pkl'
+    script:
+        "scripts/spike_sorting/s14_cell_classification.py"
+
 rule spikesort_done:
     input:
         corr_plot = session_correlations_input, 
