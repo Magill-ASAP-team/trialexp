@@ -145,6 +145,12 @@ analyze_data = analyzer.get_extension(property2test).get_data()
 display(analyze_data)
 
 #%%
+property2test = 'templates'
+analyzer.compute(input=property2test)
+analyze_data = analyzer.get_extension(property2test).get_data()
+display(analyze_data)
+
+#%%
 # df_metrics = analyzer2dataframe(analyzer)
 
 

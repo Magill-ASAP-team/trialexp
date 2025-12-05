@@ -8,43 +8,28 @@ import pandas as pd
 from spikeinterface.core.sortinganalyzer import register_result_extension, AnalyzerExtension
 from spikeinterface.core import SortingAnalyzer
 import numpy as np
+from trialexp.process.ephys.get_footprint_new3 import get_footprint_radius
 
 class ComputeFiringProperties(AnalyzerExtension):
-    """
-    Compute the extremum channel for each unit.
-
-    Parameters
-    ----------
-    sorting_analyzer : SortingAnalyzer
-        The SortingAnalyzer object
-    peak_sign : {"neg", "pos"}, default: "neg"
-        Whether to use the positive ("pos") or negative ("neg") peaks to estimate extremum channels.
-
-    Returns
-    -------
-    extremum_channels : pd.Series
-        Series with unit_id as index and extremum channel_id as values
-
-    Examples
-    --------
-    >>> analyzer.compute("extremum_channel")
-    >>> extremum_channels = analyzer.get_extension("extremum_channel").get_data()
-    """
+   
 
     extension_name = "firing_properties"
-    depend_on = ["autocorrelograms"]
+    depend_on = ["autocorrelograms", 'templates','extremum_channel']
     need_recording = False
     use_nodepipeline = False
     need_job_kwargs = False
     need_backward_compatibility_on_load = False
 
-    def _set_params(self, long_isi_limit=2, post_spike_suppression_win=[600,900], autocorrelogram_bin_size=1):
+    def _set_params(self, long_isi_limit=2, post_spike_suppression_win=[600,900],
+                    autocorrelogram_bin_size=1, spatial_extent_threshold=30):
         # long_isi_limit is in s
         # post_spike_suppression_win is in ms
         # autocorrelogram_bin_size is in ms
-        params = dict(long_isi_limit=long_isi_limit, 
-                      post_spike_suppression_win=post_spike_suppression_win, 
-                      autocorrelogram_bin_size=autocorrelogram_bin_size)
+        # spatial_extent_threshold is in uV (microvolts)
+        params = dict(long_isi_limit=long_isi_limit,
+                      post_spike_suppression_win=post_spike_suppression_win,
+                      autocorrelogram_bin_size=autocorrelogram_bin_size,
+                      spatial_extent_threshold=spatial_extent_threshold)
 
         return params
 
@@ -79,13 +64,18 @@ class ComputeFiringProperties(AnalyzerExtension):
         # peak_sign = self.params["peak_sign"]
         unit_ids = self.sorting_analyzer.unit_ids
         df_firing_properties = pd.DataFrame(index=unit_ids)
-        
-        
+
+        # Compute long ISI portion
         long_isi_limit = self.params['long_isi_limit']
         long_isi_portion = self.compute_long_isi_portion(self.sorting_analyzer, long_isi_limit=long_isi_limit)
-        
+
+        # Compute post-spike suppression
         post_spike_suppression_win = self.params['post_spike_suppression_win']
         post_spike_suppression = self.compute_post_spike_suppression(self.sorting_analyzer, post_spike_suppression_win=post_spike_suppression_win)
+
+        # Compute spatial extent
+        spatial_extent_threshold = self.params['spatial_extent_threshold']
+        spatial_extent = self.compute_spatial_extent(self.sorting_analyzer, threshold=spatial_extent_threshold)
 
         # # Compute extremum channel for each unit
         # extremum_channel_dict = get_template_extremum_channel(
@@ -95,12 +85,14 @@ class ComputeFiringProperties(AnalyzerExtension):
         # # Convert to pandas Series
         # extremum_channels = pd.Series(extremum_channel_dict, name="extremum_channel_id")
         # extremum_channels.index.name = "unit_id"
-        
+
         # self.data
 
+        # Add all metrics to DataFrame
         df_firing_properties['long_isi_portion'] = pd.Series(long_isi_portion)
         df_firing_properties['post_spike_suppression_ms'] = pd.Series(post_spike_suppression)
-        
+        df_firing_properties['spatial_extent_um'] = pd.Series(spatial_extent)
+
         self.data['firing_properties'] = df_firing_properties
 
     def _get_data(self):
@@ -162,8 +154,74 @@ class ComputeFiringProperties(AnalyzerExtension):
                 
                 # Convert to ms
                 post_spike_suppression[unit_ids[uidx]] = suppression_bins * bin_size
-            
+
             return post_spike_suppression
+
+    def compute_spatial_extent(self, sorting_analyzer: SortingAnalyzer, threshold=30):
+        """
+        Compute the spatial extent (footprint radius) for each unit.
+
+        Parameters
+        ----------
+        sorting_analyzer : SortingAnalyzer
+            The SortingAnalyzer object
+        threshold : float, default: 30
+            Amplitude threshold in microvolts (uV) for determining spatial extent.
+            The radius is calculated as the distance where mean amplitude across
+            all radial directions drops to this threshold.
+
+        Returns
+        -------
+        spatial_extent : dict
+            Dictionary mapping unit_id to spatial extent in micrometers (um)
+
+        Notes
+        -----
+        This method requires the 'templates' extension to be computed first.
+        The spatial extent is calculated using 2D Euclidean distance from the
+        peak channel, based on the unit's template waveform amplitude profile.
+        """
+        # Get templates extension
+        templates_ext = sorting_analyzer.get_extension("templates")
+        if templates_ext is None:
+            raise ValueError("Templates extension must be computed first")
+
+        # Get template data: shape (num_units, num_samples, num_channels)
+        templates_array = templates_ext.get_templates()
+
+        # Get channel locations: shape (num_channels, 2)
+        channel_locations = sorting_analyzer.get_channel_locations()
+        xcoords = channel_locations[:, 0]  # x coordinates in um
+        ycoords = channel_locations[:, 1]  # y coordinates in um
+
+        unit_ids = sorting_analyzer.unit_ids
+        spatial_extent = {}
+
+        # Iterate over each unit
+        for uidx in range(len(unit_ids)):
+            unit_id = unit_ids[uidx]
+
+            # Extract template for this unit: shape (num_samples, num_channels)
+            unit_template = templates_array[uidx, :, :]
+
+            # Transpose to (num_channels, num_samples) as required by get_footprint_radius
+            unit_template_transposed = unit_template.T
+
+            # Calculate spatial extent
+            try:
+                footprint_radius = get_footprint_radius(
+                    unit_template_transposed,
+                    xcoords,
+                    ycoords,
+                    threshold=threshold
+                )
+                spatial_extent[unit_id] = footprint_radius
+            except Exception as e:
+                # Handle potential errors (e.g., interpolation issues)
+                print(f"Warning: Could not compute spatial extent for unit {unit_id}: {e}")
+                spatial_extent[unit_id] = np.nan
+
+        return spatial_extent
 
 
 register_result_extension(ComputeFiringProperties)

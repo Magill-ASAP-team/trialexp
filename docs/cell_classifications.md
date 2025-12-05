@@ -10,3 +10,4 @@ Here is a table describing these factors and their meaning in the context of cel
 | | | This factor separates the remaining units (MSNs and TANs). Units with post-spike suppression of **$> 40\ \text{ms}$ are labelled TANs**. The units that remain (those with short suppression) are labelled **MSNs**. |
 
 **Note:** A small number of units (36 out of 8,303) exhibited both short waveforms ($<400\ \mu\text{s}$) and long post-spike suppression ($>40\ \text{ms}$). These rare units exhibited TAN-like responses but were excluded from further analysis.
+
