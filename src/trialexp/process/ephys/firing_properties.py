@@ -77,17 +77,6 @@ class ComputeFiringProperties(AnalyzerExtension):
         spatial_extent_threshold = self.params['spatial_extent_threshold']
         spatial_extent = self.compute_spatial_extent(self.sorting_analyzer, threshold=spatial_extent_threshold)
 
-        # # Compute extremum channel for each unit
-        # extremum_channel_dict = get_template_extremum_channel(
-        #     self.sorting_analyzer, peak_sign=peak_sign, outputs="index"
-        # )
-
-        # # Convert to pandas Series
-        # extremum_channels = pd.Series(extremum_channel_dict, name="extremum_channel_id")
-        # extremum_channels.index.name = "unit_id"
-
-        # self.data
-
         # Add all metrics to DataFrame
         df_firing_properties['long_isi_portion'] = pd.Series(long_isi_portion)
         df_firing_properties['post_spike_suppression_ms'] = pd.Series(post_spike_suppression)

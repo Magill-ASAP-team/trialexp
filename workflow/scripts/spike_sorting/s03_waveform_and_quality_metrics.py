@@ -2,6 +2,8 @@
 # Script to extract waveforms and quality metrics
 # for details about the metrics used, see https://spikeinterface.readthedocs.io/en/latest/modules/qualitymetrics.html
 #%%
+%reload_ext autoreload
+%autoreload 2
 from loguru import logger
 import os
 from pathlib import Path
@@ -69,7 +71,7 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
     sorting = sorting.remove_units(units2remove)
     # Truncate sorting to 30s for testing
-    sorting = sorting.frame_slice(start_frame=0, end_frame=int(30 * sorting.get_sampling_frequency()))
+    # sorting = sorting.frame_slice(start_frame=0, end_frame=int(30 * sorting.get_sampling_frequency()))
     
     # load the correct recording
     recording = se.read_openephys(recording_path, stream_name=stream)
@@ -91,13 +93,13 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=1000)
     analyzer.compute("waveforms", n_jobs=-1)
     analyzer.compute("templates")
-    # analyzer.compute("unit_locations")
+    analyzer.compute("unit_locations")
     
-    # print('I will calculate the template metrics')
-    # analyzer.compute("template_metrics", n_jobs=-1)
+    print('I will calculate the template metrics')
+    analyzer.compute("template_metrics", n_jobs=-1)
     
-    # print('I will calculate the noise levels')
-    # analyzer.compute("noise_levels")
+    print('I will calculate the noise levels')
+    analyzer.compute("noise_levels")
     
     print('I will calculate the autocorrelogram')
     analyzer.compute(input="autocorrelograms",
@@ -105,24 +107,22 @@ for probe_folder in kilosort_folder.glob('Probe*'):
                         bin_ms=1.0)
     analyzer.compute(input='extremum_channel')
 
-    # print('I will calculate the ISI histogram')
-    # isi =  analyzer.compute(input="isi_histograms",
-    #                      window_ms=50.0,
-    #                      bin_ms=1.0,
-    #                      method="auto")
-
-    # print('I am now calculating the quality metrics of the sorting')
-    # # analyzer.compute("principal_components")
+    print('I will calculate the ISI histogram')
+    isi =  analyzer.compute(input="isi_histograms",
+                         window_ms=50.0,
+                         bin_ms=1.0,
+                         method="auto")
     
-    # metric_names=['firing_rate', 'presence_ratio', 'snr', 'isi_violation', 'amplitude_cutoff']
+    print('I am now calculating the firing properties')
+    analyzer.compute('firing_properties') 
 
-    # amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
-    # analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
-    
-    # # also find the extremum channel
-    # extremum_channels = get_template_extremum_channel(analyzer, peak_sign="neg", outputs='index')  
+    print('I am now calculating the quality metrics of the sorting')    
+    metric_names=['firing_rate', 'presence_ratio', 'snr', 'isi_violation', 'amplitude_cutoff']
 
-    
+    amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
+    analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
+ 
+
     df_metrics = analyzer2dataframe(analyzer)
     df_metrics['session_ID'] = session_ID
     df_metrics['probe_name'] = probe_name
@@ -132,34 +132,23 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     # # Calculate the unit position
     # # unit_positions from spikeinterface is calculated using monopolar interpolation (Boussard 2021, NeurIPS)
     # # but sometimes it may gives us some crazy locations
-    # # ks_chan_pos is just calculated using the location of the channel with the largest amplitude
+    # # ks_chan_pos is calculated from the average of spike_positions estimated from kilosort
     # # the two positions in general align with each other except for MUA neurons
-    # ks_results = load_kilosort(probe_folder)
-    # add_ks_metadata(ks_results, df_metrics, good_only=True)
+    print('I will now calculate the unit positions')
+    ks_results = load_kilosort(probe_folder)
+    add_ks_metadata(ks_results, df_metrics)
 
-    # df_quality_metrics.append(df_metrics)
-#%%
-property2test = 'firing_properties'
-analyzer.compute(input=property2test)
-analyze_data = analyzer.get_extension(property2test).get_data()
-display(analyze_data)
-
-#%%
-property2test = 'templates'
-analyzer.compute(input=property2test)
-analyze_data = analyzer.get_extension(property2test).get_data()
-display(analyze_data)
-
-#%%
-# df_metrics = analyzer2dataframe(analyzer)
+    df_quality_metrics.append(df_metrics)
 
 
-# #%% save output
-# if len(df_quality_metrics):
-#     df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
-#     df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
-# else:
-#     logger.warning('Cannot find any sorting results to process')
+
+
+#%% save output
+if len(df_quality_metrics):
+    df_quality_metrics = pd.concat(df_quality_metrics, axis=0, ignore_index=True)
+    df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
+else:
+    logger.warning('Cannot find any sorting results to process')
     
 #%%
 

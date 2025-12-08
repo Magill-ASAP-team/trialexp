@@ -48,7 +48,7 @@ def load_kilosort(ks_result_folder, skip_PC_feature=False):
     return ks_results
 
 
-def add_ks_metadata(ks_results, df_metrics, good_only=False):
+def add_ks_metadata(ks_results, df_metrics, good_only=True):
     """
     Adds metadata from ks_results to df_metrics DataFrame.
     
@@ -59,23 +59,31 @@ def add_ks_metadata(ks_results, df_metrics, good_only=False):
     Returns:
         None
     """
-    ks_labels = ks_results['cluster_KSLabel']['KSLabel'].values
-    good_idx = (ks_labels=='good')
-    
+    ks_labels = ks_results['cluster_KSLabel']['KSLabel'].values    
     sel_idx = np.arange(len(ks_labels))
+    
     if good_only:
-        sel_idx = good_idx
+        sel_idx = (ks_labels=='good')
+        
+    ks_labels = ks_labels[sel_idx]
             
     # Note: templates from kilosort is alredy whitened
     # so its spatial feature may not match the original signal
-    chan_pos = np.stack([ks_results['channel_positions'][ch] for ch in max_chans])
+    # get the average spike location for a cluster
+    clus = ks_results['spike_clusters']
+    cluster_id	 = ks_results['cluster_KSLabel'].cluster_id[sel_idx]
+    spike_positions = ks_results['spike_positions']
+    chan_pos = np.zeros((len(cluster_id),2))
+
+    for i, id in enumerate(cluster_id):
+        chan_pos[i,:] = spike_positions[clus==id].mean(axis=0)
     
-    df_metrics['ks_chan_pos_x'] = chan_pos[sel_idx,0]
-    df_metrics['ks_chan_pos_y'] = chan_pos[sel_idx,1]
-    df_metrics['ks_labels'] = ks_labels[sel_idx]
+    df_metrics['ks_chan_pos_x'] = chan_pos[:,0]
+    df_metrics['ks_chan_pos_y'] = chan_pos[:,1]
+    df_metrics['ks_labels'] = ks_labels
     
     # make sure the order is correct
-    assert all(df_metrics['unit_id'].values == ks_results['cluster_KSLabel']['cluster_id'][sel_idx].values), 'unit_id mismatch'
+    assert all(df_metrics['unit_id'].values == cluster_id), 'unit_id mismatch'
 
 def get_spike_trains(
         synced_timestamp_files: list, 
