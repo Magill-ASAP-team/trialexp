@@ -87,3 +87,12 @@ brain_region = 'striatum'  # Change this to 'cortex' for cortical data. Striatum
 
 print(f"Classifying {brain_region} neurons...")
 cell_types = bc.classify_and_plot_brain_region(ephys_properties, ephys_param, brain_region)
+#%%
+# Show classification results
+if cell_types is not None:
+    # Create combined results table
+    ephys_df = pd.DataFrame(ephys_properties)
+    ephys_properties_table = ephys_df.copy()
+    ephys_properties_table['cell_type'] = cell_types
+   
+    print(ephys_properties_table)
