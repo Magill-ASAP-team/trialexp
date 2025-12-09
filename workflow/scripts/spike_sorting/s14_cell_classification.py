@@ -10,7 +10,7 @@ from snakehelper.SnakeIOHelper import getSnake
 from trialexp import config
 from kilosort.io import load_ops
 from spikeinterface.core.template import Templates  
-
+import seaborn as sns
 #%% Load inputs
 
 
@@ -20,99 +20,74 @@ from spikeinterface.core.template import Templates
 
 #%%
 df_quality_metrics = pd.read_pickle(sinput.df_quality_metrics)
-# %%
-df_sel = df_quality_metrics[df_quality_metrics['peak_to_valley']<0.4]
-#%%
-np.array(df_quality_metrics.iloc[0].templates).shape
+    
+#%% Cell type classification based on properties
+def classify_celltype(cell):
+    # Basd on Andy Peters 202
+    cell_type = None
 
-# %%
+    if cell['peak_to_valley'] <= 0.4/1000:
+        # Narrow spike: FSI or UIN
+        if cell['long_isi_portion'] > 0.1:
+            cell_type = 'UIN'
+        else:
+            # No long pause, almost tunic firing
+            cell_type = 'FSI'
+        
+    else:
+        if cell['post_spike_suppression_ms'] > 40:
+            cell_type = 'TAN'
+        else:
+            cell_type = 'MSN'
+    
+    return cell_type
 
-kilsort_folder = Path(sinput.df_quality_metrics).parent/'kilosort4/ProbeA'
-ops = load_ops(kilsort_folder/'ops.npy')
-nt = ops['nt']
-fs = ops['fs']
-templates_array = np.stack(df_quality_metrics.templates.values)
+def classify_spike_origin(cell):
+    # Based on Ye et al. 2025
+    # Axon recording in Neuropixel 1.0 should be around 6%
+    origin = None
+    if cell['peak_to_valley'] <= 0.4/1000:
+        # narrow spikes
+        if cell['spatial_footprint_um'] <= 20:
+            origin = 'axon' 
+        else:
+            origin = 'soma' # interneuron
+    else:
+        origin = 'soma'
+        
+    return origin
+        
+    
 
-#%%
+df_quality_metrics['cell_type'] = df_quality_metrics.apply(classify_celltype, axis=1)
+df_quality_metrics['spike_origin'] = df_quality_metrics.apply(classify_spike_origin, axis=1)
 
-  
-# Your template data (must be 3D: units x samples x channels)  
-# templates_array = np.random.randn(3, 50, 8)  # 3 units, 50 samples, 8 channels  
-nbefore = fs*(1/1000)  # 20 samples before peak  
-  
-templates = Templates(  
-    templates_array=templates_array,  
-    sampling_frequency=fs,  
-    nbefore=nbefore  
-)
-#%%
-from spikeinterface.core.template_tools import get_template_extremum_channel  
-extremum_channels = get_template_extremum_channel(templates, peak_sign="both", outputs='index')  
-print(extremum_channels)
+# Plot a pie chart of cell type distribution
+import matplotlib.pyplot as plt
 
-# check with the maxwaveform
-extre_idx = np.array(list(extremum_channels.values()))
-maxcha = df_quality_metrics['maxWaveformCh'].values
-#%%
-print(extre_idx[:3])
-print(maxcha[:3])
-print(np.mean(np.abs(extre_idx-maxcha)))
-print(np.mean(extre_idx==maxcha))
-'''
-85% of cluster show difference < 4 channel
-'''
-'''
-[  2 158   0] extre
-[2 1 0] max
-'''
-#%%
-#plot spikes for comparison
-# (533, 90, 384)
+cell_type_counts = df_quality_metrics['cell_type'].value_counts()
+plt.figure(figsize=(8, 6))
+plt.pie(cell_type_counts.values, labels=cell_type_counts.index, autopct='%1.1f%%')
+plt.title('Cell Type Distribution')
+plt.axis('equal')
+plt.show()
 
-# %%
-templates_kilo = np.load(kilsort_folder/'templates.npy')
-ks_label = pd.read_csv(kilsort_folder/'cluster_KSLabel.tsv',sep='\t')
-whitening_mat_inv = np.load(kilsort_folder/'whitening_mat_inv.npy')
-amplitudes = np.load(kilsort_folder/'amplitudes.npy')
+# Plot a pie chart of spike origin distribution
+spike_origin_counts = df_quality_metrics['spike_origin'].value_counts()
+plt.figure(figsize=(8, 6))
+plt.pie(spike_origin_counts.values, labels=spike_origin_counts.index, autopct='%1.1f%%')
+plt.title('Spike Origin Distribution')
+plt.axis('equal')
+plt.show()
+            
+#%% Create pairplot for cell type classification features
+plt.figure()
+pairplot_data = df_quality_metrics[['peak_to_valley', 'long_isi_portion', 'post_spike_suppression_ms', 'cell_type']].copy()
+# Convert peak_to_valley from seconds to milliseconds for better readability
+pairplot_data['peak_to_valley'] = pairplot_data['peak_to_valley'] * 1000
 
+sns.pairplot(pairplot_data, hue='cell_type', diag_kind='kde', corner=True)
+plt.suptitle('Cell Type Classification Features', y=1.01)
+plt.show()
+ 
 
-original_templates = np.zeros_like(templates_kilo)  
-for t in range(templates_kilo.shape[1]):  # For each time point  
-    original_templates[:, t, :] = templates_kilo[:, t, :] @ whitening_mat_inv.T
-
-original_templates = original_templates[ks_label['KSLabel']=='good',:,:]
-cluster_id = np.flatnonzero(ks_label['KSLabel']=='good')
-clus = np.load(kilsort_folder/'spike_clusters.npy')
-
-'''
-by default, kilosort use -(nt//2), nt//2+1 to extract the spikes
-spikeinterface uses 1ms before and 2ms after to extract the template
-
-spikeinterface compute using random waveforms
-maxchan is using the template from kilosort
-template from kilsort is in the whitening space, so the spatial spread may be different
-even in get_templates function the templates are scaled but still in whitening space
-You need to recover the original by 
-w = whitening_mat_inv @ w
-
-Also spikeinterface return data in uV
-But kilosort directly load the data in int16 format, so it may be missing a scaling factor
-the channel gain for openephys is 0.19499999, which seem to make sense
-'''
-
-#%% Compare the template from spikeinterface and kilosort
-cluster2plot = 10
-fig, ax = plt.subplots()
-scale = 0.19499999
-ax.plot(templates_array[cluster2plot,:,extre_idx[cluster2plot]], label='spikeinterface')
-ax.plot(original_templates[cluster2plot,:,extre_idx[cluster2plot]]*scale, label='kilosort')
-fig.legend()
-
-amplitudes[clus==cluster_id[cluster2plot]].mean()
-
-#%%
-cluster2plot = 5
-fig, ax = plt.subplots()
-ax.plot(templates_array[cluster2plot,:,extre_idx[cluster2plot]], label='extrem')
-ax.plot(templates_array[cluster2plot,:,maxcha[cluster2plot]], label='maxchan')
-fig.legend()

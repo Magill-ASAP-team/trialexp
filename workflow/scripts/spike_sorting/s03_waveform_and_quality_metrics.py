@@ -71,7 +71,6 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     units2remove = sorting.unit_ids[sorting.get_property('KSLabel')=='mua']
     sorting = sorting.remove_units(units2remove)
     # Truncate sorting to 30s for testing
-    # sorting = sorting.frame_slice(start_frame=0, end_frame=int(30 * sorting.get_sampling_frequency()))
     
     # load the correct recording
     recording = se.read_openephys(recording_path, stream_name=stream)
@@ -149,6 +148,4 @@ if len(df_quality_metrics):
     df_quality_metrics.to_pickle(Path(soutput.df_quality_metrics))
 else:
     logger.warning('Cannot find any sorting results to process')
-    
-#%%
-
+  
