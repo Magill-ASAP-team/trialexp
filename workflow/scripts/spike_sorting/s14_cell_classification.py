@@ -199,12 +199,23 @@ chan_locs = df_quality_metrics.attrs['chan_locs']
 
 
 ephys_plot.plot_template(template, max_chan, chan_locs)
-
+display(cell)
 #%%
 # plot some MSN
 df_msn = df_quality_metrics[df_quality_metrics['cell_type']=='MSN']
+df_sel = df_msn[df_msn.firing_rate>20]
 
-cell = df_msn.iloc[1]
+cell = df_sel.iloc[2]
 template = np.array(cell.templates)
 max_chan = cell['extremum_channel']
-ephys_plot.plot_template(template, max_chan, chan_locs)
+fig, ax = ephys_plot.plot_template(template, max_chan, chan_locs)
+
+cell_info = ''
+for s in ['peak_to_valley', 'long_isi_portion', 'post_spike_suppression_ms', 
+        'spatial_footprint_um', 'firing_rate']:
+  
+    
+    cell_info += f'{s}: {cell[s]:.2f}\n'
+
+# fig.suptitle(cell_info)
+print(cell_info)
