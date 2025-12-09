@@ -139,7 +139,7 @@ for probe_folder in kilosort_folder.glob('Probe*'):
 
     df_quality_metrics.append(df_metrics)
 
-
+    df_metrics.attrs['chan_locs'] = recording.get_channel_locations()
 
 
 #%% save output
