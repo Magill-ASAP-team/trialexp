@@ -1,7 +1,7 @@
 import matplotlib.pylab as plt
 import numpy as np
 
-def draw_spike_waveform(wi, maxChan, xc, yc, ax=None, nc=16,n_chan=383,scale = 10, alpha=1, shift=0, color='k',**kwargs):
+def draw_spike_waveform(wi, maxChan, xc, yc, ax=None, nc=16,n_chan=383,scale = 10, fs=30000, alpha=1, shift=0, color='k',**kwargs):
     """
     Draw spike waveforms on a probe layout.
     This function plots spike waveforms centered around the maximum channel, overlaying them
@@ -75,9 +75,20 @@ def draw_spike_waveform(wi, maxChan, xc, yc, ax=None, nc=16,n_chan=383,scale = 1
     # ax.plot([x0[0], x0[0] + 20], [y0[-1] - 20, y0[-1] - 20], 'r-', linewidth=2, label='20 µm')
     xlim = ax.get_xlim()
     scale_bar_x = xlim[0]+5
-    ax.plot([scale_bar_x, scale_bar_x], [y0[-1], y0[-1] + 5], 'g-', linewidth=2)
-    ax.text(scale_bar_x+2, y0[-1]+1, f'{scale*5} uV', fontsize=10, va='center')
+    ylim = ax.get_ylim()
+    scale_bar_y = ylim[0] + 5
     
+    ax.plot([scale_bar_x, scale_bar_x], [scale_bar_y, scale_bar_y + 5], 'g-', linewidth=2)
+    ax.text(scale_bar_x, scale_bar_y+6, f'{scale*5} uV', fontsize=10, va='center')
+    
+    # Draw horizontal scale bar for time (20 µm horizontal distance equals waveform width)
+    # Horizontal scale bar for time
+   
+    time_bar_samples = int(fs/1000)  # number of samples for 1ms at 30kHz (fs/2)
+    time_bar_um = time_bar_samples / (wv.shape[0] / 20)  # convert to spatial units
+    # time_bar_ms = (time_bar_samples / fs) * 1000  # convert to milliseconds
+    ax.plot([scale_bar_x, scale_bar_x + time_bar_um], [scale_bar_y, scale_bar_y], 'g-', linewidth=2)
+    ax.text(scale_bar_x + time_bar_um/2, scale_bar_y - 2, f'1 ms', fontsize=10, ha='center')
     
 
 def plot_template(template, max_chan, chan_locs):
@@ -113,3 +124,5 @@ def plot_template(template, max_chan, chan_locs):
     draw_spike_waveform(template, max_chan, chan_locs[:,0], chan_locs[:,1], ax[1])
 
     plt.tight_layout()
+    
+    return fig, ax
