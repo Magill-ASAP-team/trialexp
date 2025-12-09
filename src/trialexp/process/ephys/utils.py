@@ -76,10 +76,8 @@ def analyzer2dataframe(analyzer, extension2skip=['waveforms']):
     #Special processing for correlogram
     # only extract the auto-correlogram
     if 'autocorrelograms' in other_metrics.keys():
-        df_metrics['acg'] = [other_metrics['autocorrelograms'][0][i,i] for i in range(len(df_metrics))]
-        
-    
-        
+        df_metrics['acg'] = [other_metrics['autocorrelograms'][0][i] for i in range(len(df_metrics))]
+        df_metrics.attrs['acg_bin_ms'] = other_metrics['autocorrelograms'][1]
     df_metrics.attrs.update(other_metrics)
     
     return df_metrics
