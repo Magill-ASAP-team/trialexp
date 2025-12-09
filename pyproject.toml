@@ -24,6 +24,7 @@ dependencies = [
     "bidict==0.23.1",
     "bleach==6.1.0",
     "bokeh==3.4.3",
+    "bombcell>=0.70",
     "bottleneck==1.4.2",
     "build==1.2.2.post1",
     "certifi==2024.6.2",
