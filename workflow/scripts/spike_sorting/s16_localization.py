@@ -44,7 +44,7 @@ if len(localization_files)> 0:
     First axis is left-right
     Second axis is top-down
     Third axis is back-front
-    Note: the coordinate do not start at Bregma, and everything are positive only.
+    Note: the coordinates do not start at Bregma, and everything are positive only.
     '''
     xr_local = construct_localization_dataset(df_local, xr_spikes_trials)
     xr_local.to_netcdf(soutput.xr_local)
