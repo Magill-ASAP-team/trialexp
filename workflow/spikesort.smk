@@ -151,6 +151,16 @@ rule cell_classification:
     script:
         "scripts/spike_sorting/s14_cell_classification.py"
 
+rule curation:
+    input: 
+        df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
+    output:
+        df_bombcell = '{sessions}/{task_path}/{session_id}/processed/df_bombcell.pkl',
+        df_qm_table = '{sessions}/{task_path}/{session_id}/processed/df_qm_table.pkl'
+    script:
+        "scripts/spike_sorting/s15_cell_classification.py"
+
+
 rule spikesort_done:
     input:
         corr_plot = session_correlations_input, 
