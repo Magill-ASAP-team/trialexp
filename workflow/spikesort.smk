@@ -151,6 +151,14 @@ rule cell_classification:
     script:
         "scripts/spike_sorting/s14_cell_classification.py"
 
+rule localization:
+    input: 
+        xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
+    output:
+        xr_local = '{sessions}/{task_path}/{session_id}/processed/xr_localization.nc'
+    script:
+        "scripts/spike_sorting/s16_localization.py"
+
 rule curation:
     input: 
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
