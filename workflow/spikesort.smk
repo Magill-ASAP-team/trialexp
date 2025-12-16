@@ -164,7 +164,8 @@ rule curation:
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     output:
         df_bombcell = '{sessions}/{task_path}/{session_id}/processed/df_bombcell.pkl',
-        df_qm_table = '{sessions}/{task_path}/{session_id}/processed/df_qm_table.pkl'
+        df_qm_table = '{sessions}/{task_path}/{session_id}/processed/df_qm_table.pkl',
+        curation_plots = '{sessions}/{task_path}/{session_id}/processed/figures/ephys/curation'
     script:
         "scripts/spike_sorting/s15_cell_classification.py"
 
@@ -174,7 +175,7 @@ rule spikesort_done:
         corr_plot = session_correlations_input, 
         df_bombcell = '{sessions}/{task_path}/{session_id}/processed/df_bombcell.pkl',
         xr_local = '{sessions}/{task_path}/{session_id}/processed/xr_localization.nc',
-        df_cell_types = '{sessions}/{task_path}/{session_id}/processed/df_celltypes.pkl'
+        df_cell_types = '{sessions}/{task_path}/{session_id}/processed/df_celltypes.pkl',
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
         cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
         time_warp = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
