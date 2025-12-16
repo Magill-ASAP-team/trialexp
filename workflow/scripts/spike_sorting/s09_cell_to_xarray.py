@@ -70,7 +70,7 @@ df_quality_metrics = df_quality_metrics.set_index('cluID')
 xr_metrics = xr.Dataset.from_dataframe(df_quality_metrics[['ks_chan_pos_x',
                                                            'ks_chan_pos_y',
                                                            'probe_name',
-                                                           'maxWaveformCh',
+                                                           'extremum_channel',
                                                            'ks_labels']])
 
 
