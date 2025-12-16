@@ -40,7 +40,7 @@ sort SEARCH_TERM *FLAGS:
     if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
         echo "Aborted."; exit 1; \
     fi
-    targets=$(echo "$target" | awk '{printf "%s/processed/spike_workflow.done ", $0}')
+    targets=$(echo "$target" | awk '{printf "%sprocessed/spike_workflow.done ", $0}')
     uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 -k {{FLAGS}} --rerun-incomplete -q rules --rerun-triggers mtime
 
 #Search for and execute the sorting workflow in a session folder
@@ -53,7 +53,7 @@ sort-session SESSION_ID *FLAGS:
     if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
         echo "Aborted."; exit 1; \
     fi
-    targets=$(echo "$target" | awk '{printf "%s/processed/spike_workflow.done ", $0}')
+    targets=$(echo "$target" | awk '{printf "%sprocessed/spike_workflow.done ", $0}')
     uv run snakemake $targets --snakefile workflow/spikesort.smk -c20 -k {{FLAGS}} --rerun-incomplete -q rules --rerun-triggers mtime
 
 
