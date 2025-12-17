@@ -10,6 +10,7 @@ import mlflow
 import mlflow.pytorch
 from sklearn.preprocessing import normalize
 from torch.utils.data import Dataset, DataLoader
+from scipy.signal import savgol_filter
 
 class SymmetricSigmoid(nn.Module):
     def __init__(self, c=0.5, k=10.0, scale=1.0, shift=0.0):
@@ -2233,3 +2234,74 @@ class SparseCodingWithShifts(nn.Module):
         else:
             params = {}
         return params
+
+
+def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
+    """
+    Prepare atoms and target data for sparse encoding.
+    
+    Parameters
+    ----------
+    xr_session : xarray.Dataset
+        Session data containing spikes, photometry, and trial information
+    signal2analyze : str
+        Name of the signal variable to analyze (e.g., 'zscored_df_over_f')
+    mask_idx : array-like
+        Boolean mask for valid trials
+        
+    Returns
+    -------
+    dict
+        Dictionary containing prepared data including:
+        - dict_atoms_smooth: normalized and smoothed dictionary atoms
+        - target_stack_smooth: normalized and smoothed target signal
+        - event_time: time coordinates
+        - cluID_atom: cluster IDs
+        - lick_rate: lick rate data
+    """
+    atoms = xr_session['spikes_FR_session'].data  # original dimen: trial x time x cluID
+    atoms = atoms.transpose([1, 2, 0])  # time x cluID x trial
+
+    target = xr_session[signal2analyze].data
+    target = target.T  # time x trial
+    lick_rate = xr_session['lick_rate'].data
+    lick_rate = lick_rate.T
+
+    # Filter valid trials
+    atoms = atoms[:, :, mask_idx]
+    target = target[:, mask_idx]
+    lick_rate = lick_rate[:, mask_idx]
+    event_time = xr_session.time
+    cluID_atom = xr_session.cluID.data
+
+    # Prepare atoms stack
+    atoms_stack = atoms.transpose([1, 2, 0])
+    atoms_stack = atoms_stack.reshape(atoms_stack.shape[0], -1)
+
+    def normal_twoend(x):
+        x = 2 * (x - x.min()) / (x.max() - x.min()) - 1  # normalize to [-1, 1]
+        return x
+
+    # Add intercept baseline
+    baseline_atom = -np.ones((1, atoms_stack.shape[1]))
+    dict_atoms = np.vstack([atoms_stack, baseline_atom])
+    dict_atoms = normalize(dict_atoms, axis=1)
+
+    target_stack = target.T.reshape(1, -1)
+    target_stack = normal_twoend(target_stack)
+
+    # Smoothing
+    target_stack_smooth = savgol_filter(target_stack.ravel(), 21, 2).reshape(1, -1)
+    target_stack_smooth = normal_twoend(target_stack_smooth)
+    dict_atoms_smooth = savgol_filter(dict_atoms, 21, 2).reshape(dict_atoms.shape[0], -1)
+
+    return {
+        'dict_atoms_smooth': dict_atoms_smooth,
+        'target_stack_smooth': target_stack_smooth,
+        'target_stack': target_stack,
+        'atoms': atoms,
+        'target': target,
+        'event_time': event_time,
+        'cluID_atom': cluID_atom,
+        'lick_rate': lick_rate
+    }

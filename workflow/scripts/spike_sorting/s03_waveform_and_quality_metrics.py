@@ -2,8 +2,6 @@
 # Script to extract waveforms and quality metrics
 # for details about the metrics used, see https://spikeinterface.readthedocs.io/en/latest/modules/qualitymetrics.html
 #%%
-%reload_ext autoreload
-%autoreload 2
 from loguru import logger
 import os
 from pathlib import Path

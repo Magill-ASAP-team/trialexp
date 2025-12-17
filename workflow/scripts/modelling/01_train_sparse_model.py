@@ -13,19 +13,27 @@ from sklearn.preprocessing import normalize
 import torch
 import pickle
 import trialexp.process.model.pytorch_decomposition as decom
+from snakehelper.SnakeIOHelper import getSnake
+from trialexp import config
+import xarray as xr
+from scipy.signal import savgol_filter
+from loguru import logger
+#%% Load inputs
 
-#%%
-xr_spikes_all = xr.open_dataset(df2load.path/'processed/xr_spikes_timewarped.nc')
+(sinput, soutput) = getSnake(locals(), 'workflow/modelling.smk',
+  [config.debug_folder + r'/processed/da_sparse_encode.pkl'],
+  'train_sparse_model')
 
-#%%
-# load the time warp data
-xr_photom_warp = xr.load_dataset(df2load.path/'processed'/'xr_photom_timewarped.nc')
+#%% load data
+xr_spikes_all = xr.open_dataset(sinput.xr_timewarpped)
+xr_photom_warp = xr.load_dataset(sinput.xr_photom_timewarped)
+
+#%% Merge Neuropixels with photometry
 sampling_rate = 1000/np.diff(xr_photom_warp['time'])[0]
 print(f'Photometry sample rate: {sampling_rate} Hz')
 
-xr_spikes_all = xr_spikes_all.interp(time = xr_photom_warp.time)
+xr_spikes_all = xr_spikes_all.interp(time = xr_photom_warp.time) # make sure the time axis is the same
 
-# Use all trials without splitting by outcome
 xr_all_trials = xr_spikes_all.merge(xr_photom_warp)
 
 #%% add in coefficient of variance information
@@ -33,9 +41,8 @@ cv = ephys_utils.get_cell_mean_cv(xr_all_trials['spikes_FR_session'], axis=1)
 fr = ephys_utils.get_cell_mean_fr(xr_all_trials['spikes_FR_session'], axis=1)
 
 xr_all_trials['cv'] = xr.DataArray(cv, dims=['cluID'], coords={'cluID': xr_all_trials.cluID})
-xr_all_trials['fr'] = xr.DataArray(fr, dims=['cluID'], coords={'cluID': xr_all_trials.cluID}
-                                   
-#%%
+xr_all_trials['fr'] = xr.DataArray(fr, dims=['cluID'], coords={'cluID': xr_all_trials.cluID})
+
 # Filter cells based on firing rate and coefficient of variation criteria
 mask = (xr_all_trials['fr'] > 1) #doesn't quite make sense to use cv as criteira here, as cell response differently for different trials
 xr_all_filtered = xr_all_trials.sel(cluID=mask)
@@ -44,18 +51,19 @@ print(f'Original number of cells: {len(xr_all_trials.cluID)}')
 print(f'Filtered number of cells: {len(xr_all_filtered.cluID)}')
 
 #%%
-# session_ids = xr2analyze.session_id
-# xr_session = xr2analyze.sel(session_id = session_ids[0])
 # # the combined dataset contains all possible trial_nb in the combined data, that's why some trial_nb are nan
 # we need to filter it down to the valid data only, otherwise there will be too many nan
 
 xr_session = xr_all_filtered
 xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan'))
-xr_session
 
+target_sensors = ['ACh','DA']
+signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
+
+# for target_sensor, signal2analyze in zip(target_sensor, signal2analyze_list):
 # Extract atoms and target for all trials
 # extract the appropriate signal for each trial outcome 
-
+signal2analyze = signal2analyze_list[1]
 atoms = xr_session['spikes_FR_session'].data # original dimen: trial x time x cluID
 atoms = atoms.transpose([1,2,0]) # time x cluID x trial
 
@@ -64,39 +72,18 @@ target = target.T #time x trial
 lick_rate = xr_session['lick_rate'].data
 lick_rate = lick_rate.T
 
-# sometimes the photometry may stop first and result in nan trial
-mask_idx = (~np.isnan(atoms[0,0,:])) & (~np.isnan(target[0,:]))
+# Use the function
+mask_idx = (~np.isnan(atoms[0, 0, :])) & (~np.isnan(target[0, :]))
+prepared_data = decom.prepare_data_for_encoding(xr_session, signal2analyze, mask_idx)
 
-atoms = atoms[:,:,mask_idx]
-target =target[:,mask_idx]
-lick_rate = lick_rate[:, mask_idx]
-event_time = xr_session.time
-cluID_atom = xr_session.cluID.data
-
-#%%
-import pytorch_decomposition as decomp
-
-# Original atoms
-atoms_stack = atoms.transpose([1,2,0])
-atoms_stack = atoms_stack.reshape(atoms_stack.shape[0], -1)
-
-
-def normal_twoend(x):
-    x = 2 * (x - x.min()) / (x.max() - x.min()) - 1 #normalize to [-1, 1]
-    return x
-
-# add in the intercept
-baseline_atom = -np.ones((1, atoms_stack.shape[1])) 
-dict_atoms = np.vstack([atoms_stack, baseline_atom])
-dict_atoms = normalize(dict_atoms, axis=1)
-
-target_stack = target.T.reshape(1, -1)
-target_stack = normal_twoend(target_stack)
-
-# smoothing
-target_stack_smooth = savgol_filter( target_stack.ravel(), 21, 2).reshape(1,-1)
-target_stack_smooth = normal_twoend(target_stack_smooth)
-dict_atoms_smooth = savgol_filter( dict_atoms, 21, 2).reshape(dict_atoms.shape[0], -1)
+dict_atoms_smooth = prepared_data['dict_atoms_smooth']
+target_stack_smooth = prepared_data['target_stack_smooth']
+target_stack = prepared_data['target_stack']
+atoms = prepared_data['atoms']
+target = prepared_data['target']
+event_time = prepared_data['event_time']
+cluID_atom = prepared_data['cluID_atom']
+lick_rate = prepared_data['lick_rate']
 
 
 # check the average signal to make sure the smoothing is appropriate
