@@ -57,6 +57,7 @@ evt_time_step = np.mean(np.diff(evt_time))
 evt_time = xr_spike_fr_interp.spk_event_time
 evt_time_step = np.mean(np.diff(evt_time))
 # by default both the firing rate and photom data are averaged before calculating the correlation
+# need to make sure photometry and neuropixels are using the new lick detection method
 results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_fr_interp,
                                                            xr_session,
                                                            evt_name,
@@ -65,7 +66,6 @@ results = Parallel(n_jobs=20, verbose=5)(delayed(analyze_correlation)(xr_spike_f
                                                            xr_spike_trial.cluID,
                                                            trial_outcome=trial_outcome,
                                                            average_trial=True) for evt_name, sig_name, trial_outcome in var2analyze)
-
 
 #%% Save
 xr_corr = xr.merge(results)

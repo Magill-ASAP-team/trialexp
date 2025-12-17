@@ -6,6 +6,8 @@ from trialexp.config import SESSION_ROOT_DIR
 
 load_dotenv()
 
+include: 'pycontrol.smk'
+
 def rec_properties_input(wildcards):
     # determine if there is an ephys recording for that folder
     recording_csv = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/ephys/states.npy')
