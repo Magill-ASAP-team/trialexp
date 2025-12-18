@@ -40,7 +40,7 @@ rule spike_sorting:
     input:
         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
     log:
-        '{session_path}/{task}/{session_id}/processed/log/spike_sorting.log'
+        '{sessions}/{task_path}/{session_id}/processed/log/spike_sorting.log'
     output:
         sorting_complete = touch('{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'), 
         si_output_folder = directory('{sessions}/{task_path}/{session_id}/processed/kilosort4'),
@@ -56,7 +56,7 @@ rule waveform_and_quality_metrics:
         rec_properties = '{sessions}/{task_path}/{session_id}/ephys/rec_properties.csv',
         sorting_complete = '{sessions}/{task_path}/{session_id}/processed/spike_sorting.done'
     log:
-        '{session_path}/{task}/{session_id}/processed/log/waveform_and_quality_metrics.log'
+        '{sessions}/{task_path}/{session_id}/processed/log/waveform_and_quality_metrics.log'
     output:
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     threads: 32
@@ -68,7 +68,7 @@ rule ephys_sync:
     input:
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     log:
-        '{session_path}/{task}/{session_id}/processed/log/ephys_sync.log'
+        '{sessions}/{task_path}/{session_id}/processed/log/ephys_sync.log'
     output:
         ephys_sync_complete = touch('{sessions}/{task_path}/{session_id}/processed/ephys_sync.done')
     script:
@@ -81,7 +81,7 @@ rule cells_to_xarray:
         ephys_sync_complete = '{sessions}/{task_path}/{session_id}/processed/ephys_sync.done',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',   
     log:
-        '{session_path}/{task}/{session_id}/processed/log/cells_to_xarray.log'
+        '{sessions}/{task_path}/{session_id}/processed/log/cells_to_xarray.log'
     output:
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
@@ -97,7 +97,7 @@ rule cell_overview_plot:
         pycontrol_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_pycontrol.pkl',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',  
     log:
-        '{session_path}/{task}/{session_id}/processed/log/cell_overview_plot.log'     
+        '{sessions}/{task_path}/{session_id}/processed/log/cell_overview_plot.log'     
     output:
         figures_path = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/overview'),
         cell_overview_complete = touch('{sessions}/{task_path}/{session_id}/processed/cell_overview.done'),
@@ -113,7 +113,7 @@ rule cell_response_comparison:
         pycontrol_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_pycontrol.pkl',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',   
     log:
-        '{session_path}/{task}/{session_id}/processed/log/cell_response_comparison.log'     
+        '{sessions}/{task_path}/{session_id}/processed/log/cell_response_comparison.log'     
     output:
         response_curves_path = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/response_curves'),
         df_cell_prop = '{sessions}/{task_path}/{session_id}/processed/df_cell_prop.pkl',
@@ -136,7 +136,7 @@ rule session_correlations:
         xr_spike_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
     log:
-        '{session_path}/{task}/{session_id}/processed/log/session_correlations.log'   
+        '{sessions}/{task_path}/{session_id}/processed/log/session_correlations.log'   
     output:
         xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
         corr_plots = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/correlations'),
@@ -154,7 +154,7 @@ rule spike_timewarp:
         xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
         xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',  
     log:
-        '{session_path}/{task}/{session_id}/processed/log/spike_timewarp.log'     
+        '{sessions}/{task_path}/{session_id}/processed/log/spike_timewarp.log'     
     output:
         xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
         figure_dir= directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/timewarp'),
@@ -165,7 +165,7 @@ rule cell_classification:
     input: 
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     log:
-        '{session_path}/{task}/{session_id}/processed/log/cell_classification.log'   
+        '{sessions}/{task_path}/{session_id}/processed/log/cell_classification.log'   
     output:
         df_cell_types = '{sessions}/{task_path}/{session_id}/processed/df_celltypes.pkl'
     script:
@@ -175,7 +175,7 @@ rule localization:
     input: 
         xr_spikes_trials = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_trials.nc',
     log:
-        '{session_path}/{task}/{session_id}/processed/log/localization.log'   
+        '{sessions}/{task_path}/{session_id}/processed/log/localization.log'   
     output:
         xr_local = '{sessions}/{task_path}/{session_id}/processed/xr_localization.nc'
     script:
@@ -185,7 +185,7 @@ rule curation:
     input: 
         df_quality_metrics = '{sessions}/{task_path}/{session_id}/processed/df_quality_metrics.pkl',
     log:
-        '{session_path}/{task}/{session_id}/processed/log/curation.log'   
+        '{sessions}/{task_path}/{session_id}/processed/log/curation.log'   
     output:
         df_bombcell = '{sessions}/{task_path}/{session_id}/processed/df_bombcell.pkl',
         df_qm_table = '{sessions}/{task_path}/{session_id}/processed/df_qm_table.pkl',
