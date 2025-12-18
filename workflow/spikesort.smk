@@ -191,7 +191,7 @@ rule curation:
         df_qm_table = '{sessions}/{task_path}/{session_id}/processed/df_qm_table.pkl',
         curation_plots = '{sessions}/{task_path}/{session_id}/processed/figures/ephys/curation'
     script:
-        "scripts/spike_sorting/s15_cell_classification.py"
+        "scripts/spike_sorting/s15_curation.py"
 
 
 rule spikesort_done:

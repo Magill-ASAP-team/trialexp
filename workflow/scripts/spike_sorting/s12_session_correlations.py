@@ -82,6 +82,7 @@ for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success'
     idx = xr_session.isel(session_id=0).trial_outcome ==outcome
     if sum(idx)>0:
         xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
+        
         xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
         xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
         

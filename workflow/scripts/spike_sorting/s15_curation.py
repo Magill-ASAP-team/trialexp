@@ -85,7 +85,7 @@ print(f"Classifying {brain_region} neurons...")
 cell_types = bc.classify_and_plot_brain_region(ephys_properties, ephys_param, brain_region)
 
 #%%
-Show classification results
+#Show classification results
 if cell_types is not None:
     # Create combined results table
     ephys_df = pd.DataFrame(ephys_properties)
