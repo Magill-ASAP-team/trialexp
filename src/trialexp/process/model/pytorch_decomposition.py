@@ -2305,3 +2305,36 @@ def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
         'cluID_atom': cluID_atom,
         'lick_rate': lick_rate
     }
+
+
+def plot_reconstruction_comparison(target_stack_smooth, reconstruction, time_range=(100, 150), sampling_rate=50):
+    """
+    Plot comparison between target signal and reconstruction.
+    
+    Parameters
+    ----------
+    target_stack_smooth : np.ndarray
+        Smoothed target signal
+    reconstruction : np.ndarray
+        Reconstructed signal from sparse encoding
+    time_range : tuple, optional
+        Time range to display (start, end) in seconds
+    sampling_rate : float, optional
+        Sampling rate in Hz
+    
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure object
+    ax : matplotlib.axes.Axes
+        Axes object
+    """
+    t = np.arange(len(reconstruction.ravel())) / sampling_rate
+    fig, ax = plt.subplots(1, 1, figsize=(6, 3))
+    ax.plot(t, target_stack_smooth.T, label='Target')
+    ax.plot(t, reconstruction.T, 'r', label='Reconstruction')
+    ax.set_xlim(time_range)
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Signal')
+    ax.legend()
+    return fig, ax

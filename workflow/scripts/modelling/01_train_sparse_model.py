@@ -5,19 +5,18 @@ Train pytorch model for sparse encoding with time shift
 #%%
 from scipy.signal import savgol_filter
 from scipy.signal import butter, filtfilt
-import glob
-from sklearn import preprocessing
-import matplotlib.gridspec as gridspec
 import trialexp.process.ephys.utils as ephys_utils
 from sklearn.preprocessing import normalize
 import torch
 import pickle
-import trialexp.process.model.pytorch_decomposition as decom
+import trialexp.process.model.pytorch_decomposition as decomp
 from snakehelper.SnakeIOHelper import getSnake
 from trialexp import config
 import xarray as xr
 from scipy.signal import savgol_filter
 from loguru import logger
+from pathlib import Path
+import numpy as np
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/modelling.smk',
@@ -57,96 +56,89 @@ print(f'Filtered number of cells: {len(xr_all_filtered.cluID)}')
 xr_session = xr_all_filtered
 xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan'))
 
-target_sensors = ['ACh','DA']
+save_files = [soutput.ach_model, soutput.da_model]
 signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
 
 # for target_sensor, signal2analyze in zip(target_sensor, signal2analyze_list):
 # Extract atoms and target for all trials
 # extract the appropriate signal for each trial outcome 
-signal2analyze = signal2analyze_list[1]
-atoms = xr_session['spikes_FR_session'].data # original dimen: trial x time x cluID
-atoms = atoms.transpose([1,2,0]) # time x cluID x trial
-
-target = xr_session[signal2analyze].data
-target = target.T #time x trial
-lick_rate = xr_session['lick_rate'].data
-lick_rate = lick_rate.T
-
-# Use the function
-mask_idx = (~np.isnan(atoms[0, 0, :])) & (~np.isnan(target[0, :]))
-prepared_data = decom.prepare_data_for_encoding(xr_session, signal2analyze, mask_idx)
-
-dict_atoms_smooth = prepared_data['dict_atoms_smooth']
-target_stack_smooth = prepared_data['target_stack_smooth']
-target_stack = prepared_data['target_stack']
-atoms = prepared_data['atoms']
-target = prepared_data['target']
-event_time = prepared_data['event_time']
-cluID_atom = prepared_data['cluID_atom']
-lick_rate = prepared_data['lick_rate']
 
 
-# check the average signal to make sure the smoothing is appropriate
-target_stack_smooth_trial = target_stack_smooth.reshape(target.shape[1],-1)
+for save_file, signal2analyze in zip(save_files, signal2analyze_list):
+    
+    atoms = xr_session['spikes_FR_session'].data # original dimen: trial x time x cluID
+    atoms = atoms.transpose([1,2,0]) # time x cluID x trial
+    
+    target = xr_session[signal2analyze].data
+    target = target.T #time x trial
+    lick_rate = xr_session['lick_rate'].data
+    lick_rate = lick_rate.T
 
-trial_mask = (xr_session.trial_outcome[mask_idx] == 'success')
-plt.plot(event_time,target_stack_smooth_trial[trial_mask,:].mean(axis=0))
+    # Use the function
+    mask_idx = (~np.isnan(atoms[0, 0, :])) & (~np.isnan(target[0, :]))
+    prepared_data = decomp.prepare_data_for_encoding(xr_session, signal2analyze, mask_idx)
 
-plt.figure()
-plt.plot(np.arange(len(target_stack.ravel()))/50, target_stack.ravel(), alpha=0.5)
-plt.plot(np.arange(len(target_stack_smooth.ravel()))/50, target_stack_smooth.ravel(),'r-')
-plt.xlim([0, 50])
+    dict_atoms_smooth = prepared_data['dict_atoms_smooth']
+    target_stack_smooth = prepared_data['target_stack_smooth']
+    target_stack = prepared_data['target_stack']
+    atoms = prepared_data['atoms']
+    target = prepared_data['target']
+    event_time = prepared_data['event_time']
+    cluID_atom = prepared_data['cluID_atom']
+    lick_rate = prepared_data['lick_rate']
 
-#%%
 
-# Check if CUDA is available
-print(f"CUDA available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-else:
-    print("Using CPU")
+    # check the average signal to make sure the smoothing is appropriate
+    target_stack_smooth_trial = target_stack_smooth.reshape(target.shape[1],-1)
 
-init_shifts = np.random.normal(100, 1, dict_atoms.shape[0])
+    trial_mask = (xr_session.trial_outcome[mask_idx] == 'success')
 
-code_final, info, reconstruction, model = decomp.sparse_encode_pytorch_with_shift(
-    target=target_stack_smooth,
-    dictionary=dict_atoms_smooth,  # unshifted patterns
-    max_shift_ms=[-200, 200],
-    init_shift_ms= init_shifts,
-    sampling_rate=sampling_rate,
-    n_iterations=10,
-    sparsity_weight=1e-3,
-    n_steps_code=5000,
-    n_steps_shift= 1000,
-    sparsity_type='elastic_net',
-    max_lr_shift=0.1,
-    device='cuda',
-    shift_print_step= 400,
-    code_print_step=1000,
-    early_stop_patience = 100,
-    use_mlflow=True  # Track experiments
-)
+    # Check if CUDA is available
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("Using CPU")
 
-#%%
-t = np.arange(len(reconstruction.ravel()))/50
-fig,ax = plt.subplots(1,1,figsize=(6,3))
-ax.plot(t, target_stack_smooth.T)
-ax.plot(t, reconstruction.T,'r')
-ax.set_xlim([100,150])
+    init_shifts = np.random.normal(100, 1, dict_atoms_smooth.shape[0])
 
-with open(f'pytorch_model_{target_sensor}_{session_id}_timewarp.pickle','wb') as f:
-    pickle.dump({
-        'code_final': code_final,
-        'target_stack_smooth': target_stack_smooth,
-        'dict_atoms_smooth': dict_atoms_smooth,
-        'reconstruction': reconstruction,
-        'trial_outcome':  xr_session.trial_outcome[mask_idx],
-        'event_time': event_time,
-        'atoms': atoms,
-        'target': target,
-        'info': info,
-        'model': model,
-        'lick_rate': lick_rate,
-        'cluID': cluID_atom,
-        'trial_nb': xr_session.trial_nb[mask_idx],
-    }, f)
+    code_final, info, reconstruction, model = decomp.sparse_encode_pytorch_with_shift(
+        target=target_stack_smooth,
+        dictionary=dict_atoms_smooth,  # unshifted patterns
+        max_shift_ms=[-200, 200],
+        init_shift_ms= init_shifts,
+        sampling_rate=sampling_rate,
+        n_iterations=10,
+        sparsity_weight=1e-3,
+        n_steps_code=5000,
+        n_steps_shift= 1000,
+        sparsity_type='elastic_net',
+        max_lr_shift=0.1,
+        device='cuda',
+        shift_print_step= 400,
+        code_print_step=1000,
+        early_stop_patience = 100,
+        use_mlflow=True  # Track experiments
+    )
+
+    with open(save_file,'wb') as f:
+        pickle.dump({
+            'code_final': code_final,
+            'target_stack_smooth': target_stack_smooth,
+            'dict_atoms_smooth': dict_atoms_smooth,
+            'reconstruction': reconstruction,
+            'trial_outcome':  xr_session.trial_outcome[mask_idx],
+            'event_time': event_time,
+            'atoms': atoms,
+            'target': target,
+            'info': info,
+            'model': model,
+            'lick_rate': lick_rate,
+            'cluID': cluID_atom,
+            'trial_nb': xr_session.trial_nb[mask_idx],
+        }, f)
+        
+        
+    # plot figures for quick check
+    fig, ax = decomp.plot_reconstruction_comparison(target_stack_smooth, reconstruction)
+    fig.savefig(Path(soutput.figures_dir)/f'reconstruction_{signal2analyze}.png', dpi=200)
