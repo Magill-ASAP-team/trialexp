@@ -16,6 +16,22 @@ def rec_properties_input(wildcards):
     else:
         return []
 
+
+def check_photometry_exists(wildcards):
+    ppd_files = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
+    if len(ppd_files) > 0:
+        return True
+    else:
+        return False
+
+def session_correlations_input(wildcards):
+    # only run if photometry file is present
+    ppd_files = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
+    if len(ppd_files)>0:
+        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/xr_corr.nc'
+    else:
+        return []
+
 def session2analyze(tasks:list=None, cohort:list = None):
     #specify the list of task to analyze to save time.
     total_sessions = []
@@ -122,13 +138,7 @@ rule cell_response_comparison:
     script:
         "scripts/spike_sorting/s11b_cell_response_comparison.py"
 
-def session_correlations_input(wildcards):
-    # only run if photometry file is present
-    ppd_files = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
-    if len(ppd_files)>0:
-        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/xr_corr.nc'
-    else:
-        return []
+
 
 rule session_correlations:
     input: 
@@ -147,19 +157,30 @@ rule session_correlations:
 
 rule spike_timewarp:
     input:
-        xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc',
         xr_spikes_fr = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_fr.nc',
         condition_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_conditions.pkl',
         event_dataframe = '{sessions}/{task_path}/{session_id}/processed/df_events_cond.pkl',
-        xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
-        xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',  
     log:
         '{sessions}/{task_path}/{session_id}/processed/log/spike_timewarp.log'     
     output:
         xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
-        figure_dir= directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/timewarp'),
     script:
         "scripts/spike_sorting/s13_time_warping.py"
+
+
+rule spike_timewarp_figures:
+    input:
+        xr_spike_timewarp = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
+        xr_session = '{sessions}/{task_path}/{session_id}/processed/xr_session.nc',
+        xr_photom_timewarp = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc',
+        xr_corr = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc',
+    log:
+        '{sessions}/{task_path}/{session_id}/processed/log/spike_timewarp_figures.log'     
+    output:
+        figure_dir= directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/timewarp'),
+        done = touch('{sessions}/{task_path}/{session_id}/processed/spike_timewarp_figures.done')
+    script:
+        "scripts/spike_sorting/s13b_time_warping_figures.py"
 
 rule cell_classification:
     input: 
@@ -189,20 +210,26 @@ rule curation:
     output:
         df_bombcell = '{sessions}/{task_path}/{session_id}/processed/df_bombcell.pkl',
         df_qm_table = '{sessions}/{task_path}/{session_id}/processed/df_qm_table.pkl',
-        curation_plots = '{sessions}/{task_path}/{session_id}/processed/figures/ephys/curation'
+        curation_plots = directory('{sessions}/{task_path}/{session_id}/processed/figures/ephys/curation')
     script:
         "scripts/spike_sorting/s15_curation.py"
 
 
 rule spikesort_done:
     input:
-        corr_plot = session_correlations_input, 
+        corr_plot = branch(check_photometry_exists, 
+                            then = '{sessions}/{task_path}/{session_id}/processed/xr_corr.nc', 
+                            otherwise = []),
+        spike_timewarp_figures = branch(check_photometry_exists,
+                                    then = '{sessions}/{task_path}/{session_id}/processed/spike_timewarp_figures.done',
+                                    otherwise = []),
         df_bombcell = '{sessions}/{task_path}/{session_id}/processed/df_bombcell.pkl',
         xr_local = '{sessions}/{task_path}/{session_id}/processed/xr_localization.nc',
         df_cell_types = '{sessions}/{task_path}/{session_id}/processed/df_celltypes.pkl',
         comparison_done = '{sessions}/{task_path}/{session_id}/processed/cell_response_comparison.done',
         cell_trial_responses_complete = '{sessions}/{task_path}/{session_id}/processed/cell_overview.done',
         time_warp = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
+    
     priority: 20
     output:
         spike_sort_done = touch('{sessions}/{task_path}/{session_id}/processed/spikesort.done'),
