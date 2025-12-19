@@ -45,6 +45,9 @@ df_metrics = pd.read_pickle(sinput.df_quality_metrics)
 
 
 #%% Calculate cross-correlation between unit activity and photometry signals
+'''
+Some Neurpixels only recoding do not have photometry data
+'''
 photom_vars = ['_zscored_df_over_f', '_zscored_df_over_f_analog_2']
 var = [v.replace(photom_vars[0],'') for v in xr_session.data_vars.keys() if v.endswith(photom_vars[0])]
 trial_outcomes = np.unique(xr_spike_fr_interp.trial_outcome)
@@ -79,6 +82,7 @@ for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success'
     idx = xr_session.isel(session_id=0).trial_outcome ==outcome
     if sum(idx)>0:
         xr_corr2plot = xr_corr.sel(trial_outcome=outcome)
+        
         xr_spike2plot = xr_spike_fr_interp.sel(trial_nb = idx)
         xr_session2plot = xr_session.isel(session_id=0).sel(trial_nb = idx)
         
@@ -88,19 +92,19 @@ for evt_name, sig_name,outcome in itertools.product(var, photom_vars, ['success'
 # %% plot the overall distribution
 sig_names = ['_zscored_df_over_f','_zscored_df_over_f_analog_2']
 
+if len(xr_corr)>0:
+    for outcome in trial_outcomes:
+        fig,axes = plt.subplots(1,2,figsize=(10,10),dpi=200)
 
-for outcome in trial_outcomes:
-    fig,axes = plt.subplots(1,2,figsize=(10,10),dpi=200)
+        for i, sn in enumerate(sig_names):
+            df_meancorr = get_corr_spatial_distribution(xr_corr.sel(trial_outcome=outcome), df_metrics, sn)
+            
+            sns.heatmap(df_meancorr,cmap='vlag',ax=axes[i])
+            axes[i].invert_yaxis()
+            axes[i].set_title(sn)
+            axes[i].set_ylabel('Depth um')
 
-    for i, sn in enumerate(sig_names):
-        df_meancorr = get_corr_spatial_distribution(xr_corr.sel(trial_outcome=outcome), df_metrics, sn)
-        
-        sns.heatmap(df_meancorr,cmap='vlag',ax=axes[i])
-        axes[i].invert_yaxis()
-        axes[i].set_title(sn)
-        axes[i].set_ylabel('Depth um')
-
-    fig.tight_layout()
-    fig.savefig(Path(soutput.corr_plots)/f'corr_dist_{outcome}.png', dpi=200)
+        fig.tight_layout()
+        fig.savefig(Path(soutput.corr_plots)/f'corr_dist_{outcome}.png', dpi=200)
 
 # %%

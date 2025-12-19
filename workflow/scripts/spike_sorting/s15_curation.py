@@ -44,16 +44,26 @@ param = bc.get_default_parameters(ks_dir,
 param['maxRPVviolations'] =0.2 # align with kilosort default
 
 # %%
-(
-    quality_metrics,
-    param,
-    unit_type,
-    unit_type_string,
-    figures,
+try:
+    (quality_metrics,
+        param,
+        unit_type,
+        unit_type_string,
+        figures,
 ) = bc.run_bombcell(
-    ks_dir, save_path, param, return_figures=True,
-)
-
+        ks_dir, save_path, param, return_figures=True,
+    )
+except ValueError:
+    #reextract the raw waveform
+    param["reextractRaw"]= True
+    (quality_metrics,
+        param,
+        unit_type,
+        unit_type_string,
+        figures,
+    ) = bc.run_bombcell(
+        ks_dir, save_path, param, return_figures=True,
+    )
 # Conert quality metric to dataframe
 quality_metrics_table = pd.DataFrame(quality_metrics)
 quality_metrics_table.insert(0, 'Bombcell_unit_type', unit_type_string)
@@ -64,6 +74,12 @@ Hill et al does not use ISI violation for classification as used by Kilosort, bu
 Its main assumption is that the contamination process is independent, which may not be true. Also the FDR depends on the firing rate.
 See Vincent and Economo (2024) for a detailed discussion about the relation betwene ISI and FDR.
 '''
+
+#%% Also store the criteria table
+boolean_quality_metrics_table = bc.make_qm_table(
+    quality_metrics, param, unit_type_string
+)
+boolean_quality_metrics_table.to_pickle(soutput.df_qm_table)
 
 #%%
 # Compute ephys properties for cell type classification
@@ -85,7 +101,7 @@ print(f"Classifying {brain_region} neurons...")
 cell_types = bc.classify_and_plot_brain_region(ephys_properties, ephys_param, brain_region)
 
 #%%
-Show classification results
+#Show classification results
 if cell_types is not None:
     # Create combined results table
     ephys_df = pd.DataFrame(ephys_properties)

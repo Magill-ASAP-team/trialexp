@@ -722,44 +722,59 @@ def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False)
 def get_warping_specs(df_events_cond, df_conditions, specs_path):
 
     with open(specs_path) as f:
-        specs = json.load(f)
-
+      specs = json.load(f)
+    
     if 'task_name' in df_events_cond.attrs:
         task_name = df_events_cond.attrs['task_name']
     else:
         task_name = df_events_cond.attrs['Task name']
-    
+        
     trigger = df_events_cond.attrs['triggers'][0]
 
     if task_name in ['pavlovian_spontanous_reaching_oct23',
-                 'pavlovian_reaching_Oct26',
-                 'pavlovian_spontanous_reaching_march23',
-                 'pavlovian_spontanous_reaching_oct23',
-                 'pavlovian_spontanous_reaching_April24']:
+                    'pavlovian_reaching_Oct26',
+                    'pavlovian_spontanous_bar_Sep24',
+                    'pavlovian_spontanous_reaching_march23',
+                    'pavlovian_spontanous_reaching_oct23',
+                    'pavlovian_spontanous_reaching_April24']:
+        
         extraction_specs = specs['spontanous_reaching']
         outcome2plot = df_conditions.trial_outcome.unique()
-    
+        
     elif task_name in ['reaching_go_spout_bar_VR_Dec23',
-                   'reaching_go_spout_bar_apr23',
-                   'reaching_go_spout_bar_mar23',
-                   'reaching_go_spout_bar_june05',
-                   'reaching_go_spout_bar_nov22']:
+                    'reaching_go_spout_bar_apr23',
+                    'reaching_go_spout_bar_mar23',
+                    'reaching_go_spout_bar_june05',
+                    'reaching_go_spout_bar_nov22']:
         extraction_specs = specs['reaching_go_spout_bar_reward']
         outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
-    
-    elif task_name in ['reaching_go_spout_bar_VR_April24']:
+        
+    elif task_name in ['reaching_go_spout_bar_VR_April24',
+                    'reaching_go_spout_bar_VR_April24_silent',
+                    'reaching_go_spout_bar_VR_Feb25',
+                        'reaching_go_spout_bar_VR_cued_random_June25']:
         extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
         outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
-    
+        
 
-    elif task_name in ['reaching_go_spout_incr_break2_nov22']:
+    elif task_name in ['reaching_go_spout_incr_break2_nov22',
+                    'reaching_go_spout_incr_break2_April24',
+                    'reaching_go_spout_incr_break2_Feb25',
+                    'reaching_go_spout_incr_break2_June25',
+                    'cued_and_cued_reward_May25']:
         extraction_specs = specs['break2']
-        outcome2plot = df_conditions.trial_outcome.unique()
+        outcome2plot = ['success', 'no_reach', 'late_reach']
+
+    elif task_name in ['pavlovian_task_August25','pavlovian_task_August25_silent']:
+        extraction_specs = specs['pavlovian_go_reward_nogap']
+        outcome2plot = ['standard','omission','jackpot']
+        
     else:
         extraction_specs = specs['default']
-    #update the trigger
+        #update the trigger
         extraction_specs[trigger] = extraction_specs.pop('trigger')
         outcome2plot = df_conditions.trial_outcome.unique()
+
     return trigger,extraction_specs,outcome2plot
 
 def normalize_signal(data_array, baseline_period:list):

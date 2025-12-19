@@ -599,38 +599,6 @@ def highlight_pvalues_consec_win(pvalues, time, ax, alpha=0.2, threshold=0.05, c
     for t in sig_t:
         ax.axvline(t, alpha=alpha, color='y')
             
-            
-def load_extraction_spec(task_name, df_conditions, specs):
-    
-    if task_name in ['pavlovian_spontanous_reaching_oct23',
-                    'pavlovian_reaching_Oct26',
-                    'pavlovian_spontanous_reaching_march23',
-                    'pavlovian_spontanous_reaching_oct23']:
-        
-        extraction_specs = specs['spontanous_reaching']
-        outcome2plot = df_conditions.trial_outcome.unique()
-        
-    elif task_name in ['reaching_go_spout_bar_VR_Dec23']:
-        extraction_specs = specs['reaching_go_spout_bar_lick']
-        outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
-        
-    elif task_name in ['reaching_go_spout_bar_mar23',
-                    'reaching_go_spout_bar_june05',
-                    'reaching_go_spout_bar_nov22',
-                    'reaching_go_spout_bar_apr23']:
-        extraction_specs = specs['reaching_go_spout_bar']
-        outcome2plot = [['success','aborted'], 'no_reach', 'late_reach']
-        
-    elif task_name in ['reaching_go_spout_incr_break2_nov22']:
-        extraction_specs = specs['break2']
-        outcome2plot = df_conditions.trial_outcome.unique()
-    else:
-        extraction_specs = specs['default']
-        #update the trigger
-        extraction_specs['trigger'] = extraction_specs.pop('trigger')
-        outcome2plot = df_conditions.trial_outcome.unique()
-        
-    return extraction_specs, outcome2plot
 
 def draw_beta_values(reg_res, factor, ax,extraction_specs, display_pvalue=False):
 
