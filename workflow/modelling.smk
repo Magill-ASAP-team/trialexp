@@ -6,6 +6,13 @@ from trialexp.config import SESSION_ROOT_DIR
 
 load_dotenv()
 
+def check_photometry_exists(wildcards):
+    ppd_files = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
+    if len(ppd_files) > 0:
+        return True
+    else:
+        return False
+
 def rec_properties_input(wildcards):
     # determine if there is an ephys recording for that folder
     recording_csv = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/ephys/states.npy')
@@ -20,6 +27,8 @@ rule train_sparse_model:
     input:
         xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
         xr_photom_timewarped = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc', 
+    log:
+        '{sessions}/{task_path}/{session_id}/processed/log/train_sparse_model.log'  
     output:
         ach_model = '{sessions}/{task_path}/{session_id}/processed/ach_sparse_encode.pkl',
         da_model = '{sessions}/{task_path}/{session_id}/processed/da_sparse_encode.pkl',
