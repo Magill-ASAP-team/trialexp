@@ -11,6 +11,7 @@ import mlflow.pytorch
 from sklearn.preprocessing import normalize
 from torch.utils.data import Dataset, DataLoader
 from scipy.signal import savgol_filter
+from loguru import logger
 
 class SymmetricSigmoid(nn.Module):
     def __init__(self, c=0.5, k=10.0, scale=1.0, shift=0.0):
@@ -2236,7 +2237,7 @@ class SparseCodingWithShifts(nn.Module):
         return params
 
 
-def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
+def prepare_data_for_encoding(xr_session, signal2analyze, shuffle_trials=False):
     """
     Prepare atoms and target data for sparse encoding.
     
@@ -2248,6 +2249,8 @@ def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
         Name of the signal variable to analyze (e.g., 'zscored_df_over_f')
     mask_idx : array-like
         Boolean mask for valid trials
+    shuffle_trials: bool
+        whether to shuffle the trials before training the model
         
     Returns
     -------
@@ -2264,8 +2267,11 @@ def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
 
     target = xr_session[signal2analyze].data
     target = target.T  # time x trial
-    lick_rate = xr_session['lick_rate'].data
+    lick_rate = xr_session['lick_rate'].data #not used for now
     lick_rate = lick_rate.T
+
+    mask_idx = (~np.isnan(atoms[0, 0, :])) & (~np.isnan(target[0, :]))
+
 
     # Filter valid trials
     atoms = atoms[:, :, mask_idx]
@@ -2287,6 +2293,13 @@ def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
     dict_atoms = np.vstack([atoms_stack, baseline_atom])
     dict_atoms = normalize(dict_atoms, axis=1)
 
+    # shuffling if required
+    if shuffle_trials:
+        logger.info('Shuffling trials for target')
+        n_trials = target.shape[1]
+        shuffled_trial_indices = np.random.permutation(n_trials)
+        target = target[:, shuffled_trial_indices]  
+
     target_stack = target.T.reshape(1, -1)
     target_stack = normal_twoend(target_stack)
 
@@ -2301,8 +2314,11 @@ def prepare_data_for_encoding(xr_session, signal2analyze, mask_idx):
         'target_stack': target_stack,
         'atoms': atoms,
         'target': target,
+        'mask_idx': mask_idx,
         'event_time': event_time,
         'cluID_atom': cluID_atom,
+        'trial_outcome': xr_session.trial_outcome[mask_idx],
+        'trial_nb': xr_session.trial_nb[mask_idx],
         'lick_rate': lick_rate
     }
 

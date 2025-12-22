@@ -21,8 +21,8 @@ import numpy as np
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/modelling.smk',
-  [config.debug_folder + r'/processed/da_sparse_encode.pkl'],
-  'train_sparse_model')
+  [config.debug_folder + r'/processed/da_sparse_encode_shuffle.pkl'],
+  'shuffle_sparse_model')
 
 #%% load data
 xr_spikes_all = xr.open_dataset(sinput.xr_timewarpped)
@@ -64,7 +64,7 @@ signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
 # Extract atoms and target for all trials
 # extract the appropriate signal for each trial outcome 
 
-n_shuffle = 1
+n_shuffle = 100
 
 # Check if CUDA is available
 print(f"CUDA available: {torch.cuda.is_available()}")
@@ -85,13 +85,11 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     for n in range(n_shuffle):
         print(f"Shuffle iteration {n+1}/{n_shuffle}")
         
-        target = target.T #time x trial
         lick_rate = xr_session['lick_rate'].data
         lick_rate = lick_rate.T
 
         # Use the function
-        mask_idx = (~np.isnan(atoms[0, 0, :])) & (~np.isnan(target[0, :]))
-        prepared_data = decomp.prepare_data_for_encoding(xr_session, signal2analyze, mask_idx)
+        prepared_data = decomp.prepare_data_for_encoding(xr_session, signal2analyze, shuffle_trials=True)
 
         dict_atoms_smooth = prepared_data['dict_atoms_smooth']
         target_stack_smooth = prepared_data['target_stack_smooth']
@@ -100,22 +98,11 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
         target = prepared_data['target']
         event_time = prepared_data['event_time']
         cluID_atom = prepared_data['cluID_atom']
-        lick_rate = prepared_data['lick_rate']
-
-        # Shuffle the trial dimension in target
-        n_trials = target.shape[1]
-        shuffled_trial_indices = np.random.permutation(n_trials)
-        target = target[:, shuffled_trial_indices]
-        target_stack_smooth = target_stack_smooth[:, shuffled_trial_indices]
-        target_stack = target_stack[:, shuffled_trial_indices]
-        lick_rate = lick_rate[:, shuffled_trial_indices]
-
-        # check the average signal to make sure the smoothing is appropriate
-        target_stack_smooth_trial = target_stack_smooth.reshape(target.shape[1],-1)
-
-        trial_mask = (xr_session.trial_outcome[mask_idx] == 'success')
-
-
+        trial_outcome = prepared_data['trial_outcome']
+        trial_nb = prepared_data['trial_nb']
+        mask_idx = prepared_data['mask_idx'] #which trial is actually used to train the model
+        lick_rate = prepared_data['lick_rate'] # current not used
+        
 
         init_shifts = np.random.normal(100, 1, dict_atoms_smooth.shape[0])
 
@@ -140,12 +127,11 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
 
         shuffle_results.append({
             'shuffle_idx': n,
-            'shuffled_trial_indices': shuffled_trial_indices,
             'code_final': code_final,
             'target_stack_smooth': target_stack_smooth,
             'dict_atoms_smooth': dict_atoms_smooth,
             'reconstruction': reconstruction,
-            'trial_outcome':  xr_session.trial_outcome[mask_idx],
+            'trial_outcome':  trial_outcome,
             'event_time': event_time,
             'atoms': atoms,
             'target': target,
@@ -153,7 +139,8 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             'model': model,
             'lick_rate': lick_rate,
             'cluID': cluID_atom,
-            'trial_nb': xr_session.trial_nb[mask_idx],
+            'trial_nb': trial_nb,
+            'mask_idx': mask_idx
         })
     
     with open(save_file,'wb') as f:
@@ -162,3 +149,4 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             'shuffle_results': shuffle_results
         }, f)
         
+# %%
