@@ -64,7 +64,7 @@ save_files = [soutput.ach_model, soutput.da_model]
 signal2analyze_list = ['zscored_df_over_f_analog_2']
 
 # CV configuration
-n_folds = 5
+n_folds = 10
 random_state = 42
 
 
@@ -104,72 +104,163 @@ fold_results = []
 # ===== STAGE 2: CV loop =====
 logger.info(f"\nStage 2: Running {n_folds}-fold cross-validation...")
 
-# for fold_idx, (train_idx, test_idx) in enumerate(kfold.split(np.arange(n_valid_trials))):
+for fold_idx, (train_idx, test_idx) in enumerate(kfold.split(np.arange(n_valid_trials))):
+    logger.info(f"\n{'-'*60}")
+    logger.info(f"Fold {fold_idx+1}/{n_folds}")
+    logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
+    logger.info(f"{'-'*60}")
 
-# For debugging: just run the first fold
-fold_idx = 0
-(train_idx, test_idx) = list(kfold.split(np.arange(n_valid_trials)))[fold_idx]
-
-logger.info(f"\n{'-'*60}")
-logger.info(f"Fold {fold_idx+1}/{n_folds}")
-logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
-logger.info(f"{'-'*60}")
-
-# ===== Prepare train and test data from trial subsets =====
-train_data = decomp.prepare_fold_from_atoms_target(
-    atoms, target, train_idx, lick_rate
-)
-test_data = decomp.prepare_fold_from_atoms_target(
-    atoms, target, test_idx, lick_rate
-)
-
-# ===== Train model using sklearn baseline =====
-logger.info("Training sklearn baseline model on train fold...")
-
-code_train, info_train, reconstruction_train, _ = \
-    decomp.sparse_encode_sklearn_baseline(
-        target=train_data['target_stack_smooth'],
-        dictionary=train_data['dict_atoms_smooth'],
-        sparsity_weight=1e-4,
-        algorithm='lasso_lars',
-        verbose=True
+    # ===== Prepare train and test data from trial subsets =====
+    train_data = decomp.prepare_fold_from_atoms_target(
+        atoms, target, train_idx, lick_rate
+    )
+    test_data = decomp.prepare_fold_from_atoms_target(
+        atoms, target, test_idx, lick_rate
     )
 
-train_r2 = info_train['variance_explained']
-logger.info(f"Train R²: {train_r2:.4f}")
+    # ===== Train model using sklearn baseline =====
+    logger.info("Training sklearn baseline model on train fold...")
 
-# Save training dictionary for test phase (prevent data leakage)
-train_dict = train_data['dict_atoms_smooth']
+    code_train, info_train, reconstruction_train, _ = \
+        decomp.sparse_encode_sklearn_baseline(
+            target=train_data['target_stack_smooth'],
+            dictionary=train_data['dict_atoms_smooth'],
+            sparsity_weight=1e-2,
+            algorithm='lasso_lars',
+            verbose=True
+        )
 
-# ===== Predict on test fold =====
-logger.info("Predicting on test fold with sklearn baseline...")
+    train_r2 = info_train['variance_explained']
+    logger.info(f"Train R²: {train_r2:.4f}")
 
-# Use the same sklearn baseline on test data
-code_test, info_test, reconstruction_test, _ = \
-    decomp.sparse_encode_sklearn_baseline(
-        target=test_data['target_stack_smooth'],
-        dictionary=test_data['dict_atoms_smooth'],
-        code = code_train,
-        sparsity_weight=1e-4,
-        algorithm='lasso_lars',
-        verbose=True
-    )
+    # ===== Predict on test fold =====
+    logger.info("Predicting on test fold with sklearn baseline...")
 
-test_prediction = reconstruction_test
-test_r2 = info_test['variance_explained']
+    # Use the same sklearn baseline on test data
+    code_test, info_test, reconstruction_test, _ = \
+        decomp.sparse_encode_sklearn_baseline(
+            target=test_data['target_stack_smooth'],
+            dictionary=test_data['dict_atoms_smooth'],
+            code = code_train,
+            sparsity_weight=1e-2,
+            algorithm='lasso_lars',
+            verbose=True
+        )
 
-logger.info(f"Test R²: {test_r2:.4f}")
-logger.info(f"Train-Test gap: {train_r2 - test_r2:.4f}")
+    test_prediction = reconstruction_test
+    test_r2 = info_test['variance_explained']
 
-# Compute additional metrics
-test_mse = info_test['reconstruction_loss']
-logger.info(f"Test MSE: {test_mse:.6f}")
-logger.info(f"Train MSE: {info_train['reconstruction_loss']:.6f}")
-logger.info(f"Test non-zero coefficients: {info_test['n_nonzero']}")
-logger.info(f"Train non-zero coefficients: {info_train['n_nonzero']}")
+    logger.info(f"Test R²: {test_r2:.4f}")
+    logger.info(f"Train-Test gap: {train_r2 - test_r2:.4f}")
 
-#%%
+    # Compute additional metrics
+    test_mse = info_test['reconstruction_loss']
+    logger.info(f"Test MSE: {test_mse:.6f}")
+    logger.info(f"Train MSE: {info_train['reconstruction_loss']:.6f}")
+    logger.info(f"Test non-zero coefficients: {info_test['n_nonzero']}")
+    logger.info(f"Train non-zero coefficients: {info_train['n_nonzero']}")
+
+    # ===== Store OOF predictions =====
+    # Reshape predictions back to (n_test_trials × T)
+    n_test_trials = len(test_idx)
+
+    test_pred_trials = test_prediction.reshape(n_test_trials, T)
+    test_true_trials = test_data['target_stack_smooth'].reshape(n_test_trials, T)
+
+    # Store in OOF arrays (using original trial indices)
+    for i, orig_idx in enumerate(test_idx):
+        oof_predictions[orig_idx] = test_pred_trials[i]
+        oof_ground_truth[orig_idx] = test_true_trials[i]
+
+    # Store fold metadata
+    fold_results.append({
+        'fold_idx': fold_idx,
+        'train_idx': train_idx,
+        'test_idx': test_idx,
+        'train_r2': train_r2,
+        'test_r2': test_r2,
+        'train_mse': info_train['reconstruction_loss'],
+        'test_mse': test_mse,
+        'n_nonzero_train': info_train['n_nonzero'],
+        'n_nonzero_test': info_test['n_nonzero'],
+        'code_train': code_train
+    })
+
+# ===== STAGE 3: Calculate Global OOF R² =====
+logger.info(f"\n{'='*80}")
+logger.info("Stage 3: Computing global out-of-fold metrics...")
+logger.info(f"{'='*80}")
+
+# Verify all trials were filled
+assert not np.any(np.isnan(oof_predictions)), "Not all trials were filled in OOF predictions!"
+assert not np.any(np.isnan(oof_ground_truth)), "Not all trials were filled in OOF ground truth!"
+
+oof_pred_flat = oof_predictions.ravel()
+oof_true_flat = oof_ground_truth.ravel()
+
+oof_mse = np.mean((oof_pred_flat - oof_true_flat) ** 2)
+oof_var = np.var(oof_true_flat)
+oof_r2 = 1 - (oof_mse / oof_var)
+
+# Calculate per-fold statistics
+fold_train_r2_mean = np.mean([f['train_r2'] for f in fold_results])
+fold_train_r2_std = np.std([f['train_r2'] for f in fold_results])
+fold_test_r2_mean = np.mean([f['test_r2'] for f in fold_results])
+fold_test_r2_std = np.std([f['test_r2'] for f in fold_results])
+
+logger.info(f"\n{'='*60}")
+logger.info("CROSS-VALIDATION RESULTS")
+logger.info(f"{'='*60}")
+logger.info(f"Global OOF R²: {oof_r2:.4f}")
+logger.info(f"Mean fold train R²: {fold_train_r2_mean:.4f} ± {fold_train_r2_std:.4f}")
+logger.info(f"Mean fold test R²: {fold_test_r2_mean:.4f} ± {fold_test_r2_std:.4f}")
+logger.info(f"Train-test gap: {fold_train_r2_mean - fold_test_r2_mean:.4f}")
+logger.info(f"{'='*60}\n")
+
+# ===== STAGE 4: Save results =====
+save_file = save_files[0]  # Using first save file for debugging
+logger.info(f"Saving results to {save_file}")
+
+with open(save_file, 'wb') as f:
+    pickle.dump({
+        'cv_type': 'kfold',
+        'n_folds': n_folds,
+        'random_state': random_state,
+        'oof_predictions': oof_predictions,
+        'oof_ground_truth': oof_ground_truth,
+        'oof_r2': oof_r2,
+        'oof_mse': oof_mse,
+        'fold_results': fold_results,
+        'fold_train_r2_mean': fold_train_r2_mean,
+        'fold_train_r2_std': fold_train_r2_std,
+        'fold_test_r2_mean': fold_test_r2_mean,
+        'fold_test_r2_std': fold_test_r2_std,
+        # Metadata
+        'signal2analyze': signal2analyze,
+        'trial_outcome': trial_outcome,
+        'trial_nb': trial_nb,
+        'n_valid_trials': n_valid_trials,
+        'timepoints_per_trial': T,
+        'n_neurons': atoms.shape[1],
+        'sampling_rate': sampling_rate
+    }, f)
+
+logger.info(f"Completed processing {signal2analyze}\n")
+
+#%% Visualization of last fold
 fig, ax = plt.subplots(1,1, figsize=(12, 10), sharex=True)
 
-ax.plot(test_prediction.T[:232*3],'k')
-ax.plot(test_data['target_stack_smooth'].T[:232*3],'r')
+# Plot last fold's test results
+last_fold_idx = fold_results[-1]['fold_idx']
+last_test_idx = fold_results[-1]['test_idx']
+
+# Get predictions for last fold from OOF arrays
+last_fold_pred = oof_predictions[last_test_idx]
+last_fold_true = oof_ground_truth[last_test_idx]
+
+ax.plot(last_fold_pred.ravel(),'k', label='Prediction')
+ax.plot(last_fold_true.ravel(),'r', label='Ground Truth')
+ax.legend()
+ax.set_title(f'Fold {last_fold_idx+1} Test Set Predictions')
+ax.set_xlabel('Timepoints')
+ax.set_ylabel('Signal')
