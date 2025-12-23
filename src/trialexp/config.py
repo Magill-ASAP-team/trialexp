@@ -26,7 +26,7 @@ RAW_DATA_ROOT_DIR = os.environ.get('RAW_DATA_ROOT_DIR')
 ANATOMY_ROOT_DIR = os.environ.get('ANATOMY_ROOT_DIR')
 TEMP_DATA_PATH = os.environ.get('TEMP_DATA_PATH')
 
-session_id = 'RE018-2024-11-01-125303'
+session_id = 'RE018-2024-11-07-130122'
 search_results = list(Path(SESSION_ROOT_DIR).glob(f'*/by_sessions/*/{session_id}'))
 if len(search_results)>0:
     debug_folder = search_results[0]

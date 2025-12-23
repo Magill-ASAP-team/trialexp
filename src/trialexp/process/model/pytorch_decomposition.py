@@ -1,3 +1,4 @@
+#this is a test
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +10,7 @@ import torch.nn.functional as F
 import mlflow
 import mlflow.pytorch
 from sklearn.preprocessing import normalize
+from sklearn.decomposition import sparse_encode
 from torch.utils.data import Dataset, DataLoader
 from scipy.signal import savgol_filter
 from loguru import logger
@@ -1542,6 +1544,135 @@ def sparse_encode_pytorch_with_shift(
     return code_final, info, reconstruction_final, model
 
 
+def sparse_encode_sklearn_baseline(
+    target: np.ndarray,
+    dictionary: np.ndarray,
+    code = None,
+    sparsity_weight: float = 0.001,
+    algorithm: str = 'lasso_lars',
+    verbose: bool = True,
+) -> Tuple[np.ndarray, dict, np.ndarray, None]:
+    """
+    Simplified baseline sparse encoding using sklearn's sparse_encode.
+
+    This function provides a simple baseline for comparison with the PyTorch version,
+    using standard sklearn sparse coding without time shifts or activation learning.
+
+    Parameters:
+    -----------
+    target : np.ndarray
+        Target signal to decompose, shape (1, n_features) or (n_features,)
+    dictionary : np.ndarray
+        Dictionary of atoms (neural patterns), shape (n_components, n_features)
+    sparsity_weight : float
+        Regularization weight for sparsity (alpha parameter in sklearn)
+        Default: 0.001
+    algorithm : str
+        Algorithm to use for sparse coding:
+        - 'lasso_lars': LARS algorithm (fast, default)
+        - 'lasso_cd': Coordinate descent (good for large datasets)
+        - 'lars': Least angle regression (no L1 penalty)
+        - 'threshold': Simple thresholding
+        - 'omp': Orthogonal matching pursuit
+        Default: 'lasso_lars'
+    verbose : bool
+        Whether to print progress information
+        Default: True
+
+    Returns:
+    --------
+    code : np.ndarray
+        Sparse code, shape (1, n_components)
+    info : dict
+        Dictionary containing:
+        - 'reconstruction_loss': MSE reconstruction loss
+        - 'total_loss': Total loss (reconstruction + sparsity penalty)
+        - 'n_nonzero': Number of non-zero coefficients (threshold > 0.01)
+        - 'variance_explained': R² = 1 - MSE/var(target)
+    reconstruction : np.ndarray
+        Reconstructed signal, shape (1, n_features)
+    activation_module : None
+        Returns None (no activation module in baseline)
+
+    Notes:
+    ------
+    - This is a simple baseline without time shifts or learnable activations
+    - Uses the same dictionary and target format as sparse_encode_pytorch_with_shift
+    - Returns the same output structure for easy comparison
+    - Much faster than PyTorch version but less flexible
+    """
+
+    if verbose:
+        print(f"{'='*60}")
+        print(f"Sklearn Baseline Sparse Encoding")
+        print(f"{'='*60}")
+        print(f"Target shape: {target.shape}")
+        print(f"Dictionary shape: {dictionary.shape}")
+        print(f"Sparsity weight (alpha): {sparsity_weight}")
+        print(f"Algorithm: {algorithm}")
+
+    # Reshape target if needed
+    if target.ndim == 1:
+        target = target.reshape(1, -1)
+
+    # sklearn sparse_encode expects:
+    # - X: data matrix (n_samples, n_features)
+    # - dictionary: (n_components, n_features) - already in correct format
+    # - alpha: regularization parameter (our sparsity_weight)
+
+    # Perform sparse encoding
+    # only do the training again is code is not provided
+    # otherwise just do the reconstruction
+    if code is None:
+        code = sparse_encode(
+            X=target,
+            dictionary=dictionary,
+            algorithm=algorithm,
+            alpha=sparsity_weight,
+            n_jobs=1,
+            check_input=True,
+            verbose=0 if not verbose else 1
+        )
+
+    # Compute reconstruction
+    reconstruction = code @ dictionary
+
+    # Compute metrics
+    mse = np.mean((target - reconstruction) ** 2)
+    target_var = np.var(target)
+    variance_explained = 1.0 - (mse / target_var) if target_var > 0 else 0.0
+
+    # Count non-zero coefficients (using same threshold as PyTorch version)
+    n_nonzero = np.sum(np.abs(code) > 0.01)
+
+    # Compute total loss (reconstruction + L1 penalty)
+    l1_penalty = sparsity_weight * np.sum(np.abs(code))
+    total_loss = mse + l1_penalty
+
+    # Prepare info dictionary
+    info = {
+        'reconstruction_loss': float(mse),
+        'total_loss': float(total_loss),
+        'n_nonzero': int(n_nonzero),
+        'variance_explained': float(variance_explained),
+        'sparsity': float(n_nonzero / code.shape[1]),  # fraction of non-zero
+        'algorithm': algorithm,
+    }
+
+    if verbose:
+        print(f"\nResults:")
+        print(f"  Reconstruction loss (MSE): {mse:.6f}")
+        print(f"  Variance explained (R²): {variance_explained:.4f}")
+        print(f"  Non-zero coefficients: {n_nonzero}/{code.shape[1]} ({100*n_nonzero/code.shape[1]:.1f}%)")
+        print(f"  L1 penalty: {l1_penalty:.6f}")
+        print(f"  Total loss: {total_loss:.6f}")
+        print(f"  Code range: [{code.min():.4f}, {code.max():.4f}]")
+        print(f"  Code mean: {code.mean():.4f} ± {code.std():.4f}")
+        print(f"{'='*60}")
+
+    return code, info, reconstruction, None
+
+
 # Example usage and test function
 def test_sparse_encode():
     """Test function to demonstrate usage."""
@@ -2237,6 +2368,11 @@ class SparseCodingWithShifts(nn.Module):
         return params
 
 
+def normal_twoend(x):
+    """Normalize data to range [-1, 1]"""
+    x = 2 * (x - x.min()) / (x.max() - x.min()) - 1  # normalize to [-1, 1]
+    return x
+    
 def prepare_data_for_encoding(xr_session, signal2analyze, shuffle_trials=False):
     """
     Prepare atoms and target data for sparse encoding.
@@ -2279,19 +2415,16 @@ def prepare_data_for_encoding(xr_session, signal2analyze, shuffle_trials=False):
     lick_rate = lick_rate[:, mask_idx]
     event_time = xr_session.time
     cluID_atom = xr_session.cluID.data
+    
+    # smoothing
+    atoms_smooth = savgol_filter(atoms, 21,2, axis=0)
+    target_smooth = savgol_filter(target, 21,2, axis=0)
 
-    # Prepare atoms stack
-    atoms_stack = atoms.transpose([1, 2, 0])
-    atoms_stack = atoms_stack.reshape(atoms_stack.shape[0], -1)
 
-    def normal_twoend(x):
-        x = 2 * (x - x.min()) / (x.max() - x.min()) - 1  # normalize to [-1, 1]
-        return x
+    # Concentate trials together
+    atoms_stack = atoms_smooth.transpose([1, 2, 0])
+    atoms_stack = atoms_stack.reshape(atoms_stack.shape[0], -1) # concatenate trials together
 
-    # Add intercept baseline
-    baseline_atom = -np.ones((1, atoms_stack.shape[1]))
-    dict_atoms = np.vstack([atoms_stack, baseline_atom])
-    dict_atoms = normalize(dict_atoms, axis=1)
 
     # shuffling if required
     if shuffle_trials:
@@ -2300,20 +2433,33 @@ def prepare_data_for_encoding(xr_session, signal2analyze, shuffle_trials=False):
         shuffled_trial_indices = np.random.permutation(n_trials)
         target = target[:, shuffled_trial_indices]  
 
-    target_stack = target.T.reshape(1, -1)
-    target_stack = normal_twoend(target_stack)
-
-    # Smoothing
-    target_stack_smooth = savgol_filter(target_stack.ravel(), 21, 2).reshape(1, -1)
+    target_stack_smooth = target_smooth.T.reshape(1, -1)
     target_stack_smooth = normal_twoend(target_stack_smooth)
-    dict_atoms_smooth = savgol_filter(dict_atoms, 21, 2).reshape(dict_atoms.shape[0], -1)
+        
+    # Add intercept baseline
+    atoms_stack_norm = normalize(atoms_stack, axis=1)
+    baseline_atom = -np.ones((1, atoms_stack_norm.shape[1]))
+    dict_atoms_smooth = np.vstack([atoms_stack_norm, baseline_atom])
+    
+    # Reshape dict_atoms_smooth back to time x cluID x trial
+    n_cluID = atoms.shape[1]
+    n_trials = atoms.shape[2]
+    n_timepoints = atoms.shape[0]
+    # Keep all atoms including baseline (last row) before reshaping
+    # Note: n_cluID + 1 accounts for the baseline atom
+    atoms_norm_smooth = atoms_stack_norm.reshape(n_cluID, n_trials, n_timepoints).transpose([2, 0, 1])
 
+    # Reshape target_stack_smooth back to time x trial
+    target_norm_smooth = target_stack_smooth.reshape(n_trials, n_timepoints).T
     return {
-        'dict_atoms_smooth': dict_atoms_smooth,
+        'dict_atoms_smooth': dict_atoms_smooth, #all the trials already concatenate together
         'target_stack_smooth': target_stack_smooth,
-        'target_stack': target_stack,
         'atoms': atoms,
         'target': target,
+        'atoms_smooth': atoms_smooth,
+        'atoms_stack': atoms_stack,
+        'atoms_norm_smooth': atoms_norm_smooth,  # time x cluID x trial
+        'target_norm_smooth': target_norm_smooth,  # time x trial
         'mask_idx': mask_idx,
         'event_time': event_time,
         'cluID_atom': cluID_atom,
@@ -2359,33 +2505,20 @@ def prepare_fold_from_atoms_target(
     atoms_subset = atoms[:, :, trial_indices]  # (time × cluID × n_fold_trials)
     target_subset = target[:, trial_indices]  # (time × n_fold_trials)
 
-    # Stack atoms (same as prepare_data_for_encoding lines 2284-2285)
+    # Stack atoms
     atoms_stack = atoms_subset.transpose([1, 2, 0])  # (cluID × n_fold_trials × time)
     atoms_stack = atoms_stack.reshape(atoms_stack.shape[0], -1)  # (cluID × [time*n_fold_trials])
 
-    # Normalization function (same as line 2287-2289)
-    def normal_twoend(x):
-        x = 2 * (x - x.min()) / (x.max() - x.min()) - 1
-        return x
-
-    # Add baseline (same as lines 2292-2294)
+    # Need to add back the baseline
     baseline_atom = -np.ones((1, atoms_stack.shape[1]))
     dict_atoms = np.vstack([atoms_stack, baseline_atom])
-    dict_atoms = normalize(dict_atoms, axis=1)  # sklearn normalize
 
     # Stack and normalize target (same as lines 2303-2304)
     target_stack = target_subset.T.reshape(1, -1)  # (1 × [time*n_fold_trials])
-    target_stack = normal_twoend(target_stack)
-
-    # Smoothing (same as lines 2307-2309)
-    target_stack_smooth = savgol_filter(target_stack.ravel(), 21, 2).reshape(1, -1)
-    target_stack_smooth = normal_twoend(target_stack_smooth)
-    dict_atoms_smooth = savgol_filter(dict_atoms, 21, 2).reshape(dict_atoms.shape[0], -1)
 
     return {
-        'dict_atoms_smooth': dict_atoms_smooth,
-        'target_stack_smooth': target_stack_smooth,
-        'target_stack': target_stack,
+        'dict_atoms_smooth': dict_atoms,
+        'target_stack_smooth': target_stack,
         'n_trials': len(trial_indices)
     }
 

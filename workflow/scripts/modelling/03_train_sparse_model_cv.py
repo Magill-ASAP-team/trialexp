@@ -59,12 +59,12 @@ xr_session = xr_all_filtered
 xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan'))
 
 save_files = [soutput.ach_model, soutput.da_model]
-signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
+# signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
+signal2analyze_list = ['zscored_df_over_f_analog_2']
 
 # CV configuration
-n_folds = 5
+n_folds = 2
 random_state = 42
-
 #%%
 for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     logger.info(f"\n{'='*80}")
@@ -76,8 +76,8 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     full_data = decomp.prepare_data_for_encoding(xr_session, signal2analyze)
 
     # Extract arrays (already filtered)
-    atoms = full_data['atoms']  # (time × cluID × n_valid_trials)
-    target = full_data['target']  # (time × n_valid_trials)
+    atoms = full_data['atoms_norm_smooth']  # (time × cluID × n_valid_trials)
+    target = full_data['target_norm_smooth']  # (time × n_valid_trials)
     lick_rate = full_data['lick_rate']
     trial_outcome = full_data['trial_outcome']
     trial_nb = full_data['trial_nb']
@@ -125,10 +125,10 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
                 max_shift_ms=[-200, 200],
                 init_shift_ms=init_shifts,
                 sampling_rate=sampling_rate,
-                n_iterations=1,
+                n_iterations=10,
                 sparsity_weight=1e-3,
-                n_steps_code=500,
-                n_steps_shift=100,
+                n_steps_code=5000,
+                n_steps_shift=1000,
                 sparsity_type='elastic_net',
                 max_lr_shift=0.1,
                 device='cuda',
@@ -174,6 +174,7 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             test_prediction = model_test().cpu().numpy()
 
             # Calculate test R²
+            
             test_mse = np.mean((test_prediction - test_data['target_stack_smooth']) ** 2)
             test_var = np.var(test_data['target_stack_smooth'])
             test_r2 = 1 - (test_mse / test_var)
@@ -269,3 +270,116 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     logger.info(f"Completed processing {signal2analyze}\n")
 
 logger.info("All signals processed successfully!")
+
+#%%
+
+   
+logger.info(f"\n{'-'*60}")
+logger.info(f"Fold {fold_idx+1}/{n_folds}")
+logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
+logger.info(f"{'-'*60}")
+
+# ===== Prepare train and test data from trial subsets =====
+train_data = decomp.prepare_fold_from_atoms_target(
+    atoms, target, train_idx, lick_rate
+)
+test_data = decomp.prepare_fold_from_atoms_target(
+    atoms, target, test_idx, lick_rate
+)
+
+# ===== Train model =====
+logger.info("Training model on train fold...")
+# init_shifts = np.random.normal(25, 1, train_data['dict_atoms_smooth'].shape[0])
+init_shifts = np.random.normal(25, 1, train_data['dict_atoms_smooth'].shape[0])
+
+
+code_train, info_train, reconstruction_train, model_train = \
+    decomp.sparse_encode_pytorch_with_shift(
+        target=train_data['target_stack_smooth'],
+        dictionary=train_data['dict_atoms_smooth'],
+        max_shift_ms=[-50, 50],
+        init_shift_ms=init_shifts,
+        sampling_rate=sampling_rate,
+        n_iterations=10,
+        sparsity_weight=1e-3,
+        n_steps_code=5000,
+        n_steps_shift=1000,
+        sparsity_type='elastic_net',
+        max_lr_shift=0.1,
+        device='cuda',
+        shift_print_step=400,
+        code_print_step=1000,
+        early_stop_patience=100,
+        use_mlflow=False
+    )
+
+train_r2 = info_train['variance_explained']
+logger.info(f"Train R²: {train_r2:.4f}")
+
+#%% test
+test_data = decomp.prepare_fold_from_atoms_target(
+        atoms, target, test_idx, lick_rate
+    )
+# ===== Predict on test fold =====
+logger.info("Predicting on test fold...")
+with torch.no_grad():
+    model_train.eval()
+
+    # Apply learned model to test dictionary
+    test_dict_tensor = torch.FloatTensor(test_data['dict_atoms_smooth']).to('cuda')
+
+    # Create new FourierShiftDictionary for test data
+    test_shift_dict = decomp.FourierShiftDictionary(
+        dictionary=test_dict_tensor,
+        max_shift_ms=[-200, 200],
+        sampling_rate=sampling_rate
+    ).to('cuda')
+
+    # Copy learned shifts
+    test_shift_dict.shift_logits.data = model_train.shift_dictionary.shift_logits.data
+
+    # Create test model
+    model_test = decomp.SparseCodingWithShifts(
+        shift_dictionary=test_shift_dict,
+        n_neurons=test_dict_tensor.shape[0],
+        activation_type='global'  # Match training
+    ).to('cuda')
+
+    # Copy learned code and activation
+    model_test.code.data = model_train.code.data
+    model_test.act.load_state_dict(model_train.act.state_dict())
+
+    # Forward pass
+    test_prediction = model_test().cpu().numpy()
+
+    # Calculate test R²
+    
+    test_mse = np.mean((test_prediction - test_data['target_stack_smooth']) ** 2)
+    test_var = np.var(test_data['target_stack_smooth'])
+    test_r2 = 1 - (test_mse / test_var)
+
+logger.info(f"Test R²: {test_r2:.4f}")
+logger.info(f"Train-Test gap: {train_r2 - test_r2:.4f}")
+
+# ===== Store OOF predictions =====
+# Reshape predictions back to (n_test_trials × T)
+n_test_trials = len(test_idx)
+
+test_pred_trials = test_prediction.reshape(n_test_trials, T)
+test_true_trials = test_data['target_stack_smooth'].reshape(n_test_trials, T)
+
+# Store in OOF arrays (using original trial indices)
+for i, orig_idx in enumerate(test_idx):
+    oof_predictions[orig_idx] = test_pred_trials[i]
+    oof_ground_truth[orig_idx] = test_true_trials[i]
+
+# Store fold metadata
+fold_results.append({
+    'fold_idx': fold_idx,
+    'train_idx': train_idx,
+    'test_idx': test_idx,
+    'train_r2': train_r2,
+    'test_r2': test_r2,
+    'shifts_ms': info_train['shifts_ms'],
+    'model_state_dict': model_train.state_dict()
+})
