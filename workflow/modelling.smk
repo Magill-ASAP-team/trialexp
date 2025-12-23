@@ -41,9 +41,9 @@ rule train_sparse_model:
 rule shuffle_sparse_model:
     input:
         xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
-        xr_photom_timewarped = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc', 
+        xr_photom_timewarped = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc',
     log:
-        '{sessions}/{task_path}/{session_id}/processed/log/train_sparse_model.log'  
+        '{sessions}/{task_path}/{session_id}/processed/log/train_sparse_model.log'
     output:
         ach_model = '{sessions}/{task_path}/{session_id}/processed/ach_sparse_encode_shuffle.pkl',
         da_model = '{sessions}/{task_path}/{session_id}/processed/da_sparse_encode_shuffle.pkl',
@@ -51,6 +51,21 @@ rule shuffle_sparse_model:
     threads: 32
     script:
         "scripts/modelling/02_sparse_model_shuffle.py"
+
+rule train_sparse_model_cv:
+    input:
+        xr_timewarpped = '{sessions}/{task_path}/{session_id}/processed/xr_spikes_timewarped.nc',
+        xr_photom_timewarped = '{sessions}/{task_path}/{session_id}/processed/xr_photom_timewarped.nc',
+    log:
+        '{sessions}/{task_path}/{session_id}/processed/log/train_sparse_model_cv.log'
+    output:
+        ach_model = '{sessions}/{task_path}/{session_id}/processed/ach_sparse_encode_cv.pkl',
+        da_model = '{sessions}/{task_path}/{session_id}/processed/da_sparse_encode_cv.pkl',
+        figures_dir = directory('{sessions}/{task_path}/{session_id}/processed/figures/modelling_cv'),
+        done = touch('{sessions}/{task_path}/{session_id}/processed/modelling_cv.done')
+    threads: 32
+    script:
+        "scripts/modelling/03_train_sparse_model_cv.py"
 
 rule modelling_workflow_final:
     input:

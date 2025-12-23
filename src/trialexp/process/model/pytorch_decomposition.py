@@ -2323,6 +2323,73 @@ def prepare_data_for_encoding(xr_session, signal2analyze, shuffle_trials=False):
     }
 
 
+def prepare_fold_from_atoms_target(
+    atoms: np.ndarray,
+    target: np.ndarray,
+    trial_indices: np.ndarray,
+    lick_rate: np.ndarray = None
+) -> dict:
+    """
+    Prepare stacked and normalized data for a subset of trials (for cross-validation).
+
+    This function replicates the core logic of prepare_data_for_encoding() but works on
+    already-filtered trial subsets. Used for creating train/test splits in CV.
+
+    Parameters
+    ----------
+    atoms : np.ndarray
+        Neural data, shape (time × cluID × n_trials) - already filtered for NaN
+    target : np.ndarray
+        Photometry data, shape (time × n_trials) - already filtered for NaN
+    trial_indices : np.ndarray
+        Indices of trials to include in this fold
+    lick_rate : np.ndarray, optional
+        Lick rate data, shape (time × n_trials)
+
+    Returns
+    -------
+    dict
+        Dictionary with keys:
+        - dict_atoms_smooth: smoothed dictionary atoms, shape (n_atoms × time*n_fold_trials)
+        - target_stack_smooth: smoothed target, shape (1 × time*n_fold_trials)
+        - target_stack: raw target stack, shape (1 × time*n_fold_trials)
+        - n_trials: number of trials in this fold
+    """
+    # Subset trials
+    atoms_subset = atoms[:, :, trial_indices]  # (time × cluID × n_fold_trials)
+    target_subset = target[:, trial_indices]  # (time × n_fold_trials)
+
+    # Stack atoms (same as prepare_data_for_encoding lines 2284-2285)
+    atoms_stack = atoms_subset.transpose([1, 2, 0])  # (cluID × n_fold_trials × time)
+    atoms_stack = atoms_stack.reshape(atoms_stack.shape[0], -1)  # (cluID × [time*n_fold_trials])
+
+    # Normalization function (same as line 2287-2289)
+    def normal_twoend(x):
+        x = 2 * (x - x.min()) / (x.max() - x.min()) - 1
+        return x
+
+    # Add baseline (same as lines 2292-2294)
+    baseline_atom = -np.ones((1, atoms_stack.shape[1]))
+    dict_atoms = np.vstack([atoms_stack, baseline_atom])
+    dict_atoms = normalize(dict_atoms, axis=1)  # sklearn normalize
+
+    # Stack and normalize target (same as lines 2303-2304)
+    target_stack = target_subset.T.reshape(1, -1)  # (1 × [time*n_fold_trials])
+    target_stack = normal_twoend(target_stack)
+
+    # Smoothing (same as lines 2307-2309)
+    target_stack_smooth = savgol_filter(target_stack.ravel(), 21, 2).reshape(1, -1)
+    target_stack_smooth = normal_twoend(target_stack_smooth)
+    dict_atoms_smooth = savgol_filter(dict_atoms, 21, 2).reshape(dict_atoms.shape[0], -1)
+
+    return {
+        'dict_atoms_smooth': dict_atoms_smooth,
+        'target_stack_smooth': target_stack_smooth,
+        'target_stack': target_stack,
+        'n_trials': len(trial_indices)
+    }
+
+
 def plot_reconstruction_comparison(target_stack_smooth, reconstruction, time_range=(100, 150), sampling_rate=50):
     """
     Plot comparison between target signal and reconstruction.
