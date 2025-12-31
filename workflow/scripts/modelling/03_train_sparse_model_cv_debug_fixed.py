@@ -7,7 +7,7 @@ from scipy.signal import savgol_filter
 from scipy.signal import butter, filtfilt
 import trialexp.process.ephys.utils as ephys_utils
 from sklearn.preprocessing import normalize
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import train_test_split
 import torch
 import pickle
 import trialexp.process.model.pytorch_decomposition as decomp
@@ -63,17 +63,18 @@ save_files = [soutput.ach_model, soutput.da_model]
 # signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
 signal2analyze_list = ['zscored_df_over_f_analog_2']
 
-# CV configuration
-n_folds = 2
+# Train-Val-Test split configuration (8:1:1)
 random_state = 42
-val_split = 0.2  # Validation split ratio (20% of training data)
+train_ratio = 0.8
+val_ratio = 0.1
+test_ratio = 0.1
 val_early_stop_patience = 3  # Early stopping patience
 
 #%%
 signal2analyze = signal2analyze_list[0]
 
 logger.info(f"\n{'='*80}")
-logger.info(f"Processing {signal2analyze} with {n_folds}-fold cross-validation (DEBUG: single fold)")
+logger.info(f"Processing {signal2analyze} with train-val-test split ({int(train_ratio*100)}:{int(val_ratio*100)}:{int(test_ratio*100)})")
 logger.info(f"{'='*80}\n")
 
 # ===== STAGE 1: Prepare full dataset (filters NaN trials internally) =====
@@ -97,29 +98,33 @@ logger.info(f"Number of neurons (including baseline): {atoms.shape[1]}")
 # Transpose to model input format: (n_neurons+1, time, n_trials)
 dict_atoms = atoms.transpose([1, 0, 2])
 
-# Initialize CV splitter
-kfold = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+# ===== STAGE 2: Split data into train/val/test (8:1:1) =====
+logger.info(f"\nStage 2: Splitting data into train/val/test ({int(train_ratio*100)}:{int(val_ratio*100)}:{int(test_ratio*100)})...")
 
-# ===== STAGE 2: Run FIRST FOLD ONLY (for debugging) =====
-logger.info(f"\nStage 2: Running first fold only (debugging mode)...")
+# Create indices for all trials
+all_indices = np.arange(n_valid_trials)
 
-# Get first fold
-fold_idx = 0  # FIX: Define fold_idx
-(train_idx, test_idx) = list(kfold.split(np.arange(n_valid_trials)))[fold_idx]
-
-logger.info(f"\n{'-'*60}")
-logger.info(f"Fold {fold_idx+1}/{n_folds}")
-logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
-logger.info(f"{'-'*60}")
-
-# ===== Further split train into train/validation =====
-train_inner_idx, val_idx = train_test_split(
-    train_idx,
-    test_size=val_split,
-    random_state=random_state
+# First split: separate test set (10%)
+train_val_idx, test_idx = train_test_split(
+    all_indices,
+    test_size=test_ratio,
+    random_state=random_state,
+    shuffle=True
 )
 
-logger.info(f"Split training fold: {len(train_inner_idx)} train, {len(val_idx)} validation")
+# Second split: separate validation from training (1/9 of remaining = 10% of total)
+# val_ratio / (train_ratio + val_ratio) = 0.1 / 0.9 = 0.111...
+train_inner_idx, val_idx = train_test_split(
+    train_val_idx,
+    test_size=val_ratio / (train_ratio + val_ratio),
+    random_state=random_state,
+    shuffle=True
+)
+
+logger.info(f"\n{'-'*60}")
+logger.info(f"Data split: {len(train_inner_idx)} train, {len(val_idx)} val, {len(test_idx)} test")
+logger.info(f"Proportions: {len(train_inner_idx)/n_valid_trials:.1%} train, {len(val_idx)/n_valid_trials:.1%} val, {len(test_idx)/n_valid_trials:.1%} test")
+logger.info(f"{'-'*60}")
 
 # ===== Prepare train, validation, and test data (SIMPLE INDEXING - no concatenation!) =====
 dict_train = dict_atoms[:, :, train_inner_idx]  # (n_neurons+1, time, n_train)
@@ -192,7 +197,7 @@ test_results = decomp.evaluate_sparse_model_on_test_data(
     dict_test=dict_test,
     target_test=target_test,
     sampling_rate=sampling_rate,
-    max_shift_ms=[-200, 200],
+    max_shift_ms=[-100, 100],
     device='cuda'
 )
 
@@ -244,41 +249,94 @@ del model_train, model_test
 torch.cuda.empty_cache()
 
 #%% Visualization
-fig, ax = plt.subplots(1, 1, figsize=(15, 5))
+fig, axes = plt.subplots(2, 1, figsize=(15, 10))
 
-# Plot first 2000 timepoints
+# Number of timepoints to plot (use all data or limit to 2000)
+n_plot_test = min(2000, reconstruction_test.size)
+n_plot_train = min(2000, reconstruction_train.size)
+
+# ===== Top panel: Test Set =====
+ax = axes[0]
 # IMPORTANT: ravel in column-major (Fortran) order to match (trials, time) concatenation order
 # reconstruction_test is (time, trials), we need to flatten as [trial0_t0, trial0_t1, ..., trial1_t0, ...]
-n_plot = min(2000, reconstruction_test.size)
-ax.plot(reconstruction_test.T.ravel()[:n_plot], 'r', label='Prediction', alpha=0.7, linewidth=1)
-ax.plot(target_test.T.ravel()[:n_plot], 'k', label='Ground Truth', alpha=0.5, linewidth=1)
-ax.legend()
-ax.set_title(f'Test Set Predictions (R² = {test_r2:.4f})')
-ax.set_xlabel('Timepoints')
-ax.set_ylabel('Signal')
+ax.plot(reconstruction_test.T.ravel()[:n_plot_test], 'r', label='Prediction', alpha=0.7, linewidth=1)
+ax.plot(target_test.T.ravel()[:n_plot_test], 'k', label='Ground Truth', alpha=0.5, linewidth=1)
+ax.legend(loc='upper right', framealpha=0.9)
+ax.set_title(f'Test Set Predictions (R² = {test_r2:.4f}, n={len(test_idx)} trials)', fontsize=12, fontweight='bold')
+ax.set_xlabel('Timepoints', fontsize=10)
+ax.set_ylabel('Normalized Signal', fontsize=10)
 ax.grid(True, alpha=0.3)
-ax.set_xlim([0, 1000])
+ax.set_xlim([0, min(1000, n_plot_test)])
+
+# Add text box with statistics
+textstr = f'MSE: {test_mse:.4f}\nMean: {reconstruction_test.mean():.3f} ± {reconstruction_test.std():.3f}'
+ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
+        verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+# ===== Bottom panel: Train Set =====
+ax = axes[1]
+ax.plot(reconstruction_train.T.ravel()[:n_plot_train], 'r', label='Prediction', alpha=0.7, linewidth=1)
+ax.plot(target_train.T.ravel()[:n_plot_train], 'k', label='Ground Truth', alpha=0.5, linewidth=1)
+ax.legend(loc='upper right', framealpha=0.9)
+ax.set_title(f'Train Set Predictions (R² = {train_r2:.4f}, n={len(train_inner_idx)} trials)', fontsize=12, fontweight='bold')
+ax.set_xlabel('Timepoints', fontsize=10)
+ax.set_ylabel('Normalized Signal', fontsize=10)
+ax.grid(True, alpha=0.3)
+ax.set_xlim([0, min(1000, n_plot_train)])
+
+# Add text box with statistics
+train_mse = info_train['reconstruction_loss']
+textstr = f'MSE: {train_mse:.4f}\nMean: {reconstruction_train.mean():.3f} ± {reconstruction_train.std():.3f}'
+ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
+        verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
 plt.tight_layout()
 
 # Save the figure
 output_path = '/home/MRC.OX.AC.UK/ndcn1330/code/trialexp/debug_prediction_plot.png'
 plt.savefig(output_path, dpi=150, bbox_inches='tight')
 logger.info(f"\nVisualization saved to: {output_path}")
+plt.close()
 
-# %%
-fig, ax = plt.subplots(1, 1, figsize=(15, 5))
+# ===== Additional visualization: Validation learning curves =====
+if info_train['val_r2_history']:
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-# Plot first 2000 timepoints
-# IMPORTANT: ravel in column-major (Fortran) order to match (trials, time) concatenation order
-# reconstruction_test is (time, trials), we need to flatten as [trial0_t0, trial0_t1, ..., trial1_t0, ...]
-n_plot = min(2000, reconstruction_test.size)
-ax.plot(reconstruction_train.T.ravel()[:n_plot], 'r', label='Prediction', alpha=0.7, linewidth=1)
-ax.plot(target_train.T.ravel()[:n_plot], 'k', label='Ground Truth', alpha=0.5, linewidth=1)
-ax.legend()
-ax.set_title(f'Train Set Predictions (R² = {test_r2:.4f})')
-ax.set_xlabel('Timepoints')
-ax.set_ylabel('Signal')
-ax.grid(True, alpha=0.3)
-ax.set_xlim([0, 1000])
-plt.tight_layout()
+    # Left panel: R² curves
+    ax = axes[0]
+    iterations = np.arange(1, len(info_train['train_r2_history']) + 1)
+    ax.plot(iterations, info_train['train_r2_history'], 'o-', label='Train R²', linewidth=2, markersize=6)
+    ax.plot(iterations, info_train['val_r2_history'], 's-', label='Validation R²', linewidth=2, markersize=6)
+
+    # Mark best validation iteration
+    best_iter = info_train['best_val_iteration'] + 1
+    best_val = info_train['best_val_metric']
+    ax.axvline(best_iter, color='gray', linestyle='--', alpha=0.5, label=f'Best Val (iter {best_iter})')
+    ax.plot(best_iter, best_val, 'r*', markersize=15, label=f'Best Val R²: {best_val:.4f}')
+
+    ax.set_xlabel('Iteration', fontsize=11)
+    ax.set_ylabel('R² Score', fontsize=11)
+    ax.set_title('Learning Curves: R² vs Iteration', fontsize=12, fontweight='bold')
+    ax.legend(loc='best', framealpha=0.9)
+    ax.grid(True, alpha=0.3)
+    ax.set_ylim([0, max(max(info_train['train_r2_history']), max(info_train['val_r2_history'])) * 1.1])
+
+    # Right panel: MSE curves
+    ax = axes[1]
+    ax.plot(iterations, info_train['val_mse_history'], 's-', label='Validation MSE', linewidth=2, markersize=6, color='C1')
+    ax.axvline(best_iter, color='gray', linestyle='--', alpha=0.5, label=f'Best Val (iter {best_iter})')
+
+    ax.set_xlabel('Iteration', fontsize=11)
+    ax.set_ylabel('MSE', fontsize=11)
+    ax.set_title('Validation MSE vs Iteration', fontsize=12, fontweight='bold')
+    ax.legend(loc='best', framealpha=0.9)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    # Save learning curves
+    output_path_curves = '/home/MRC.OX.AC.UK/ndcn1330/code/trialexp/debug_learning_curves.png'
+    plt.savefig(output_path_curves, dpi=150, bbox_inches='tight')
+    logger.info(f"Learning curves saved to: {output_path_curves}")
+    plt.close()
 # %%
