@@ -710,7 +710,13 @@ def sparse_encode_pytorch_with_shift(
     shift_print_step = 50,
     code_print_step = 1000,
     early_stop_patience: int = 20,
-    early_stop_threshold: float = 1e-7
+    early_stop_threshold: float = 1e-7,
+    validation_target: Optional[np.ndarray] = None,
+    validation_dictionary: Optional[np.ndarray] = None,
+    val_early_stop_patience: int = 3,
+    val_early_stop_metric: str = 'r2',
+    save_best_model: bool = True,
+    verbose_validation: bool = True
 ) -> Tuple[np.ndarray, dict, np.ndarray, nn.Module]:
     """
     PyTorch-based sparse encoding with learnable time shifts and activation.
@@ -797,6 +803,31 @@ def sparse_encode_pytorch_with_shift(
         Minimum absolute loss change to consider as improvement. If loss change is below
         this threshold for `early_stop_patience` consecutive steps, optimization stops early
         (default: 1e-7)
+    validation_target : np.ndarray, optional
+        Validation target signal, shape (1, n_features) or (n_features,).
+        If provided along with validation_dictionary, enables validation evaluation
+        after each iteration and early stopping based on validation performance.
+        Default: None (no validation)
+    validation_dictionary : np.ndarray, optional
+        Validation dictionary of atoms, shape (n_components, n_features).
+        Must have same n_components as training dictionary.
+        Default: None (no validation)
+    val_early_stop_patience : int
+        Number of iterations without validation metric improvement before stopping early.
+        Only used if validation data is provided.
+        Default: 3
+    val_early_stop_metric : str
+        Metric to use for validation early stopping: 'r2' (higher is better) or 'mse' (lower is better).
+        Only used if validation data is provided.
+        Default: 'r2'
+    save_best_model : bool
+        Whether to checkpoint and restore the best model based on validation metric.
+        Only used if validation data is provided.
+        Default: True
+    verbose_validation : bool
+        Whether to print validation metrics during training.
+        Only used if validation data is provided.
+        Default: True
 
     Returns:
     --------
@@ -813,8 +844,17 @@ def sparse_encode_pytorch_with_shift(
         - 'shifts_ms': Final learned time shifts in milliseconds
         - 'shifts_ms_history': List of shift values at each iteration
         - 'r2_history': List of variance explained values at each iteration
+        - 'train_r2_history': List of train R² values at each iteration
+        - 'val_r2_history': List of validation R² values at each iteration (empty if no validation)
+        - 'val_mse_history': List of validation MSE values at each iteration (empty if no validation)
+        - 'best_val_metric': Best validation metric value (None if no validation)
+        - 'best_val_iteration': Iteration index with best validation metric (None if no validation)
+        - 'val_early_stopped': Boolean indicating if training was stopped early due to validation
+        - 'n_iterations_completed': Number of iterations actually completed
     reconstruction : np.ndarray
         Reconstructed signal, shape (1, n_features)
+    model : nn.Module
+        Trained model (restored to best checkpoint if validation enabled and save_best_model=True)
     """
     # Handle device
     if device is None:
@@ -881,6 +921,41 @@ def sparse_encode_pytorch_with_shift(
     target_tensor = torch.FloatTensor(target).to(device)
     dictionary_tensor = torch.FloatTensor(dictionary).to(device)
 
+    # Convert validation data to tensors if provided
+    validation_target_tensor = None
+    validation_dictionary_tensor = None
+    has_validation = False
+
+    if validation_target is not None and validation_dictionary is not None:
+        has_validation = True
+
+        # Validate shapes
+        if validation_dictionary.shape[0] != dictionary.shape[0]:
+            raise ValueError(
+                f"Validation dictionary must have same number of components as training. "
+                f"Got {validation_dictionary.shape[0]}, expected {dictionary.shape[0]}"
+            )
+
+        # Warn if validation set is very small
+        val_size = validation_target.size if validation_target.ndim == 1 else validation_target.shape[1]
+        train_size = target.size if target.ndim == 1 else target.shape[1]
+        val_ratio = val_size / train_size
+
+        if val_ratio < 0.1 and verbose:
+            print(f"Warning: Validation set is small ({val_ratio*100:.1f}% of training size)")
+
+        # Reshape if needed
+        if validation_target.ndim == 1:
+            validation_target = validation_target.reshape(1, -1)
+
+        # Convert to tensors
+        validation_target_tensor = torch.FloatTensor(validation_target).to(device)
+        validation_dictionary_tensor = torch.FloatTensor(validation_dictionary).to(device)
+
+        if verbose:
+            print(f"Validation enabled: {validation_target.shape[1]} features")
+            print(f"Early stopping: patience={val_early_stop_patience}, metric={val_early_stop_metric}")
+
     # Initialize shift dictionary with Fourier phase shifts
     init_shift_tensor = None
     if init_shift_ms is not None:
@@ -911,8 +986,17 @@ def sparse_encode_pytorch_with_shift(
         'loss_shift': [],
         'loss_code': [],
         'shifts_ms_history': [],
-        'r2_history': []
+        'r2_history': [],
+        'train_r2_history': [],
+        'val_r2_history': [],
+        'val_mse_history': []
     }
+
+    # Early stopping tracking for validation
+    best_val_metric = -np.inf if val_early_stop_metric == 'r2' else np.inf
+    best_val_iteration = -1
+    val_no_improvement_count = 0
+    best_model_state = None
 
     # ----------------------------------------------------------------
     # Setup optimizers and schedulers (persistent across iterations)
@@ -968,6 +1052,59 @@ def sparse_encode_pytorch_with_shift(
         if verbose:
             print(f"Using CyclicLR for code optimizer: base_lr={_base_lr_code:.2e}, max_lr={_max_lr_code:.2e}, step_size_up={step_size_up_code}")
             print(f"Using CyclicLR for shift optimizer: base_lr={_base_lr_shift:.2e}, max_lr={_max_lr_shift:.2e}, step_size_up={step_size_up_shift}")
+
+    # Helper function for validation evaluation
+    def _evaluate_on_validation(
+        model_to_eval: nn.Module,
+        val_dictionary: torch.Tensor,
+        val_target: torch.Tensor
+    ) -> Tuple[float, float]:
+        """
+        Evaluate model on validation data.
+
+        Returns:
+            tuple: (validation_r2, validation_mse)
+        """
+        with torch.no_grad():
+            model_to_eval.eval()
+
+            # Create validation shift dictionary with same learned shifts
+            val_shift_dict = FourierShiftDictionary(
+                dictionary=val_dictionary,
+                max_shift_ms=max_shift_ms,
+                sampling_rate=sampling_rate
+            ).to(device)
+
+            # Copy learned shift parameters
+            val_shift_dict.shift_logits.data = model_to_eval.shift_dictionary.shift_logits.data.clone()
+
+            # Create validation model
+            val_model = SparseCodingWithShifts(
+                shift_dictionary=val_shift_dict,
+                n_neurons=val_dictionary.shape[0],
+                activation_type=activation_type
+            ).to(device)
+
+            # Copy learned code and activation parameters
+            val_model.code.data = model_to_eval.code.data.clone()
+
+            if activation_type == 'global' or activation_type == 'legacy':
+                val_model.act.load_state_dict(model_to_eval.act.state_dict())
+            elif activation_type == 'per_neuron':
+                for i, act in enumerate(model_to_eval.activations):
+                    val_model.activations[i].load_state_dict(act.state_dict())
+
+            # Forward pass
+            val_reconstruction = val_model()
+
+            # Compute metrics
+            val_mse = F.mse_loss(val_reconstruction, val_target).item()
+            val_var = val_target.var(unbiased=False).item()
+            val_r2 = 1 - (val_mse / val_var) if val_var > 0 else 0.0
+
+            model_to_eval.train()  # Restore training mode
+
+            return val_r2, val_mse
 
     # Iterative optimization
     for iter_idx in range(n_iterations):
@@ -1125,11 +1262,89 @@ def sparse_encode_pytorch_with_shift(
             history['shifts_ms_history'].append(shifts_ms)
             history['r2_history'].append(variance_explained.item())
 
+            # Add train R² tracking
+            train_r2 = variance_explained.item()
+            history['train_r2_history'].append(train_r2)
+
             if verbose:
                 n_nonzero = get_nonzero(model.code)
-                print(f"  Variance Explained = {variance_explained.item():.4f}")
+                print(f"  Train R² = {train_r2:.4f}")
                 print(f"  Mean shift: {shifts_ms.mean():.1f} ms (std: {shifts_ms.std():.1f} ms)")
                 print(f"  Non-zero coefficients: {n_nonzero}/{dictionary.shape[0]}")
+
+            # Validation evaluation
+            if has_validation:
+                val_r2, val_mse = _evaluate_on_validation(
+                    model_to_eval=model,
+                    val_dictionary=validation_dictionary_tensor,
+                    val_target=validation_target_tensor
+                )
+
+                history['val_r2_history'].append(val_r2)
+                history['val_mse_history'].append(val_mse)
+
+                if verbose_validation:
+                    print(f"  Val R² = {val_r2:.4f}, Val MSE = {val_mse:.6f}")
+                    print(f"  Train-Val gap = {train_r2 - val_r2:.4f}")
+
+                # Log validation metrics to MLflow
+                if use_mlflow:
+                    mlflow.log_metrics({
+                        'train_r2': train_r2,
+                        'val_r2': val_r2,
+                        'val_mse': val_mse,
+                        'train_val_gap': train_r2 - val_r2
+                    }, step=iter_idx)
+
+                # Early stopping and checkpointing logic
+                current_val_metric = val_r2 if val_early_stop_metric == 'r2' else val_mse
+                is_improvement = False
+
+                if val_early_stop_metric == 'r2':
+                    # Higher is better
+                    if current_val_metric > best_val_metric + 1e-6:  # Small epsilon for numerical stability
+                        is_improvement = True
+                else:  # 'mse'
+                    # Lower is better
+                    if current_val_metric < best_val_metric - 1e-6:
+                        is_improvement = True
+
+                if is_improvement:
+                    best_val_metric = current_val_metric
+                    best_val_iteration = iter_idx
+                    val_no_improvement_count = 0
+
+                    # Save best model state
+                    if save_best_model:
+                        import copy
+                        best_model_state = copy.deepcopy(model.state_dict())
+
+                    if verbose_validation:
+                        metric_name = 'R²' if val_early_stop_metric == 'r2' else 'MSE'
+                        print(f"  ✓ New best validation {metric_name}: {current_val_metric:.4f}")
+                else:
+                    val_no_improvement_count += 1
+
+                    if verbose_validation and val_no_improvement_count > 0:
+                        print(f"  No improvement for {val_no_improvement_count}/{val_early_stop_patience} iterations")
+
+                # Check early stopping
+                if val_no_improvement_count >= val_early_stop_patience:
+                    if verbose:
+                        metric_name = 'R²' if val_early_stop_metric == 'r2' else 'MSE'
+                        print(f"\n{'='*60}")
+                        print(f"Early stopping triggered!")
+                        print(f"No improvement in validation {metric_name} for {val_early_stop_patience} iterations")
+                        print(f"Best validation {metric_name}: {best_val_metric:.4f} at iteration {best_val_iteration+1}")
+                        print(f"{'='*60}\n")
+                    break  # Exit iteration loop
+
+    # Restore best model if validation was used and checkpointing enabled
+    if has_validation and save_best_model and best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        if verbose:
+            metric_name = 'R²' if val_early_stop_metric == 'r2' else 'MSE'
+            print(f"\nRestored model from iteration {best_val_iteration+1} (best validation {metric_name}: {best_val_metric:.4f})")
 
     # Get final results
     with torch.no_grad():
@@ -1157,7 +1372,15 @@ def sparse_encode_pytorch_with_shift(
         'activation_params': model.get_activation_params(),
         'shifts_ms': shifts_ms_final,
         'shifts_ms_history': history['shifts_ms_history'],
-        'r2_history': history['r2_history']
+        'r2_history': history['r2_history'],
+        # Add validation info
+        'train_r2_history': history['train_r2_history'],
+        'val_r2_history': history['val_r2_history'] if has_validation else [],
+        'val_mse_history': history['val_mse_history'] if has_validation else [],
+        'best_val_metric': best_val_metric if has_validation else None,
+        'best_val_iteration': best_val_iteration if has_validation else None,
+        'val_early_stopped': (has_validation and val_no_improvement_count >= val_early_stop_patience),
+        'n_iterations_completed': len(history['r2_history'])
     }
 
     # Final MLflow logging
@@ -1165,7 +1388,7 @@ def sparse_encode_pytorch_with_shift(
         try:
             # Log final metrics
             final_variance_explained = 1 - (reconstruction_loss_final / np.var(target))
-            mlflow.log_metrics({
+            mlflow_metrics = {
                 'final_reconstruction_loss': reconstruction_loss_final,
                 'final_total_loss': history['loss_code'][-1],
                 'final_n_nonzero': int(n_nonzero),
@@ -1173,7 +1396,20 @@ def sparse_encode_pytorch_with_shift(
                 'final_variance_explained': float(final_variance_explained),
                 'final_mean_shift_ms': float(shifts_ms_final.mean()),
                 'final_std_shift_ms': float(shifts_ms_final.std())
-            })
+            }
+
+            # Add validation metrics
+            if has_validation:
+                mlflow_metrics.update({
+                    'final_train_r2': history['train_r2_history'][-1],
+                    'final_val_r2': history['val_r2_history'][-1] if history['val_r2_history'] else None,
+                    'best_val_metric': best_val_metric,
+                    'best_val_iteration': best_val_iteration + 1,
+                    'val_early_stopped': info['val_early_stopped'],
+                    'n_iterations_completed': info['n_iterations_completed']
+                })
+
+            mlflow.log_metrics(mlflow_metrics)
 
             # Log the model
             mlflow.pytorch.log_model(model, "model")
@@ -1229,6 +1465,12 @@ def sparse_encode_pytorch_with_shift_trials(
         - n_steps_shift: Steps for shift optimization (default: 100)
         - device: 'cpu' or 'cuda' (default: auto-detect)
         - verbose: Print progress (default: True)
+        - validation_target: Validation target, shape (time, n_trials_val) (default: None)
+        - validation_dictionary: Validation dictionary, shape (n_neurons, time, n_trials_val) (default: None)
+        - val_early_stop_patience: Early stopping patience for validation (default: 3)
+        - val_early_stop_metric: Metric for early stopping: 'r2' or 'mse' (default: 'r2')
+        - save_best_model: Whether to restore best model (default: True)
+        - verbose_validation: Print validation metrics (default: True)
 
     Returns
     -------
@@ -1292,6 +1534,25 @@ def sparse_encode_pytorch_with_shift_trials(
 
     # Target: (time, trials) → (trials, time) → (1, trials*time)
     target_flat = target.T.reshape(1, n_trials * n_timepoints)  # (1, trials*time)
+
+    # ===== HANDLE VALIDATION DATA IF PROVIDED =====
+    # Check if validation data was passed and flatten it as well
+    if 'validation_target' in kwargs and kwargs['validation_target'] is not None:
+        val_target = kwargs['validation_target']
+        val_dictionary = kwargs['validation_dictionary']
+
+        # Extract validation dimensions
+        n_neurons_val, n_timepoints_val, n_trials_val = val_dictionary.shape
+
+        # Flatten validation data (same process as training)
+        val_dict_flat = val_dictionary.transpose([0, 2, 1])  # (n_neurons, trials_val, time)
+        val_dict_flat = val_dict_flat.reshape(n_neurons_val, n_trials_val * n_timepoints_val)
+
+        val_target_flat = val_target.T.reshape(1, n_trials_val * n_timepoints_val)
+
+        # Replace in kwargs with flattened versions
+        kwargs['validation_target'] = val_target_flat
+        kwargs['validation_dictionary'] = val_dict_flat
 
     # ===== CALL EXISTING FUNCTION =====
     # If fixed_shifts provided, pass as init_shift_ms to initialize shifts

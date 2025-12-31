@@ -7,7 +7,7 @@ from scipy.signal import savgol_filter
 from scipy.signal import butter, filtfilt
 import trialexp.process.ephys.utils as ephys_utils
 from sklearn.preprocessing import normalize
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split
 import torch
 import pickle
 import trialexp.process.model.pytorch_decomposition as decomp
@@ -66,6 +66,8 @@ signal2analyze_list = ['zscored_df_over_f_analog_2']
 # CV configuration
 n_folds = 2
 random_state = 42
+val_split = 0.2  # Validation split ratio (20% of training data)
+val_early_stop_patience = 3  # Early stopping patience
 
 #%%
 signal2analyze = signal2analyze_list[0]
@@ -110,9 +112,21 @@ logger.info(f"Fold {fold_idx+1}/{n_folds}")
 logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
 logger.info(f"{'-'*60}")
 
-# ===== Prepare train and test data (SIMPLE INDEXING - no concatenation!) =====
-dict_train = dict_atoms[:, :, train_idx]  # (n_neurons+1, time, n_train)
-target_train = target[:, train_idx]        # (time, n_train)
+# ===== Further split train into train/validation =====
+train_inner_idx, val_idx = train_test_split(
+    train_idx,
+    test_size=val_split,
+    random_state=random_state
+)
+
+logger.info(f"Split training fold: {len(train_inner_idx)} train, {len(val_idx)} validation")
+
+# ===== Prepare train, validation, and test data (SIMPLE INDEXING - no concatenation!) =====
+dict_train = dict_atoms[:, :, train_inner_idx]  # (n_neurons+1, time, n_train)
+target_train = target[:, train_inner_idx]        # (time, n_train)
+
+dict_val = dict_atoms[:, :, val_idx]    # (n_neurons+1, time, n_val)
+target_val = target[:, val_idx]          # (time, n_val)
 
 dict_test = dict_atoms[:, :, test_idx]    # (n_neurons+1, time, n_test)
 target_test = target[:, test_idx]          # (time, n_test)
@@ -120,6 +134,8 @@ target_test = target[:, test_idx]          # (time, n_test)
 logger.info(f"\nData shapes (NEW format):")
 logger.info(f"  Train dict: {dict_train.shape}")
 logger.info(f"  Train target: {target_train.shape}")
+logger.info(f"  Val dict: {dict_val.shape}")
+logger.info(f"  Val target: {target_val.shape}")
 logger.info(f"  Test dict: {dict_test.shape}")
 logger.info(f"  Test target: {target_test.shape}")
 
@@ -131,10 +147,16 @@ code_train, info_train, reconstruction_train, model_train = \
     decomp.sparse_encode_pytorch_with_shift_trials(
         target=target_train,
         dictionary=dict_train,
+        validation_target=target_val,
+        validation_dictionary=dict_val,
+        val_early_stop_patience=val_early_stop_patience,
+        val_early_stop_metric='r2',
+        save_best_model=True,
+        verbose_validation=True,
         max_shift_ms=[-200, 200],
         init_shift_ms=init_shifts,
         sampling_rate=sampling_rate,
-        n_iterations=5,
+        n_iterations=10,
         sparsity_weight=5e-3,
         n_steps_code=5000,
         n_steps_shift=1000,
@@ -150,6 +172,15 @@ code_train, info_train, reconstruction_train, model_train = \
 train_r2 = info_train['variance_explained']
 logger.info(f"\nTrain R²: {train_r2:.4f}")
 logger.info(f"Train code shape: {model_train.code.shape}")
+
+# Log validation results
+if info_train['val_r2_history']:
+    best_val_r2 = info_train['best_val_metric']
+    final_val_r2 = info_train['val_r2_history'][-1]
+    logger.info(f"Best Val R²: {best_val_r2:.4f} at iteration {info_train['best_val_iteration']+1}")
+    logger.info(f"Final Val R²: {final_val_r2:.4f}")
+    if info_train['val_early_stopped']:
+        logger.info(f"Training stopped early after {info_train['n_iterations_completed']} iterations")
 
 # ===== Predict on test fold (FROZEN MODEL - no training!) =====
 logger.info("\nPredicting on test fold (frozen model)...")
@@ -180,8 +211,12 @@ logger.info(f"\n{'='*60}")
 logger.info("RESULTS")
 logger.info(f"{'='*60}")
 logger.info(f"Train R²: {train_r2:.4f}")
+if info_train['val_r2_history']:
+    logger.info(f"Val R²:   {info_train['val_r2_history'][-1]:.4f} (best: {info_train['best_val_metric']:.4f})")
 logger.info(f"Test R²:  {test_r2:.4f}")
 logger.info(f"Train-Test gap: {train_r2 - test_r2:.4f}")
+if info_train['val_r2_history']:
+    logger.info(f"Train-Val gap: {train_r2 - info_train['val_r2_history'][-1]:.4f}")
 logger.info(f"\nTest MSE: {test_mse:.6f}")
 logger.info(f"Train MSE: {info_train['reconstruction_loss']:.6f}")
 logger.info(f"{'='*60}")
