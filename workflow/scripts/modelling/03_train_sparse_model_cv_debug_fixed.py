@@ -155,57 +155,22 @@ logger.info(f"Train code shape: {model_train.code.shape}")
 logger.info("\nPredicting on test fold (frozen model)...")
 logger.info(f"Test data has {len(test_idx)} trials")
 
-# Get dimensions
-n_neurons_test, n_timepoints_test, n_trials_test = dict_test.shape
+# Use the new evaluation function
+test_results = decomp.evaluate_sparse_model_on_test_data(
+    model_train=model_train,
+    dict_test=dict_test,
+    target_test=target_test,
+    sampling_rate=sampling_rate,
+    max_shift_ms=[-200, 200],
+    device='cuda'
+)
 
-# Flatten test data to match training format
-# (n_neurons, time, trials) → (n_neurons, trials, time) → (n_neurons, trials*time)
-dict_test_flat = dict_test.transpose([0, 2, 1])  # (n_neurons, trials, time)
-dict_test_flat = dict_test_flat.reshape(n_neurons_test, n_trials_test * n_timepoints_test)
-
-# Target: (time, trials) → (trials, time) → flatten
-target_test_flat = target_test.T.reshape(1, n_trials_test * n_timepoints_test)
-
-logger.info(f"Flattened test dict shape: {dict_test_flat.shape}")
-logger.info(f"Flattened test target shape: {target_test_flat.shape}")
-
-with torch.no_grad():
-    model_train.eval()
-
-    # Apply learned model to flattened test dictionary
-    test_dict_tensor = torch.FloatTensor(dict_test_flat).to('cuda')
-
-    # Create new FourierShiftDictionary for test data
-    test_shift_dict = decomp.FourierShiftDictionary(
-        dictionary=test_dict_tensor,
-        max_shift_ms=[-200, 200],
-        sampling_rate=sampling_rate
-    ).to('cuda')
-
-    # Copy learned shifts from training
-    test_shift_dict.shift_logits.data = model_train.shift_dictionary.shift_logits.data
-
-    # Create test model
-    model_test = decomp.SparseCodingWithShifts(
-        shift_dictionary=test_shift_dict,
-        n_neurons=test_dict_tensor.shape[0],
-        activation_type='global'  # Match training
-    ).to('cuda')
-
-    # Copy learned code and activation from training
-    model_test.code.data = model_train.code.data
-    model_test.act.load_state_dict(model_train.act.state_dict())
-
-    # Forward pass (no gradients, no optimization!)
-    reconstruction_test_flat = model_test().cpu().numpy()
-
-    # Reshape back to (time, trials)
-    reconstruction_test = reconstruction_test_flat.reshape(n_trials_test, n_timepoints_test).T
-
-    # Calculate test R²
-    test_mse = np.mean((reconstruction_test - target_test) ** 2)
-    test_var = np.var(target_test)
-    test_r2 = 1 - (test_mse / test_var)
+# Extract results
+reconstruction_test = test_results['reconstruction']
+test_r2 = test_results['test_r2']
+test_mse = test_results['test_mse']
+test_var = test_results['test_var']
+model_test = test_results['model_test']
 
 logger.info(f"\nTest code shape: {model_test.code.shape}")
 logger.info(f"Test reconstruction shape: {reconstruction_test.shape}")
@@ -257,7 +222,7 @@ ax.set_title(f'Test Set Predictions (R² = {test_r2:.4f})')
 ax.set_xlabel('Timepoints')
 ax.set_ylabel('Signal')
 ax.grid(True, alpha=0.3)
-ax.set_xlim([0, 400])
+ax.set_xlim([0, 1000])
 plt.tight_layout()
 
 # Save the figure
@@ -265,4 +230,20 @@ output_path = '/home/MRC.OX.AC.UK/ndcn1330/code/trialexp/debug_prediction_plot.p
 plt.savefig(output_path, dpi=150, bbox_inches='tight')
 logger.info(f"\nVisualization saved to: {output_path}")
 
+# %%
+fig, ax = plt.subplots(1, 1, figsize=(15, 5))
+
+# Plot first 2000 timepoints
+# IMPORTANT: ravel in column-major (Fortran) order to match (trials, time) concatenation order
+# reconstruction_test is (time, trials), we need to flatten as [trial0_t0, trial0_t1, ..., trial1_t0, ...]
+n_plot = min(2000, reconstruction_test.size)
+ax.plot(reconstruction_train.T.ravel()[:n_plot], 'r', label='Prediction', alpha=0.7, linewidth=1)
+ax.plot(target_train.T.ravel()[:n_plot], 'k', label='Ground Truth', alpha=0.5, linewidth=1)
+ax.legend()
+ax.set_title(f'Train Set Predictions (R² = {test_r2:.4f})')
+ax.set_xlabel('Timepoints')
+ax.set_ylabel('Signal')
+ax.grid(True, alpha=0.3)
+ax.set_xlim([0, 1000])
+plt.tight_layout()
 # %%

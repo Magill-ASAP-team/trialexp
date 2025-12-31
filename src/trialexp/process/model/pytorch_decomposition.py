@@ -2419,3 +2419,118 @@ def plot_reconstruction_comparison(target_stack_smooth, reconstruction, time_ran
     ax.set_ylabel('Signal')
     ax.legend()
     return fig, ax
+
+
+def evaluate_sparse_model_on_test_data(
+    model_train,
+    dict_test: np.ndarray,
+    target_test: np.ndarray,
+    sampling_rate: float,
+    max_shift_ms: list = [-200, 200],
+    device: str = 'cuda'
+) -> dict:
+    """
+    Evaluate a trained sparse encoding model on test data.
+
+    This function applies a trained sparse encoding model (with learned shifts and codes)
+    to test data by freezing all learned parameters and computing predictions without
+    any gradient updates or optimization.
+
+    Parameters
+    ----------
+    model_train : SparseCodingWithShifts
+        Trained model with learned parameters (shifts, codes, activation function)
+    dict_test : np.ndarray
+        Test dictionary atoms with shape (n_neurons, time, n_trials)
+    target_test : np.ndarray
+        Test target signal with shape (time, n_trials)
+    sampling_rate : float
+        Sampling rate in Hz
+    max_shift_ms : list, optional
+        Maximum shift range in milliseconds [min, max]. Default is [-200, 200]
+    device : str, optional
+        Device to run computation on ('cuda' or 'cpu'). Default is 'cuda'
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - 'reconstruction': reconstructed test signal (time, n_trials)
+        - 'test_r2': R² score on test data
+        - 'test_mse': mean squared error on test data
+        - 'test_var': variance of test target
+        - 'model_test': the test model with frozen parameters
+
+    Notes
+    -----
+    - The function creates a new model instance for test data but copies all learned
+      parameters from the training model (shifts, codes, activation function state)
+    - No gradients are computed and no optimization is performed
+    - The test model uses the same architecture as the training model
+
+    Examples
+    --------
+    >>> results = evaluate_sparse_model_on_test_data(
+    ...     model_train=trained_model,
+    ...     dict_test=test_atoms,
+    ...     target_test=test_target,
+    ...     sampling_rate=50.0
+    ... )
+    >>> print(f"Test R²: {results['test_r2']:.4f}")
+    """
+    # Get dimensions
+    n_neurons_test, n_timepoints_test, n_trials_test = dict_test.shape
+
+    # Flatten test data to match training format
+    # (n_neurons, time, trials) → (n_neurons, trials, time) → (n_neurons, trials*time)
+    dict_test_flat = dict_test.transpose([0, 2, 1])  # (n_neurons, trials, time)
+    dict_test_flat = dict_test_flat.reshape(n_neurons_test, n_trials_test * n_timepoints_test)
+
+    # Target: (time, trials) → (trials, time) → flatten
+    target_test_flat = target_test.T.reshape(1, n_trials_test * n_timepoints_test)
+
+    with torch.no_grad():
+        model_train.eval()
+
+        # Apply learned model to flattened test dictionary
+        test_dict_tensor = torch.FloatTensor(dict_test_flat).to(device)
+
+        # Create new FourierShiftDictionary for test data
+        test_shift_dict = FourierShiftDictionary(
+            dictionary=test_dict_tensor,
+            max_shift_ms=max_shift_ms,
+            sampling_rate=sampling_rate
+        ).to(device)
+
+        # Copy learned shifts from training
+        test_shift_dict.shift_logits.data = model_train.shift_dictionary.shift_logits.data
+
+        # Create test model
+        model_test = SparseCodingWithShifts(
+            shift_dictionary=test_shift_dict,
+            n_neurons=test_dict_tensor.shape[0],
+            activation_type='global'  # Match training
+        ).to(device)
+
+        # Copy learned code and activation from training
+        model_test.code.data = model_train.code.data
+        model_test.act.load_state_dict(model_train.act.state_dict())
+
+        # Forward pass (no gradients, no optimization!)
+        reconstruction_test_flat = model_test().cpu().numpy()
+
+        # Reshape back to (time, trials)
+        reconstruction_test = reconstruction_test_flat.reshape(n_trials_test, n_timepoints_test).T
+
+        # Calculate test R²
+        test_mse = np.mean((reconstruction_test - target_test) ** 2)
+        test_var = np.var(target_test)
+        test_r2 = 1 - (test_mse / test_var)
+
+    return {
+        'reconstruction': reconstruction_test,
+        'test_r2': test_r2,
+        'test_mse': test_mse,
+        'test_var': test_var,
+        'model_test': model_test
+    }
