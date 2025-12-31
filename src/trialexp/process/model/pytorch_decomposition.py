@@ -579,356 +579,6 @@ class SigmoidSparseEncoder(nn.Module):
             for param in activation.parameters():
                 param.requires_grad = True
 
-def sparse_encode_pytorch(
-    target: np.ndarray,
-    dictionary: np.ndarray,
-    sparsity_weight: float = 0.001,
-    learning_rate: float = 1e-4,
-    n_iterations: int = 1000,
-    patience: int = 50,
-    min_delta: float = 1e-6,
-    device: Optional[str] = None,
-    verbose: bool = True,
-    activation_type: str = 'global',
-    activation_function: str = 'sigmoid',
-    use_cyclic_lr: bool = True,
-    base_lr: Optional[float] = None,
-    max_lr: Optional[float] = None,
-    step_size_up: int = 200,
-    freeze_low_code: bool = False,
-    freeze_threshold: float = 0.01,
-    freeze_start_iter: int = 100,
-    freeze_check_interval: int = 50,
-    use_mlflow: bool = False,
-    mlflow_run_name: Optional[str] = None,
-    sparsity_type: str = 'L1',
-    l1_ratio: float = 0.5
-) -> Tuple[np.ndarray, dict, np.ndarray]:
-    """
-    PyTorch-based sparse encoding with learnable activation transformation.
-
-    This function finds sparse code such that:
-        target ≈ activation(dictionary @ code)  [for global activation]
-        or
-        target ≈ dictionary @ activation(code)  [for per-neuron activation]
-
-    The activation function (exponential or sigmoid) is learned during optimization.
-
-    Parameters:
-    -----------
-    target : np.ndarray
-        Target signal to decompose, shape (1, n_features) or (n_features,)
-    dictionary : np.ndarray
-        Dictionary of atoms, shape (n_components, n_features)
-    sparsity_weight : float
-        Regularization weight for sparsity (default: 0.001)
-    learning_rate : float
-        Learning rate for optimization (default: 0.01)
-    n_iterations : int
-        Maximum number of optimization iterations (default: 1000)
-    patience : int
-        Early stopping patience (default: 50)
-    min_delta : float
-        Minimum change in loss for early stopping (default: 1e-6)
-    device : str, optional
-        Device to use ('cuda' or 'cpu'). If None, auto-detect.
-    verbose : bool
-        Whether to print progress (default: True)
-    activation_type : str
-        Type of activation: 'global' (learnable exp after sum),
-        'per_neuron' (separate learnable exp per neuron), or 'legacy' (old TwoExpFastEnd)
-    activation_function : str
-        Type of activation function: 'exponential' or 'sigmoid' (default: 'sigmoid')
-        Only used when activation_type is 'global' or 'per_neuron'
-    use_cyclic_lr : bool
-        Whether to use cyclic learning rate (default: True)
-    base_lr : float, optional
-        Minimum learning rate for cyclic LR. If None, uses learning_rate / 10
-    max_lr : float, optional
-        Maximum learning rate for cyclic LR. If None, uses learning_rate * 10
-    step_size_up : int
-        Number of iterations for half cycle (default: 200)
-    freeze_low_code : bool
-        Whether to freeze activation parameters for neurons with low code (default: False)
-        Only applicable when activation_type='per_neuron'
-    freeze_threshold : float
-        Absolute code threshold for freezing neuron parameters (default: 0.01)
-    freeze_start_iter : int
-        Iteration to start checking for low-code neurons (default: 100)
-    freeze_check_interval : int
-        How often to check and freeze low-code neurons (default: 50)
-    use_mlflow : bool
-        Whether to log metrics and parameters to MLflow (default: False)
-    mlflow_run_name : str, optional
-        Name for the MLflow run. If None, MLflow will auto-generate a name
-    sparsity_type : str
-        Type of sparsity regularization: 'L1', 'L2', or 'elastic_net'
-        - 'L1': Promotes true sparsity (many zeros)
-        - 'L2': Keeps all coefficients small but non-zero
-        - 'elastic_net': Combines L1 and L2 based on l1_ratio
-        (default: 'L1')
-    l1_ratio : float
-        Mixing parameter for elastic net (only used when sparsity_type='elastic_net')
-        - 1.0: Pure L1 regularization
-        - 0.0: Pure L2 regularization
-        - 0.5: Equal mix of L1 and L2 (default: 0.5)
-
-    Returns:
-    --------
-    code : np.ndarray
-        Sparse code, shape (1, n_components)
-    info : dict
-        Dictionary containing:
-        - 'reconstruction_loss': Final reconstruction loss (MSE)
-        - 'total_loss': Final total loss (reconstruction + sparsity)
-        - 'n_nonzero': Number of non-zero coefficients (threshold > 0.01)
-        - 'variance_explained': Final variance explained (R² = 1 - MSE/var(target))
-        - 'loss_history': List of losses during optimization
-        - 'activation_params': Dictionary of learned activation parameters
-        - 'n_frozen_per_check': List of number of frozen neurons at each check
-    reconstruction : np.ndarray
-        Reconstructed signal, shape (1, n_features)
-    """
-    # Handle device
-    if device is None:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    elif device == 'cuda' and not torch.cuda.is_available():
-        if verbose:
-            print("Warning: CUDA requested but not available. Falling back to CPU.")
-        device = 'cpu'
-
-    if verbose:
-        print(f"Using device: {device}")
-
-    mlflow.set_experiment('sparse_encode')
-    # Start MLflow run if enabled
-    if use_mlflow:
-        mlflow.end_run()
-        mlflow.start_run(run_name=mlflow_run_name)
-        # Log hyperparameters
-        mlflow.log_params({
-            'sparsity_weight': sparsity_weight,
-            'sparsity_type': sparsity_type,
-            'l1_ratio': l1_ratio if sparsity_type == 'elastic_net' else None,
-            'learning_rate': learning_rate,
-            'n_iterations': n_iterations,
-            'patience': patience,
-            'min_delta': min_delta,
-            'device': device,
-            'activation_type': activation_type,
-            'activation_function': activation_function,
-            'use_cyclic_lr': use_cyclic_lr,
-            'freeze_low_code': freeze_low_code,
-            'freeze_threshold': freeze_threshold if freeze_low_code else None,
-            'n_components': dictionary.shape[0],
-            'n_features': dictionary.shape[1]
-        })
-        if use_cyclic_lr:
-            mlflow.log_params({
-                'base_lr': base_lr if base_lr is not None else learning_rate / 10,
-                'max_lr': max_lr if max_lr is not None else learning_rate * 10,
-                'step_size_up': step_size_up
-            })
-
-    # Reshape target if needed
-    if target.ndim == 1:
-        target = target.reshape(1, -1)
-
-    # Convert to tensors
-    target_tensor = torch.FloatTensor(target).to(device)
-    dictionary_tensor = torch.FloatTensor(dictionary).to(device)
-
-    # Initialize model
-    model = SigmoidSparseEncoder(dictionary_tensor, activation_type=activation_type, activation_function=activation_function).to(device)
-
-    # Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-    # Learning rate scheduler
-    scheduler = None
-    if use_cyclic_lr:
-        # Set default base_lr and max_lr if not provided
-        if base_lr is None:
-            base_lr = learning_rate / 10
-        if max_lr is None:
-            max_lr = learning_rate * 10
-
-        scheduler = optim.lr_scheduler.CyclicLR(
-            optimizer,
-            base_lr=base_lr,
-            max_lr=max_lr,
-            step_size_up=step_size_up,
-            mode='triangular2',  # triangular2 decreases max_lr after each cycle
-            cycle_momentum=False
-        )
-
-        if verbose:
-            print(f"Using CyclicLR: base_lr={base_lr:.2e}, max_lr={max_lr:.2e}, step_size_up={step_size_up}")
-            # Count total parameters in model
-            total_params = sum(p.numel() for p in model.parameters())
-            print(f"Total trainable parameters in model: {total_params}")
-
-    # Training loop with early stopping
-    loss_history = []
-    best_loss = float('inf')
-    patience_counter = 0
-    n_frozen_per_check = []  # Track freezing history
-
-    for iteration in range(n_iterations):
-        # Check if we should freeze low-code neurons
-        if (freeze_low_code and
-            activation_type == 'per_neuron' and
-            iteration >= freeze_start_iter and
-            iteration % freeze_check_interval == 0):
-
-            n_frozen = model.freeze_low_code_neurons(threshold=freeze_threshold)
-            n_frozen_per_check.append((iteration, n_frozen))
-
-            if verbose and n_frozen > 0:
-                total_neurons = model.n_components
-                print(f"Iteration {iteration}: Frozen {n_frozen}/{total_neurons} neurons with |code| < {freeze_threshold}")
-
-        optimizer.zero_grad()
-
-        # Forward pass
-        reconstruction = model()
-
-        # Reconstruction loss (MSE)
-        reconstruction_loss = torch.mean((target_tensor - reconstruction) ** 2)
-
-        # Sparsity loss on raw code
-        code = model.get_code()
-        if sparsity_type == 'L2':
-            sparsity_loss = sparsity_weight * torch.sum(code ** 2)
-        elif sparsity_type == 'elastic_net':
-            l1_loss = torch.sum(torch.abs(code))
-            l2_loss = torch.sum(code ** 2)
-            sparsity_loss = sparsity_weight * (l1_ratio * l1_loss + (1 - l1_ratio) * l2_loss)
-        else:  # L1 (default)
-            sparsity_loss = sparsity_weight * torch.sum(torch.abs(code))
-
-        # Total loss
-        total_loss = reconstruction_loss + sparsity_loss
-
-        # Backward pass
-        total_loss.backward()
-        optimizer.step()
-
-        # Update learning rate if using scheduler
-        if scheduler is not None:
-            scheduler.step()
-
-        # Record loss
-        loss_history.append(total_loss.item())
-
-        # Log metrics to MLflow
-        if use_mlflow:
-            mlflow.log_metrics({
-                'total_loss': total_loss.item(),
-                'reconstruction_loss': reconstruction_loss.item(),
-                'sparsity_loss': sparsity_loss.item(),
-                'learning_rate': optimizer.param_groups[0]['lr']
-            }, step=iteration)
-
-        # Print progress and log additional metrics
-        if verbose and (iteration % 1000 == 0 or iteration == n_iterations - 1):
-            n_nonzero = torch.sum(torch.abs(code) > 0.01).item()
-            variance_target = torch.var(target_tensor, unbiased=False).item()
-            variance_residual = reconstruction_loss.item()
-            variance_explained = 1 - (variance_residual / variance_target)
-            current_lr = optimizer.param_groups[0]['lr']
-
-            # Log additional metrics to MLflow
-            if use_mlflow:
-                mlflow.log_metrics({
-                    'variance_explained': variance_explained,
-                    'n_nonzero': n_nonzero,
-                    'sparsity_ratio': n_nonzero / dictionary.shape[0]
-                }, step=iteration)
-  
-      
-        # Early stopping
-        if total_loss.item() < best_loss - min_delta:
-            best_loss = total_loss.item()
-            patience_counter = 0
-        else:
-            patience_counter += 1
-
-        if patience_counter >= patience:
-            if verbose:
-                print(f"Early stopping at iteration {iteration}")
-            break
-
-    # Get final code
-    with torch.no_grad():
-        code_final = model.get_code().cpu().numpy()
-        reconstruction_final = model()
-        reconstruction_loss_final = torch.mean((target_tensor - reconstruction_final) ** 2).item()
-
-    # Count non-zero coefficients
-    # Relative threshold (% of max absolute code value)
-    max_abs_code = np.abs(code_final).max()
-    threshold = 0.01 * max_abs_code  # 1% of max
-    n_nonzero = np.sum(np.abs(code_final) > threshold)
-
-    # Calculate final variance explained
-    final_variance_explained = 1 - (reconstruction_loss_final / np.var(target))
-
-    # Return results
-    info = {
-        'reconstruction_loss': reconstruction_loss_final,
-        'total_loss': best_loss,
-        'n_nonzero': n_nonzero,
-        'variance_explained': final_variance_explained,
-        'loss_history': loss_history,
-        'activation_params': model.get_activation_params(),
-        'n_frozen_per_check': n_frozen_per_check
-    }
-
-    # Log final results to MLflow
-    if use_mlflow:
-        try:
-            # Log final metrics
-            mlflow.log_metrics({
-                'final_reconstruction_loss': reconstruction_loss_final,
-                'final_total_loss': best_loss,
-                'final_n_nonzero': int(n_nonzero),
-                'final_sparsity_ratio': float(n_nonzero) / dictionary.shape[0],
-                'final_variance_explained': 1 - (reconstruction_loss_final / np.var(target))
-            })
-
-            # Log activation parameters as metrics
-            activation_params = model.get_activation_params()
-            if activation_type == 'global':
-                for param_name, param_value in activation_params.items():
-                    mlflow.log_metric(f'activation_{param_name}', param_value)
-            elif activation_type == 'per_neuron':
-                # Log statistics of per-neuron parameters
-                for param_name, param_values in activation_params.items():
-                    mlflow.log_metrics({
-                        f'activation_{param_name}_mean': np.mean(param_values),
-                        f'activation_{param_name}_std': np.std(param_values),
-                        f'activation_{param_name}_min': np.min(param_values),
-                        f'activation_{param_name}_max': np.max(param_values)
-                    })
-
-            # Log the model
-            mlflow.pytorch.log_model(model, "model")
-
-        finally:
-            # Always end the run
-            mlflow.end_run()
-
-    # Print the final results if verbose
-    if verbose:
-        print(f"Final results: "
-              f"Variance Explained = {final_variance_explained:.4f}, "
-              f"Reconstruction Loss = {reconstruction_loss_final:.6f}, "
-              f"Non-zero = {n_nonzero}/{dictionary.shape[0]}")
-
-    return code_final, info, reconstruction_final.cpu().numpy()
-
-
 def sparse_encode_pytorch_batch(
     targets: np.ndarray,
     dictionary: np.ndarray,
@@ -1542,6 +1192,128 @@ def sparse_encode_pytorch_with_shift(
         print(f"{'='*60}")
 
     return code_final, info, reconstruction_final, model
+
+
+def sparse_encode_pytorch_with_shift_trials(
+    target: np.ndarray,
+    dictionary: np.ndarray,
+    fixed_shifts: Optional[np.ndarray] = None,
+    **kwargs
+) -> Tuple[np.ndarray, dict, np.ndarray, nn.Module]:
+    """
+    Wrapper for sparse_encode_pytorch_with_shift that accepts trial-stacked format.
+
+    This function provides a cleaner API for cross-validation by accepting
+    trial-stacked inputs instead of concatenated trials. Internally, it flattens
+    the trials, calls the existing sparse_encode_pytorch_with_shift function,
+    and reshapes the output back to trial-stacked format.
+
+    Parameters
+    ----------
+    target : np.ndarray
+        Target signal, shape (time, n_trials)
+    dictionary : np.ndarray
+        Dictionary atoms, shape (n_neurons, time, n_trials)
+    fixed_shifts : np.ndarray, optional
+        Pre-learned shifts for test mode, shape (n_neurons,) in milliseconds.
+        If provided, will be passed as init_shift_ms to initialize shifts.
+    **kwargs
+        All other parameters are passed through to sparse_encode_pytorch_with_shift.
+        Common parameters include:
+        - max_shift_ms: Maximum shift range (default: 1000.0 or [-200, 200])
+        - sampling_rate: Sampling frequency in Hz (default: 14.0)
+        - sparsity_weight: Sparsity regularization weight (default: 0.001)
+        - sparsity_type: Type of sparsity ('L1', 'L2', 'elastic_net')
+        - n_iterations: Number of alternating optimization iterations (default: 10)
+        - n_steps_code: Steps for code optimization (default: 300)
+        - n_steps_shift: Steps for shift optimization (default: 100)
+        - device: 'cpu' or 'cuda' (default: auto-detect)
+        - verbose: Print progress (default: True)
+
+    Returns
+    -------
+    code : np.ndarray
+        Sparse codes, shape (1, n_neurons) - shared across all trials
+    info : dict
+        Information dictionary containing:
+        - 'variance_explained': R² score across all trials
+        - 'reconstruction_loss': MSE across all trials
+        - 'shifts_ms': Learned time shifts, shape (n_neurons,)
+        - 'n_nonzero': Number of active neurons
+        - 'n_trials': Number of trials (added by wrapper)
+        - 'n_timepoints': Timepoints per trial (added by wrapper)
+        - ... other metrics from original function
+    reconstruction : np.ndarray
+        Reconstructed signal, shape (time, n_trials) - reshaped to match input
+    model : nn.Module
+        Trained model instance (SparseCodingWithShifts)
+
+    Examples
+    --------
+    # Training with trial-stacked data
+    >>> code, info, recon, model = sparse_encode_pytorch_with_shift_trials(
+    ...     target=target_train,          # (time, n_train_trials)
+    ...     dictionary=dict_train,        # (n_neurons, time, n_train_trials)
+    ...     max_shift_ms=[-200, 200],
+    ...     sparsity_weight=5e-3
+    ... )
+
+    # Testing with fixed shifts from training
+    >>> code_test, info_test, recon_test, model_test = sparse_encode_pytorch_with_shift_trials(
+    ...     target=target_test,
+    ...     dictionary=dict_test,
+    ...     fixed_shifts=info['shifts_ms'],  # Use learned shifts
+    ...     max_shift_ms=[-200, 200],
+    ...     sparsity_weight=5e-3
+    ... )
+
+    Notes
+    -----
+    - The model architecture (shared code and shifts) is identical to the original function
+    - Expected performance is identical to concatenated approach
+    - This wrapper only changes the input/output format for convenience
+    """
+    # Extract dimensions
+    n_neurons, n_timepoints, n_trials = dictionary.shape
+
+    # Validate target shape
+    if target.shape != (n_timepoints, n_trials):
+        raise ValueError(
+            f"Target shape {target.shape} doesn't match expected "
+            f"(time={n_timepoints}, n_trials={n_trials})"
+        )
+
+    # ===== FLATTEN: (n_neurons, time, trials) → (n_neurons, trials*time) =====
+    # IMPORTANT: Must match original concatenation order: (cluID, trial, time) → (cluID, trial*time)
+    # Original does: atoms_smooth (time, cluID, trial) → transpose([1,2,0]) → (cluID, trial, time) → reshape
+    # We have: (n_neurons, time, trial) → transpose to (n_neurons, trial, time) → reshape
+    dict_flat = dictionary.transpose([0, 2, 1])  # (n_neurons, trials, time)
+    dict_flat = dict_flat.reshape(n_neurons, n_trials * n_timepoints)  # (n_neurons, trials*time)
+
+    # Target: (time, trials) → (trials, time) → (1, trials*time)
+    target_flat = target.T.reshape(1, n_trials * n_timepoints)  # (1, trials*time)
+
+    # ===== CALL EXISTING FUNCTION =====
+    # If fixed_shifts provided, pass as init_shift_ms to initialize shifts
+    if fixed_shifts is not None:
+        kwargs['init_shift_ms'] = fixed_shifts
+
+    code, info, recon_flat, model = sparse_encode_pytorch_with_shift(
+        target=target_flat,             # (1, time*trials)
+        dictionary=dict_flat,           # (n_neurons, time*trials)
+        **kwargs
+    )
+
+    # ===== RESHAPE OUTPUT: (1, trials*time) → (time, trials) =====
+    # Original reconstruction is (1, trials*time) following (trial, time) order
+    # Need to reshape to (trials, time) then transpose to (time, trials)
+    recon_reshaped = recon_flat.reshape(n_trials, n_timepoints).T  # (time, trials)
+
+    # ===== UPDATE INFO DICT =====
+    info['n_trials'] = n_trials
+    info['n_timepoints'] = n_timepoints
+
+    return code, info, recon_reshaped, model
 
 
 def sparse_encode_sklearn_baseline(
@@ -2520,6 +2292,99 @@ def prepare_fold_from_atoms_target(
         'dict_atoms_smooth': dict_atoms,
         'target_stack_smooth': target_stack,
         'n_trials': len(trial_indices)
+    }
+
+
+def prepare_data_for_encoding_trials(
+    xr_session,
+    signal2analyze,
+    shuffle_trials=False
+) -> dict:
+    """
+    Prepare trial-stacked data for sparse encoding (wrapper around prepare_data_for_encoding).
+
+    This function returns the same normalized data as prepare_data_for_encoding() but in
+    trial-stacked format suitable for the new sparse_encode_pytorch_with_shift_trials()
+    wrapper function. This enables cleaner cross-validation without manual concatenation.
+
+    IMPORTANT: This function reshapes the CONCATENATED and NORMALIZED dict_atoms_smooth
+    back to trial format to preserve the exact same normalization statistics as the
+    original concatenated approach.
+
+    Parameters
+    ----------
+    xr_session : xarray.Dataset
+        Session data containing spikes, photometry, and trial information
+    signal2analyze : str
+        Name of the signal variable to analyze (e.g., 'dff_znorm', 'zscored_df_over_f')
+    shuffle_trials : bool
+        Whether to shuffle trials before training (default: False)
+
+    Returns
+    -------
+    dict
+        Dictionary containing prepared data:
+        - 'atoms_norm_smooth': Normalized atoms WITH baseline, shape (time, n_neurons+1, n_trials)
+        - 'target_norm_smooth': Normalized target, shape (time, n_trials)
+        - 'lick_rate': Lick rate data, shape (time, n_trials)
+        - 'trial_outcome': Trial outcomes (filtered for valid trials)
+        - 'trial_nb': Trial numbers (filtered for valid trials)
+        - 'n_neurons': Number of neurons including baseline
+        - 'n_timepoints': Number of timepoints per trial
+        - 'n_trials': Number of valid trials
+        - 'event_time': Time coordinates
+        - 'cluID_atom': Cluster IDs
+
+    Examples
+    --------
+    >>> full_data = prepare_data_for_encoding_trials(xr_session, 'dff_znorm')
+    >>> atoms = full_data['atoms_norm_smooth']  # (time, n_neurons+1, n_trials)
+    >>> target = full_data['target_norm_smooth']  # (time, n_trials)
+    >>> dict_atoms = atoms.transpose([1, 0, 2])  # (n_neurons+1, time, n_trials) for model
+
+    Notes
+    -----
+    - This function calls the existing prepare_data_for_encoding() internally
+    - Uses dict_atoms_smooth (already normalized and with baseline) and reshapes it
+    - Preserves exact normalization statistics from concatenated approach
+    - Output format is optimized for trial-wise indexing in cross-validation
+    """
+    # Call existing function to get normalized data
+    full_data = prepare_data_for_encoding(
+        xr_session=xr_session,
+        signal2analyze=signal2analyze,
+        shuffle_trials=shuffle_trials
+    )
+
+    # Extract the ALREADY NORMALIZED and CONCATENATED dict_atoms_smooth
+    # This includes baseline and has shape (n_neurons+1, time*n_trials)
+    dict_atoms_concat = full_data['dict_atoms_smooth']  # (n_neurons+1, time*n_trials)
+    target_concat = full_data['target_stack_smooth']      # (1, time*n_trials)
+
+    # Get dimensions
+    n_neurons_with_baseline = dict_atoms_concat.shape[0]  # includes baseline
+    n_timepoints = full_data['atoms'].shape[0]
+    n_trials = full_data['atoms'].shape[2]
+
+    # Reshape dict_atoms from (n_neurons+1, time*n_trials) back to (n_neurons+1, n_trials, time)
+    # then transpose to (time, n_neurons+1, n_trials)
+    dict_atoms_trial = dict_atoms_concat.reshape(n_neurons_with_baseline, n_trials, n_timepoints)
+    dict_atoms_trial = dict_atoms_trial.transpose([2, 0, 1])  # (time, n_neurons+1, n_trials)
+
+    # Reshape target from (1, time*n_trials) to (time, n_trials)
+    target_trial = target_concat.reshape(n_trials, n_timepoints).T  # (time, n_trials)
+
+    return {
+        'atoms_norm_smooth': dict_atoms_trial,   # (time, n_neurons+1, n_trials) - includes baseline, properly normalized
+        'target_norm_smooth': target_trial,      # (time, n_trials) - properly normalized
+        'lick_rate': full_data['lick_rate'],     # (time, n_trials)
+        'trial_outcome': full_data['trial_outcome'],
+        'trial_nb': full_data['trial_nb'],
+        'n_neurons': n_neurons_with_baseline,  # Include baseline
+        'n_timepoints': n_timepoints,
+        'n_trials': n_trials,
+        'event_time': full_data['event_time'],
+        'cluID_atom': full_data['cluID_atom']
     }
 
 
