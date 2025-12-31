@@ -1,5 +1,5 @@
 '''
-Train pytorch model for sparse encoding with 5-fold cross-validation
+Train pytorch model for sparse encoding with 10-fold cross-validation
 '''
 
 #%%
@@ -7,7 +7,7 @@ from scipy.signal import savgol_filter
 from scipy.signal import butter, filtfilt
 import trialexp.process.ephys.utils as ephys_utils
 from sklearn.preprocessing import normalize
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split
 import torch
 import pickle
 import trialexp.process.model.pytorch_decomposition as decomp
@@ -18,6 +18,7 @@ from scipy.signal import savgol_filter
 from loguru import logger
 from pathlib import Path
 import numpy as np
+import matplotlib.pyplot as plt
 
 #%% Load inputs
 
@@ -59,24 +60,27 @@ xr_session = xr_all_filtered
 xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan'))
 
 save_files = [soutput.ach_model, soutput.da_model]
-# signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
-signal2analyze_list = ['zscored_df_over_f_analog_2']
+signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
+# signal2analyze_list = ['zscored_df_over_f_analog_2']
 
 # CV configuration
-n_folds = 2
+n_folds = 10
 random_state = 42
+val_split = 0.2  # Validation split ratio (20% of training data in each fold)
+val_early_stop_patience = 3  # Early stopping patience
+
 #%%
 for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     logger.info(f"\n{'='*80}")
-    logger.info(f"Processing {signal2analyze} with {n_folds}-fold cross-validation")
+    logger.info(f"Processing {signal2analyze} with {n_folds}-fold cross-validation (with validation split)")
     logger.info(f"{'='*80}\n")
 
     # ===== STAGE 1: Prepare full dataset (filters NaN trials internally) =====
-    logger.info("Stage 1: Preparing full dataset...")
-    full_data = decomp.prepare_data_for_encoding(xr_session, signal2analyze)
+    logger.info("Stage 1: Preparing full dataset (NEW trial-stacked format)...")
+    full_data = decomp.prepare_data_for_encoding_trials(xr_session, signal2analyze)
 
-    # Extract arrays (already filtered)
-    atoms = full_data['atoms_norm_smooth']  # (time × cluID × n_valid_trials)
+    # Extract arrays (already filtered, includes baseline atom)
+    atoms = full_data['atoms_norm_smooth']  # (time × n_neurons+1 × n_valid_trials)
     target = full_data['target_norm_smooth']  # (time × n_valid_trials)
     lick_rate = full_data['lick_rate']
     trial_outcome = full_data['trial_outcome']
@@ -87,7 +91,10 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
 
     logger.info(f"Valid trials after filtering: {n_valid_trials}")
     logger.info(f"Timepoints per trial: {T}")
-    logger.info(f"Number of neurons: {atoms.shape[1]}")
+    logger.info(f"Number of neurons (including baseline): {atoms.shape[1]}")
+
+    # Transpose to model input format: (n_neurons+1, time, n_trials)
+    dict_atoms = atoms.transpose([1, 0, 2])
 
     # Initialize CV splitter
     kfold = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
@@ -106,27 +113,45 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
         logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
         logger.info(f"{'-'*60}")
 
-        # ===== Prepare train and test data from trial subsets =====
-        train_data = decomp.prepare_fold_from_atoms_target(
-            atoms, target, train_idx, lick_rate
-        )
-        test_data = decomp.prepare_fold_from_atoms_target(
-            atoms, target, test_idx, lick_rate
+        # ===== Further split train into train/validation =====
+        train_inner_idx, val_idx = train_test_split(
+            train_idx,
+            test_size=val_split,
+            random_state=random_state,
+            shuffle=True
         )
 
-        # ===== Train model =====
-        logger.info("Training model on train fold...")
-        init_shifts = np.random.normal(100, 1, train_data['dict_atoms_smooth'].shape[0])
+        logger.info(f"Split training fold: {len(train_inner_idx)} train, {len(val_idx)} validation")
+
+        # ===== Prepare train, validation, and test data =====
+        dict_train = dict_atoms[:, :, train_inner_idx]  # (n_neurons+1, time, n_train)
+        target_train = target[:, train_inner_idx]        # (time, n_train)
+
+        dict_val = dict_atoms[:, :, val_idx]    # (n_neurons+1, time, n_val)
+        target_val = target[:, val_idx]          # (time, n_val)
+
+        dict_test = dict_atoms[:, :, test_idx]    # (n_neurons+1, time, n_test)
+        target_test = target[:, test_idx]          # (time, n_test)
+
+        # ===== Train model with validation =====
+        logger.info("Training model with validation monitoring...")
+        init_shifts = np.random.normal(100, 1, dict_train.shape[0])
 
         code_train, info_train, reconstruction_train, model_train = \
-            decomp.sparse_encode_pytorch_with_shift(
-                target=train_data['target_stack_smooth'],
-                dictionary=train_data['dict_atoms_smooth'],
+            decomp.sparse_encode_pytorch_with_shift_trials(
+                target=target_train,
+                dictionary=dict_train,
+                validation_target=target_val,
+                validation_dictionary=dict_val,
+                val_early_stop_patience=val_early_stop_patience,
+                val_early_stop_metric='r2',
+                save_best_model=True,
+                verbose_validation=True,
                 max_shift_ms=[-200, 200],
                 init_shift_ms=init_shifts,
                 sampling_rate=sampling_rate,
                 n_iterations=10,
-                sparsity_weight=1e-3,
+                sparsity_weight=5e-3,
                 n_steps_code=5000,
                 n_steps_shift=1000,
                 sparsity_type='elastic_net',
@@ -139,55 +164,44 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             )
 
         train_r2 = info_train['variance_explained']
-        logger.info(f"Train R²: {train_r2:.4f}")
+        logger.info(f"\nTrain R²: {train_r2:.4f}")
+
+        # Log validation results
+        if info_train['val_r2_history']:
+            best_val_r2 = info_train['best_val_metric']
+            final_val_r2 = info_train['val_r2_history'][-1]
+            logger.info(f"Best Val R²: {best_val_r2:.4f} at iteration {info_train['best_val_iteration']+1}")
+            logger.info(f"Final Val R²: {final_val_r2:.4f}")
+            if info_train['val_early_stopped']:
+                logger.info(f"Training stopped early after {info_train['n_iterations_completed']} iterations")
 
         # ===== Predict on test fold =====
-        logger.info("Predicting on test fold...")
-        with torch.no_grad():
-            model_train.eval()
+        logger.info("\nPredicting on test fold...")
+        test_results = decomp.evaluate_sparse_model_on_test_data(
+            model_train=model_train,
+            dict_test=dict_test,
+            target_test=target_test,
+            sampling_rate=sampling_rate,
+            max_shift_ms=[-200, 200],
+            device='cuda'
+        )
 
-            # Apply learned model to test dictionary
-            test_dict_tensor = torch.FloatTensor(test_data['dict_atoms_smooth']).to('cuda')
-
-            # Create new FourierShiftDictionary for test data
-            test_shift_dict = decomp.FourierShiftDictionary(
-                dictionary=test_dict_tensor,
-                max_shift_ms=[-200, 200],
-                sampling_rate=sampling_rate
-            ).to('cuda')
-
-            # Copy learned shifts
-            test_shift_dict.shift_logits.data = model_train.shift_dictionary.shift_logits.data
-
-            # Create test model
-            model_test = decomp.SparseCodingWithShifts(
-                shift_dictionary=test_shift_dict,
-                n_neurons=test_dict_tensor.shape[0],
-                activation_type='global'  # Match training
-            ).to('cuda')
-
-            # Copy learned code and activation
-            model_test.code.data = model_train.code.data
-            model_test.act.load_state_dict(model_train.act.state_dict())
-
-            # Forward pass
-            test_prediction = model_test().cpu().numpy()
-
-            # Calculate test R²
-            
-            test_mse = np.mean((test_prediction - test_data['target_stack_smooth']) ** 2)
-            test_var = np.var(test_data['target_stack_smooth'])
-            test_r2 = 1 - (test_mse / test_var)
+        # Extract results
+        reconstruction_test = test_results['reconstruction']
+        test_r2 = test_results['test_r2']
+        test_mse = test_results['test_mse']
 
         logger.info(f"Test R²: {test_r2:.4f}")
         logger.info(f"Train-Test gap: {train_r2 - test_r2:.4f}")
+        if info_train['val_r2_history']:
+            logger.info(f"Train-Val gap: {train_r2 - info_train['val_r2_history'][-1]:.4f}")
 
         # ===== Store OOF predictions =====
         # Reshape predictions back to (n_test_trials × T)
         n_test_trials = len(test_idx)
 
-        test_pred_trials = test_prediction.reshape(n_test_trials, T)
-        test_true_trials = test_data['target_stack_smooth'].reshape(n_test_trials, T)
+        test_pred_trials = reconstruction_test.T  # (time, trials) -> (trials, time)
+        test_true_trials = target_test.T
 
         # Store in OOF arrays (using original trial indices)
         for i, orig_idx in enumerate(test_idx):
@@ -197,16 +211,21 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
         # Store fold metadata
         fold_results.append({
             'fold_idx': fold_idx,
-            'train_idx': train_idx,
+            'train_inner_idx': train_inner_idx,
+            'val_idx': val_idx,
             'test_idx': test_idx,
             'train_r2': train_r2,
             'test_r2': test_r2,
+            'val_r2_history': info_train['val_r2_history'],
+            'best_val_r2': info_train['best_val_metric'],
+            'best_val_iteration': info_train['best_val_iteration'],
+            'val_early_stopped': info_train['val_early_stopped'],
             'shifts_ms': info_train['shifts_ms'],
             'model_state_dict': model_train.state_dict()
         })
 
         # Clear GPU memory
-        del model_train, model_test, test_dict_tensor, test_shift_dict
+        del model_train
         torch.cuda.empty_cache()
 
     # ===== STAGE 3: Calculate Global OOF R² =====
@@ -231,13 +250,20 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     fold_test_r2_mean = np.mean([f['test_r2'] for f in fold_results])
     fold_test_r2_std = np.std([f['test_r2'] for f in fold_results])
 
+    # Validation statistics
+    fold_best_val_r2_mean = np.mean([f['best_val_r2'] for f in fold_results])
+    fold_best_val_r2_std = np.std([f['best_val_r2'] for f in fold_results])
+    n_early_stopped = sum([f['val_early_stopped'] for f in fold_results])
+
     logger.info(f"\n{'='*60}")
     logger.info("CROSS-VALIDATION RESULTS")
     logger.info(f"{'='*60}")
     logger.info(f"Global OOF R²: {oof_r2:.4f}")
     logger.info(f"Mean fold train R²: {fold_train_r2_mean:.4f} ± {fold_train_r2_std:.4f}")
+    logger.info(f"Mean best validation R²: {fold_best_val_r2_mean:.4f} ± {fold_best_val_r2_std:.4f}")
     logger.info(f"Mean fold test R²: {fold_test_r2_mean:.4f} ± {fold_test_r2_std:.4f}")
     logger.info(f"Train-test gap: {fold_train_r2_mean - fold_test_r2_mean:.4f}")
+    logger.info(f"Folds stopped early: {n_early_stopped}/{n_folds}")
     logger.info(f"{'='*60}\n")
 
     # ===== STAGE 4: Save results =====
@@ -248,6 +274,7 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             'cv_type': 'kfold',
             'n_folds': n_folds,
             'random_state': random_state,
+            'val_split': val_split,
             'oof_predictions': oof_predictions,
             'oof_ground_truth': oof_ground_truth,
             'oof_r2': oof_r2,
@@ -257,6 +284,9 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             'fold_train_r2_std': fold_train_r2_std,
             'fold_test_r2_mean': fold_test_r2_mean,
             'fold_test_r2_std': fold_test_r2_std,
+            'fold_best_val_r2_mean': fold_best_val_r2_mean,
+            'fold_best_val_r2_std': fold_best_val_r2_std,
+            'n_folds_early_stopped': n_early_stopped,
             # Metadata
             'signal2analyze': signal2analyze,
             'trial_outcome': trial_outcome,
@@ -270,116 +300,3 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     logger.info(f"Completed processing {signal2analyze}\n")
 
 logger.info("All signals processed successfully!")
-
-#%%
-
-   
-logger.info(f"\n{'-'*60}")
-logger.info(f"Fold {fold_idx+1}/{n_folds}")
-logger.info(f"Train trials: {len(train_idx)}, Test trials: {len(test_idx)}")
-logger.info(f"{'-'*60}")
-
-# ===== Prepare train and test data from trial subsets =====
-train_data = decomp.prepare_fold_from_atoms_target(
-    atoms, target, train_idx, lick_rate
-)
-test_data = decomp.prepare_fold_from_atoms_target(
-    atoms, target, test_idx, lick_rate
-)
-
-# ===== Train model =====
-logger.info("Training model on train fold...")
-# init_shifts = np.random.normal(25, 1, train_data['dict_atoms_smooth'].shape[0])
-init_shifts = np.random.normal(25, 1, train_data['dict_atoms_smooth'].shape[0])
-
-
-code_train, info_train, reconstruction_train, model_train = \
-    decomp.sparse_encode_pytorch_with_shift(
-        target=train_data['target_stack_smooth'],
-        dictionary=train_data['dict_atoms_smooth'],
-        max_shift_ms=[-50, 50],
-        init_shift_ms=init_shifts,
-        sampling_rate=sampling_rate,
-        n_iterations=10,
-        sparsity_weight=1e-3,
-        n_steps_code=5000,
-        n_steps_shift=1000,
-        sparsity_type='elastic_net',
-        max_lr_shift=0.1,
-        device='cuda',
-        shift_print_step=400,
-        code_print_step=1000,
-        early_stop_patience=100,
-        use_mlflow=False
-    )
-
-train_r2 = info_train['variance_explained']
-logger.info(f"Train R²: {train_r2:.4f}")
-
-#%% test
-test_data = decomp.prepare_fold_from_atoms_target(
-        atoms, target, test_idx, lick_rate
-    )
-# ===== Predict on test fold =====
-logger.info("Predicting on test fold...")
-with torch.no_grad():
-    model_train.eval()
-
-    # Apply learned model to test dictionary
-    test_dict_tensor = torch.FloatTensor(test_data['dict_atoms_smooth']).to('cuda')
-
-    # Create new FourierShiftDictionary for test data
-    test_shift_dict = decomp.FourierShiftDictionary(
-        dictionary=test_dict_tensor,
-        max_shift_ms=[-200, 200],
-        sampling_rate=sampling_rate
-    ).to('cuda')
-
-    # Copy learned shifts
-    test_shift_dict.shift_logits.data = model_train.shift_dictionary.shift_logits.data
-
-    # Create test model
-    model_test = decomp.SparseCodingWithShifts(
-        shift_dictionary=test_shift_dict,
-        n_neurons=test_dict_tensor.shape[0],
-        activation_type='global'  # Match training
-    ).to('cuda')
-
-    # Copy learned code and activation
-    model_test.code.data = model_train.code.data
-    model_test.act.load_state_dict(model_train.act.state_dict())
-
-    # Forward pass
-    test_prediction = model_test().cpu().numpy()
-
-    # Calculate test R²
-    
-    test_mse = np.mean((test_prediction - test_data['target_stack_smooth']) ** 2)
-    test_var = np.var(test_data['target_stack_smooth'])
-    test_r2 = 1 - (test_mse / test_var)
-
-logger.info(f"Test R²: {test_r2:.4f}")
-logger.info(f"Train-Test gap: {train_r2 - test_r2:.4f}")
-
-# ===== Store OOF predictions =====
-# Reshape predictions back to (n_test_trials × T)
-n_test_trials = len(test_idx)
-
-test_pred_trials = test_prediction.reshape(n_test_trials, T)
-test_true_trials = test_data['target_stack_smooth'].reshape(n_test_trials, T)
-
-# Store in OOF arrays (using original trial indices)
-for i, orig_idx in enumerate(test_idx):
-    oof_predictions[orig_idx] = test_pred_trials[i]
-    oof_ground_truth[orig_idx] = test_true_trials[i]
-
-# Store fold metadata
-fold_results.append({
-    'fold_idx': fold_idx,
-    'train_idx': train_idx,
-    'test_idx': test_idx,
-    'train_r2': train_r2,
-    'test_r2': test_r2,
-    'shifts_ms': info_train['shifts_ms'],
-    'model_state_dict': model_train.state_dict()
-})
