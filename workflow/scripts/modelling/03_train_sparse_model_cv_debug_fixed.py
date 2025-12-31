@@ -151,35 +151,63 @@ train_r2 = info_train['variance_explained']
 logger.info(f"\nTrain R²: {train_r2:.4f}")
 logger.info(f"Train code shape: {model_train.code.shape}")
 
-# ===== Test with NEW wrapper function (uses fixed shifts) =====
-logger.info("\nTesting on test fold (using sparse_encode_pytorch_with_shift_trials with fixed_shifts)...")
+# ===== Predict on test fold (FROZEN MODEL - no training!) =====
+logger.info("\nPredicting on test fold (frozen model)...")
 logger.info(f"Test data has {len(test_idx)} trials")
 
-# Call wrapper with fixed shifts from training
-code_test, info_test, reconstruction_test, model_test = \
-    decomp.sparse_encode_pytorch_with_shift_trials(
-        target=target_test,
-        dictionary=dict_test,
+# Get dimensions
+n_neurons_test, n_timepoints_test, n_trials_test = dict_test.shape
+
+# Flatten test data to match training format
+# (n_neurons, time, trials) → (n_neurons, trials, time) → (n_neurons, trials*time)
+dict_test_flat = dict_test.transpose([0, 2, 1])  # (n_neurons, trials, time)
+dict_test_flat = dict_test_flat.reshape(n_neurons_test, n_trials_test * n_timepoints_test)
+
+# Target: (time, trials) → (trials, time) → flatten
+target_test_flat = target_test.T.reshape(1, n_trials_test * n_timepoints_test)
+
+logger.info(f"Flattened test dict shape: {dict_test_flat.shape}")
+logger.info(f"Flattened test target shape: {target_test_flat.shape}")
+
+with torch.no_grad():
+    model_train.eval()
+
+    # Apply learned model to flattened test dictionary
+    test_dict_tensor = torch.FloatTensor(dict_test_flat).to('cuda')
+
+    # Create new FourierShiftDictionary for test data
+    test_shift_dict = decomp.FourierShiftDictionary(
+        dictionary=test_dict_tensor,
         max_shift_ms=[-200, 200],
-        fixed_shifts=info_train['shifts_ms'],  # Initialize with learned shifts
-        sampling_rate=sampling_rate,
-        n_iterations=5,
-        sparsity_weight=5e-3,
-        n_steps_code=5000,
-        n_steps_shift=1000,
-        sparsity_type='elastic_net',
-        max_lr_shift=0.1,
-        device='cuda',
-        shift_print_step=400,
-        code_print_step=1000,
-        early_stop_patience=100,
-        use_mlflow=False
-    )
+        sampling_rate=sampling_rate
+    ).to('cuda')
 
-test_r2 = info_test['variance_explained']
-test_mse = info_test['reconstruction_loss']
+    # Copy learned shifts from training
+    test_shift_dict.shift_logits.data = model_train.shift_dictionary.shift_logits.data
 
-logger.info(f"\nTest code shape: {code_test.shape}")
+    # Create test model
+    model_test = decomp.SparseCodingWithShifts(
+        shift_dictionary=test_shift_dict,
+        n_neurons=test_dict_tensor.shape[0],
+        activation_type='global'  # Match training
+    ).to('cuda')
+
+    # Copy learned code and activation from training
+    model_test.code.data = model_train.code.data
+    model_test.act.load_state_dict(model_train.act.state_dict())
+
+    # Forward pass (no gradients, no optimization!)
+    reconstruction_test_flat = model_test().cpu().numpy()
+
+    # Reshape back to (time, trials)
+    reconstruction_test = reconstruction_test_flat.reshape(n_trials_test, n_timepoints_test).T
+
+    # Calculate test R²
+    test_mse = np.mean((reconstruction_test - target_test) ** 2)
+    test_var = np.var(target_test)
+    test_r2 = 1 - (test_mse / test_var)
+
+logger.info(f"\nTest code shape: {model_test.code.shape}")
 logger.info(f"Test reconstruction shape: {reconstruction_test.shape}")
 logger.info(f"Learned shifts (ms): min={info_train['shifts_ms'].min():.1f}, max={info_train['shifts_ms'].max():.1f}, mean={info_train['shifts_ms'].mean():.1f}")
 
