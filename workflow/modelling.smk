@@ -19,7 +19,7 @@ def rec_properties_input(wildcards):
     photometry = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
 
     if len(recording_csv) > 0 and len(photometry) > 0:
-        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/modelling.done'
+        return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/modelling_cv.done'
     else:
         return []
 
