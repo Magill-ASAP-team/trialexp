@@ -66,8 +66,12 @@ signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
 # CV configuration
 n_folds = 10
 random_state = 42
-val_split = 0.2  # Validation split ratio (20% of training data in each fold)
+val_split = 0.1  # Validation split ratio (20% of training data in each fold)
 val_early_stop_patience = 3  # Early stopping patience
+
+# Shuffle configuration for null distribution
+n_shuffles = 1000
+shuffle_random_seed = 42
 
 #%%
 for save_file, signal2analyze in zip(save_files, signal2analyze_list):
@@ -103,6 +107,11 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     oof_predictions = np.full((n_valid_trials, T), np.nan)
     oof_ground_truth = np.full((n_valid_trials, T), np.nan)
     fold_results = []
+
+    # Storage for shuffled ground truth (for null distribution)
+    shuffle_ground_truth = {}
+    for shuffle_idx in range(n_shuffles):
+        shuffle_ground_truth[shuffle_idx] = np.full((n_valid_trials, T), np.nan)
 
     # ===== STAGE 2: CV loop =====
     logger.info(f"\nStage 2: Running {n_folds}-fold cross-validation...")
@@ -208,6 +217,21 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             oof_predictions[orig_idx] = test_pred_trials[i]
             oof_ground_truth[orig_idx] = test_true_trials[i]
 
+        # ===== Generate shuffled ground truth for null distribution =====
+        logger.info(f"Generating {n_shuffles} shuffled ground truth samples...")
+        for shuffle_idx in range(n_shuffles):
+            # Create reproducible permutation
+            shuffle_seed = shuffle_random_seed + fold_idx * n_shuffles + shuffle_idx
+            rng = np.random.RandomState(shuffle_seed)
+            permutation = rng.permutation(len(test_idx))
+
+            # Shuffle test ground truth (predictions stay fixed)
+            shuffled_true_trials = test_true_trials[permutation]
+
+            # Store in global array using original trial indices
+            for i, orig_idx in enumerate(test_idx):
+                shuffle_ground_truth[shuffle_idx][orig_idx] = shuffled_true_trials[i]
+
         # Store fold metadata
         fold_results.append({
             'fold_idx': fold_idx,
@@ -266,6 +290,46 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     logger.info(f"Folds stopped early: {n_early_stopped}/{n_folds}")
     logger.info(f"{'='*60}\n")
 
+    # ===== STAGE 3.5: Calculate Shuffle R² scores (null distribution) =====
+    logger.info(f"\n{'='*80}")
+    logger.info("Stage 3.5: Computing shuffle R² scores (null distribution)...")
+    logger.info(f"{'='*80}")
+
+    # Verify all shuffle arrays are filled
+    for shuffle_idx in range(n_shuffles):
+        assert not np.any(np.isnan(shuffle_ground_truth[shuffle_idx])), \
+            f"Shuffle {shuffle_idx} has unfilled trials!"
+
+    # Calculate R² for each shuffle
+    shuffle_r2_scores = np.zeros(n_shuffles)
+    for shuffle_idx in range(n_shuffles):
+        shuffle_true_flat = shuffle_ground_truth[shuffle_idx].ravel()
+
+        # Calculate R² comparing OOF predictions to shuffled ground truth
+        shuffle_mse = np.mean((oof_pred_flat - shuffle_true_flat) ** 2)
+        shuffle_var = np.var(shuffle_true_flat)
+        shuffle_r2_scores[shuffle_idx] = 1 - (shuffle_mse / shuffle_var)
+
+    # Calculate statistics
+    shuffle_r2_mean = np.mean(shuffle_r2_scores)
+    shuffle_r2_std = np.std(shuffle_r2_scores)
+    shuffle_r2_min = np.min(shuffle_r2_scores)
+    shuffle_r2_max = np.max(shuffle_r2_scores)
+    shuffle_r2_percentiles = np.percentile(shuffle_r2_scores, [5, 25, 50, 75, 95])
+
+    # Calculate empirical p-value
+    p_value = np.mean(shuffle_r2_scores >= oof_r2)
+
+    logger.info(f"\n{'='*60}")
+    logger.info("SHUFFLE NULL DISTRIBUTION RESULTS")
+    logger.info(f"{'='*60}")
+    logger.info(f"True OOF R²: {oof_r2:.4f}")
+    logger.info(f"Shuffle R² (mean ± std): {shuffle_r2_mean:.4f} ± {shuffle_r2_std:.4f}")
+    logger.info(f"Shuffle R² range: [{shuffle_r2_min:.4f}, {shuffle_r2_max:.4f}]")
+    logger.info(f"Shuffle R² percentiles [5,25,50,75,95]: {shuffle_r2_percentiles}")
+    logger.info(f"Empirical p-value: {p_value:.4f} ({int(p_value * n_shuffles)}/{n_shuffles} shuffles >= true R²)")
+    logger.info(f"{'='*60}\n")
+
     # ===== STAGE 4: Save results =====
     logger.info(f"Saving results to {save_file}")
 
@@ -287,6 +351,14 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             'fold_best_val_r2_mean': fold_best_val_r2_mean,
             'fold_best_val_r2_std': fold_best_val_r2_std,
             'n_folds_early_stopped': n_early_stopped,
+            # Shuffle/null distribution results
+            'shuffle_r2_scores': shuffle_r2_scores,
+            'n_shuffles': n_shuffles,
+            'shuffle_random_seed': shuffle_random_seed,
+            'shuffle_r2_mean': shuffle_r2_mean,
+            'shuffle_r2_std': shuffle_r2_std,
+            'shuffle_r2_percentiles': shuffle_r2_percentiles,
+            'empirical_p_value': p_value,
             # Metadata
             'signal2analyze': signal2analyze,
             'trial_outcome': trial_outcome,
@@ -300,3 +372,4 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
     logger.info(f"Completed processing {signal2analyze}\n")
 
 logger.info("All signals processed successfully!")
+# %%
