@@ -366,7 +366,8 @@ for save_file, signal2analyze in zip(save_files, signal2analyze_list):
             'n_valid_trials': n_valid_trials,
             'timepoints_per_trial': T,
             'n_neurons': atoms.shape[1],
-            'sampling_rate': sampling_rate
+            'sampling_rate': sampling_rate,
+            'cluID': xr_all_filtered.cluID.data,
         }, f)
 
     logger.info(f"Completed processing {signal2analyze}\n")
