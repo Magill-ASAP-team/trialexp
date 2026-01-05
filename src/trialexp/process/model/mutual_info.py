@@ -141,5 +141,8 @@ def plot_top_mi_cells(xr_mi, xr_session, photo_var, extraction_specs, event='spo
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(10*n_cols, 4*n_rows),dpi=100)
     for i in range(n_cells):
         plot_fr_with_photom(xr_session, extraction_specs, photo_var, xr_session.cluID[sort_idx[i]], ax=axes.flat[i])
+        ax.set_title(f'MI = {mi_cue[sort_idx[i]]:.2f}')
         
     fig.tight_layout()
+    
+    return fig
