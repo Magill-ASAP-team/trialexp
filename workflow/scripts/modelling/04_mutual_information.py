@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 from trialexp.process.pyphotometry.linear_modelling import compute_ticks
 import trialexp.process.model.mutual_info as mi 
-
+import seaborn as sns
 #%% Load inputs
 
 (sinput, soutput) = getSnake(locals(), 'workflow/modelling.smk',
@@ -60,60 +60,20 @@ xr_session = xr_all_trials
 xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan'))
 
 save_files = [soutput.ach_model, soutput.da_model]
-signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2']
-# signal2analyze_list = ['zscored_df_over_f_analog_2']
+signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2','lick_rate']
 
-# %%
-# fr = xr_session['spikes_FR_session'].data # trial x time x cluID
-# photom = xr_session['zscored_df_over_f_analog_2'].data # trial x time
-cluID = xr_session.cluID.data
-
-# def prepare_data_for_mi(fr, photom):
-#     # fr should be in the shsape trial x time x cluID
-#     # photom should be in the shape trial x time
-
-#     fr = fr.transpose([2, 0, 1]) # cluID x trial x time
-
-#     # optional smoothing
-#     #    atoms_smooth = savgol_filter(atoms, 21,2, axis=0)
-#     #     target_smooth = savgol_filter(target, 21,2, axis=0)
-
-#     # filter invalid trials
-#     mask_idx = (~np.isnan(fr[0, :, 0])) & (~np.isnan(photom[:,0]))
-#     # Filter valid trials
-#     fr = fr[:, mask_idx, :]
-#     photom = photom[mask_idx,:]
-
-#     fr_stack = fr.reshape(fr.shape[0], -1) #reshape will start from the last dimension, and keep it intact
-#     photom_stack = photom.ravel()
-#     return fr_stack, photom_stack, mask_idx
-
-# fr_stack, photom_stack,_ = prepare_data_for_mi(fr, photom)
-#%% 
-
-# mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=10)
-
-# #%% Sort cells with mi
-
-# sort_idx = np.argsort(mi)[::-1] # descending sort
-# #%%
-# fig, ax = plt.subplots(figsize=(10,6))
-# ax.plot(xr_session['spikes_FR_session'].isel(cluID=sort_idx[1]).mean(dim='trial_nb'))
-# ax2 = ax.twinx()
-# ax2.plot(xr_session['zscored_df_over_f_analog_2'].mean(dim='trial_nb'), color='red')
 
 #%% calculate MI on specific event window
-    
-extraction_specs = eval(xr_session.attrs['extraction_specs'])
-event_win = mi.extract_event_windows(extraction_specs, xr_session)
-xr_mi = mi.calculate_mi_per_event(xr_session, event_win)
+for sig_var in signal2analyze_list:
+    extraction_specs = eval(xr_session.attrs['extraction_specs'])
+    event_win = mi.extract_event_windows(extraction_specs, xr_session)
+    xr_mi = mi.calculate_mi_per_event(xr_session, event_win)
 
 # %% split into different windows and calculate the MI
 
 
 
 #%%
-mi_cue = xr_mi.sel(event='spout').data
-sort_idx = np.argsort(mi_cue)[::-1]
-mi.plot_fr_with_photom(xr_session, event_win, cluID[sort_idx[10]])
+# sns.set_context('paper')
+mi.plot_top_mi_cells(xr_mi, xr_session,'zscored_df_over_f_analog_2', extraction_specs, event='spout', n_cells=5)
 # %%

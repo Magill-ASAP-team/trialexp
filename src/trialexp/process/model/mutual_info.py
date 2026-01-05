@@ -2,6 +2,8 @@ import xarray as xr
 import numpy as np 
 from sklearn.feature_selection import mutual_info_regression
 import matplotlib.pyplot as plt
+from trialexp.process.pyphotometry.linear_modelling import compute_ticks, add_warp_info
+import seaborn as sns 
 
 def prepare_data_for_mi(fr, photom):
     # fr should be in the shsape trial x time x cluID
@@ -23,15 +25,31 @@ def prepare_data_for_mi(fr, photom):
     photom_stack = photom.ravel()
     return fr_stack, photom_stack, mask_idx
 
-def plot_fr_with_photom(xr_session, event_win, cell_ID):
-    fig, ax = plt.subplots(figsize=(10,6))
+def plot_fr_with_photom(xr_session, extraction_specs, photo_var, cluID, fr_var='spikes_FR_session', ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10,6))
     x = xr_session['time']
-    ax.plot(x, xr_session['spikes_FR_session'].sel(cluID=cell_ID).mean(dim='trial_nb'))
+    
+    tab10 = plt.cm.tab10.colors
+    
     ax2 = ax.twinx()
-    ax2.plot(x, xr_session['zscored_df_over_f_analog_2'].mean(dim='trial_nb'), color='red')
+    ax.plot(x, xr_session[photo_var].mean(dim='trial_nb'), color=tab10[0], label=photo_var)
+    ax.set_ylabel(f'{photo_var}')
 
-    for e, t in event_win.items():
-        ax.axvspan(t[0], t[1], alpha=0.2, edgecolor='k')
+    ax2.plot(x, xr_session[fr_var].sel(cluID=cluID).mean(dim='trial_nb'), color=tab10[1], label=cluID)
+    ax2.set_ylabel(f'Firing rate (per s) \n {cluID.data}')
+ 
+    trigger = xr_session.attrs['triggers']
+    
+    add_warp_info(ax, extraction_specs, trigger)
+    # sns.move_legend(ax, 'upper left', bbox_to_anchor=[1,1], title=None, frameon=False)
+    ticks, ticks_labels = compute_ticks(extraction_specs)
+    ax.set_xticks(ticks, labels =ticks_labels, rotation=30) # duplicated tick will be overrided
+
+    ax.spines['top'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    
+    
         
 def extract_event_windows(extraction_specs, xr_session):
     """
@@ -100,3 +118,28 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
                          coords={'event': evt_list, 'cluID': xr_session.cluID})
     return xr_mi
 
+def plot_top_mi_cells(xr_mi, xr_session, photo_var, extraction_specs, event='spout', n_cells=6):
+    """Plot firing rate with photometry for top MI cells.
+    
+    Parameters
+    ----------
+    xr_mi : xarray.Dataset
+        Dataset containing mutual information values
+    xr_session : xarray.Dataset
+        Session dataset with spike and photometry data
+    event_win : dict
+        Dictionary containing event window specifications
+    event : str, optional
+        Event name to select MI values for, by default 'spout'
+    n_cells : int, optional
+        Number of top MI cells to plot, by default 5
+    """
+    mi_cue = xr_mi.sel(event=event).data
+    sort_idx = np.argsort(mi_cue)[::-1]
+    n_cols = 1
+    n_rows = (n_cells + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(10*n_cols, 4*n_rows),dpi=100)
+    for i in range(n_cells):
+        plot_fr_with_photom(xr_session, extraction_specs, photo_var, xr_session.cluID[sort_idx[i]], ax=axes.flat[i])
+        
+    fig.tight_layout()
