@@ -45,10 +45,9 @@ rule compute_mutual_information:
     log:
         '{sessions}/{task_path}/{session_id}/processed/log/compute_mutual_information.log'  
     output:
-        ach_model = '{sessions}/{task_path}/{session_id}/processed/ach_mutual_info.pkl',
-        da_model = '{sessions}/{task_path}/{session_id}/processed/da_mutual_info.pkl',
-        figures_dir = directory('{sessions}/{task_path}/{session_id}/processed/figures/modelling'),
-        done = touch('{sessions}/{task_path}/{session_id}/processed/modelling_mi.done')
+        xr_mi = '{sessions}/{task_path}/{session_id}/processed/xr_mi.nc',
+        xr_mi_shuffle = '{sessions}/{task_path}/{session_id}/processed/xr_mi_shuffle.nc',
+        figures_dir = directory('{sessions}/{task_path}/{session_id}/processed/figures/modelling/mutual_info'),
     threads: 32
     script:
         "scripts/modelling/01_train_sparse_model.py"
@@ -72,8 +71,8 @@ rule train_sparse_model_cv:
 
 rule modelling:
     input:
-        '{sessions}/{task_path}/{session_id}/processed/modelling_cv.done'),
-        '{sessions}/{task_path}/{session_id}/processed/modelling_mi.done')
+        '{sessions}/{task_path}/{session_id}/processed/modelling_cv.done',
+        '{sessions}/{task_path}/{session_id}/processed/xr_mi.nc'
     output:
         touch('{sessions}/{task_path}/{session_id}/processed/modelling.done')
         
