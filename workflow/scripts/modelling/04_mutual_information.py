@@ -47,16 +47,17 @@ signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2','lick_r
 #%%
 xr_mi = xr.Dataset()
 for sig_var in signal2analyze_list:
+    logger.info(f'Calculating MI for {sig_var}')
     # calculate MI on specific event window
     extraction_specs = eval(xr_session.attrs['extraction_specs'])
     event_win = mi.extract_event_windows(extraction_specs, xr_session)
     xa_mi = mi.calculate_mi_per_event(xr_session,event_win, photom_var=sig_var)
-    xa_mi_shuffle = mi.calculate_mi_per_event_shuffled(xr_session,event_win, photom_var=sig_var, n_shuffles=100)
+    xa_mi_shuffle = mi.calculate_mi_per_event_shuffled(xr_session,event_win, photom_var=sig_var, n_shuffles=3)
     xa_comp = mi.compare_mi_significance(xa_mi, xa_mi_shuffle)
     
-    xr_mi[f'mi_{signal2analyze_list}'] = xa_mi
-    xr_mi[f'mi_{signal2analyze_list}_shuffle'] = xa_mi
-    xr_mi[f'mi_comp_{signal2analyze_list}'] = xa_comp
+    xr_mi[f'mi_{sig_var}'] = xa_mi
+    xr_mi[f'mi_{sig_var}_shuffle'] = xa_mi_shuffle
+    xr_mi[f'mi_{sig_var}_comp_pvalue'] = xa_comp['p_value']
 
 #%%
 
@@ -67,5 +68,5 @@ for sig_var, evt in itertools.product(signal2analyze_list, xr_mi.event.data):
     
     fig.savefig(Path(soutput.figures_dir)/f'mi_{evt}_{sig_var}.png',dpi=200)
     
-# %%
+# %% save
 xr_mi.to_netcdf(soutput.xr_mi)
