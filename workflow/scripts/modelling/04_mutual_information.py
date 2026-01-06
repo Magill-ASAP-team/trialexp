@@ -1,5 +1,5 @@
 '''
-Train pytorch model for sparse encoding with time shift
+Calculating mutual information and do shuffling analysis
 '''
 
 #%%

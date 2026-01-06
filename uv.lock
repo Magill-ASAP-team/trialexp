@@ -781,6 +781,19 @@ wheels = [
 ]
 
 [[package]]
+name = "entropy-estimators"
+version = "0.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a4/c4/a1b58f7a391ea6239e00b83a806291568ce4a8282f80ef86f256a413ba70/entropy_estimators-0.0.2.tar.gz", hash = "sha256:ca940ed2629bc83416735fad306c8be163c13d3875e45bb31bbea70170b89c40", size = 22079 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/42/ae401ed4e30d6eba6663dad5d5af25a3b011b0c5c776ce6636307c85bb7b/entropy_estimators-0.0.2-py3-none-any.whl", hash = "sha256:2498d226be757d50fb15b19941a3c35cdd5cabfe6613817b11b0b50980ebe4d3", size = 20696 },
+]
+
+[[package]]
 name = "exceptiongroup"
 version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1265,6 +1278,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/21/ed/f86a79a07470cb078
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/3e/741d8c82801c347547f8a2a06aa57dbb1992be9e948df2ea0eda2c8b79e8/idna-3.7-py3-none-any.whl", hash = "sha256:82fee1fc78add43492d3a1898bfa6d8a904cc97d8427f683ed8e798d07761aa0", size = 66836 },
 ]
+
+[[package]]
+name = "idtxl"
+version = "1.6"
+source = { git = "https://github.com/pwollstadt/IDTxl.git#1a5397fa69c395c954817190101a97261d8117a4" }
 
 [[package]]
 name = "immutables"
@@ -4580,6 +4598,8 @@ dependencies = [
 
 [package.optional-dependencies]
 full = [
+    { name = "entropy-estimators" },
+    { name = "idtxl" },
     { name = "kilosort" },
     { name = "snakehelper" },
     { name = "snakemake" },
@@ -4635,6 +4655,7 @@ requires-dist = [
     { name = "dpath", specifier = "==2.2.0" },
     { name = "dtaidistance", specifier = "==2.3.13" },
     { name = "elephant", specifier = "==1.1.0" },
+    { name = "entropy-estimators", marker = "extra == 'full'", specifier = ">=0.0.2" },
     { name = "exceptiongroup", specifier = "==1.2.1" },
     { name = "executing", specifier = "==2.0.1" },
     { name = "faiss-cpu", specifier = "==1.8.0" },
@@ -4659,6 +4680,7 @@ requires-dist = [
     { name = "httpx", specifier = "==0.27.0" },
     { name = "humanfriendly", specifier = "==10.0" },
     { name = "idna", specifier = "==3.7" },
+    { name = "idtxl", marker = "extra == 'full'", git = "https://github.com/pwollstadt/IDTxl.git" },
     { name = "importlib-metadata", specifier = "==7.2.0" },
     { name = "importlib-resources", specifier = "==6.4.0" },
     { name = "ipykernel", specifier = ">=6.29.4" },

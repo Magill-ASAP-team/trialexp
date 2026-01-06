@@ -272,6 +272,8 @@ full = [
     "kilosort",
     "snakemake>=9.0.0",
     "snakehelper",
+    "idtxl",
+    "entropy-estimators>=0.0.2",
 ]
 
 [tool.uv.sources]
@@ -282,6 +284,7 @@ torch = [
 torchaudio = [
   { index = "pytorch-cu118", extra="full"},
 ]
+idtxl = { git = "https://github.com/pwollstadt/IDTxl.git" }
 
 
 [[tool.uv.index]]
