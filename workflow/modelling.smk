@@ -34,7 +34,7 @@ rule compute_mutual_information:
         figures_dir = directory('{sessions}/{task_path}/{session_id}/processed/figures/modelling/mutual_info'),
     threads: 32
     script:
-        "scripts/modelling/01_train_sparse_model.py"
+        "scripts/modelling/04_mutual_information.py"
 
 
 rule train_sparse_model_cv:
