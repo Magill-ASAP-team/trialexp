@@ -52,7 +52,7 @@ for sig_var in signal2analyze_list:
     extraction_specs = eval(xr_session.attrs['extraction_specs'])
     event_win = mi.extract_event_windows(extraction_specs, xr_session)
     xa_mi = mi.calculate_mi_per_event(xr_session,event_win, photom_var=sig_var)
-    xa_mi_shuffle = mi.calculate_mi_per_event_shuffled(xr_session,event_win, photom_var=sig_var, n_shuffles=3)
+    xa_mi_shuffle = mi.calculate_mi_per_event_shuffled(xr_session,event_win, photom_var=sig_var, n_shuffles=100)
     xa_comp = mi.compare_mi_significance(xa_mi, xa_mi_shuffle)
     
     xr_mi[f'mi_{sig_var}'] = xa_mi
