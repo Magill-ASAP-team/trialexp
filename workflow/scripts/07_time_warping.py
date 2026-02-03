@@ -66,6 +66,9 @@ elif task_name in ['reaching_go_spout_bar_VR_April24',
     extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
     outcome2plot = ['success',['omission','jackpot'],'aborted', 'no_reach', 'late_reach']
     
+elif task_name in ['two_cue_reaching_task_January26']:
+    extraction_specs = specs['reaching_go_spout_bar_reward_nogap']
+    outcome2plot = [['CS_1_success','CS_2_success'],['CS_1_success','CS_1_omission'],['CS_2_success','CS_2_omission'],['CS_1_aborted','CS_2_aborted'], ['CS_1_no_reach', 'CS_2_no_reach'], ['CS_1_late_reach', 'CS_2_late_reach']]
 
 elif task_name in ['reaching_go_spout_incr_break2_nov22',
                    'reaching_go_spout_incr_break2_April24',

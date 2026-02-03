@@ -122,3 +122,5 @@ node_modules
 
 .web
 *.eeg-info
+mlruns
+mlflow.db
