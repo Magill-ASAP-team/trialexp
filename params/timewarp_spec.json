@@ -149,6 +149,27 @@
             "label": "reward\ndelivery"
         }
     },
+    "pavlovian_reward": {
+        "cue_presentation": {
+            "event_window": [
+                -500,
+                1000
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue on"
+        },
+        "US_delay_timer": {
+            "event_window": [
+                -500,
+                1000
+            ],
+            "alternative": ["US_jackpot","US_omission"],
+            "order": "first",
+            "padding": 0,
+            "label": "reward\ndelivery"
+        }
+    },
     "reaching_go_spout_bar": {
         "hold_for_water": {
             "event_window": [
