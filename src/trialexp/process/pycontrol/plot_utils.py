@@ -24,7 +24,14 @@ trial_outcome_palette = {
     'free_reward_no_reach': default_palette[9],
     'jackpot': default_palette[10],
     'omission': default_palette[11],
+    'CS_2_success': default_palette[0], 
+    'CS_1_late_reach': default_palette[1],
+    'CS_1_success': default_palette[2],
+    'CS_2_late_reach': default_palette[3],
+    'CS_2_no_reach': default_palette[4],
+    'CS_1_no_reach':default_palette[5]
 }
+
 trial_outcome_palette.update({f'stim_duration:{x}':default_palette[i] for i,x in enumerate([0,1000,2000,3000,4000,6000,8000])})
 
 def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=None, **kwargs):
