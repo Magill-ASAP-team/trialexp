@@ -117,7 +117,10 @@ for probe_folder in kilosort_folder.glob('Probe*'):
     metric_names=['firing_rate', 'presence_ratio', 'snr', 'isi_violation', 'amplitude_cutoff']
 
     amp_cutoff = analyzer.compute("quality_metrics",metric_names=metric_names)
-    analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
+    try:
+        analyzer.save_as(format='zarr', folder=waveform_folder/'analyzer')
+    except Exception as e:
+        logger.info(e)
  
 
     df_metrics = analyzer2dataframe(analyzer)
