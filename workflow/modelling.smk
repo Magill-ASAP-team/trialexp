@@ -17,8 +17,9 @@ def rec_properties_input(wildcards):
     # determine if there is an ephys recording for that folder
     recording_csv = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/ephys/states.npy')
     photometry = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/pyphotometry/*.ppd')
+    spike_workflow = glob(f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/spike_workflow.done')
 
-    if len(recording_csv) > 0 and len(photometry) > 0:
+    if len(recording_csv) > 0 and len(photometry) > 0 and len(spike_workflow) > 0:
         return f'{wildcards.sessions}/{wildcards.task_path}/{wildcards.session_id}/processed/modelling.done'
     else:
         return []
