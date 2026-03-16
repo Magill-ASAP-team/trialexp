@@ -7,7 +7,18 @@ def plot_and_handler_error(plot_func, **kwargs):
     if len(kwargs['data'].dropna())>0:
         trial_outcome = kwargs['data']['trial_outcome'].iloc[0]
         # if trial_outcome in trial_outcome_palette:
-        kwargs['color'] = trial_outcome_palette[trial_outcome]
+        try:
+            kwargs['color'] = trial_outcome_palette[trial_outcome]
+        except KeyError:
+            # try reformatting the trial outcome
+            # modify it according to different subtypes
+            if 'CS_1_' in trial_outcome:
+                trial_outcome = trial_outcome.replace('CS_1_','')
+                kwargs['color'] = trial_outcome_palette[trial_outcome]
+            elif 'CS_2_' in trial_outcome:
+                trial_outcome = trial_outcome.replace('CS_2_','')
+                kwargs['color'] = np.array(trial_outcome_palette[trial_outcome])*0.5
+                
         plot_func(**kwargs)
   
 def annotate_trial_number(data, **kwargs):
