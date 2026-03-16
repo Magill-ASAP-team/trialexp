@@ -128,11 +128,81 @@
             "label": "trial end"
         }       
     },
+    "two_cue_spout_reward": {
+        "hold_for_water": {
+            "event_window": [
+                -500,
+                0
+            ],
+            "order": "only",
+            "padding": 200,
+            "label": "cue on"
+        },
+        "bar_off": {
+            "event_window": [
+                0,
+                50
+            ],
+            "order": "last_before_first",
+            "dependent_event": "spout",
+            "padding": 100,
+            "label": "reach start"
+        },
+        "spout": {
+            "event_window": [
+                0,
+                500
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "reach finish"
+        },
+        "US_delay_timer": {
+            "event_window": [
+                0,
+                2000
+            ],
+            "alternative": ["US_jackpot","US_omission"],
+            "order": "first",
+            "padding": 300,
+            "label": "reward\ndelivery"
+        },
+        "trial_end":{
+            "event_window": [
+                0,
+                0
+            ],
+            "order": "first",
+            "padding": 0,
+            "label": "trial end"
+        }       
+    },
     "pavlovian_go_reward_nogap": {
         "hold_for_water": {
             "event_window": [
                 -500,
                 500
+            ],
+            "order": "only",
+            "padding": 500,
+            "label": "cue on"
+        },
+        "US_delay_timer": {
+            "event_window": [
+                -500,
+                1000
+            ],
+            "alternative": ["US_jackpot","US_omission"],
+            "order": "first",
+            "padding": 0,
+            "label": "reward\ndelivery"
+        }
+    },
+    "pavlovian_reward": {
+        "cue_presentation": {
+            "event_window": [
+                -500,
+                1000
             ],
             "order": "only",
             "padding": 500,

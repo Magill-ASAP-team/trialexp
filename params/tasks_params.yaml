@@ -1425,3 +1425,42 @@ opto_sweep_pavlovian_July25:
   extra_trigger_events:
   - lick
   trial_parameters: []
+two_cue_reaching_task_January26:
+  triggers:
+  - hold_for_water
+  events:
+  - name: bar
+    order: first
+  - name: bar_off
+    order: first
+  - name: spout
+    order: first
+  - name: US_end_timer
+    order: first
+  - name: lick
+    order: first
+  - name: US_delay_timer
+    order: first
+  conditions:
+  - Go_to_get_water
+  - US_end_timer
+  - break_after_abort
+  - water_on
+  - water by bar_off
+  - water by spout
+  - water for free
+  - water success
+  - button_press
+  - busy_win_timer
+  - spout
+  - waiting_for_spout
+  - US_omission
+  trial_window:
+  - '-2000'
+  - '3000'
+  extra_trigger_events:
+  - spout
+  - bar_off
+  - lick
+  - US_end_timer
+  trial_parameters: []

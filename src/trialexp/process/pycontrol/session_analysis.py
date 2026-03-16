@@ -435,7 +435,7 @@ def compute_trial_outcome(row, task_name):
         else:
             return "undefined"
     elif task_name in [
-        "pavlovian_task_August25",'pavlovian_task_August25_silent'
+        "pavlovian_task_August25",'pavlovian_task_August25_silent','pavlovian_task_February26'
     ]:
         if row.US_delay_timer:
             return "standard"
@@ -519,6 +519,40 @@ def compute_trial_outcome(row, task_name):
         'opto_sweep_pavlovian_July25'
     ]:
         return f'stim_duration:{row.stim_duration}'
+    elif task_name in [
+        "two_cue_reaching_task_January26"]:
+
+        if row.CS_1 and row.break_after_abort:
+            return "CS_1_aborted"
+        elif row.CS_2 and row.break_after_abort:
+            return "CS_2_aborted"
+        
+        elif row.CS_1 and not row.spout:
+            return "CS_1_no_reach"
+        elif row.CS_2 and not row.spout:
+            return "CS_2_no_reach"
+        
+        elif row.button_press:
+            return "button_press"
+        elif row["water by bar_off"]:
+            return "water_by_bar_off"
+        
+        elif row.CS_1 and row.US_omission:
+            return "CS_1_omission"
+        elif row.CS_2 and row.US_omission:
+            return "CS_2_omission"
+        
+        elif row.CS_1 and row.spout and not row.water_on:
+            return "CS_1_late_reach"
+        elif row.CS_2 and row.spout and not row.water_on:
+            return "CS_2_late_reach"
+        
+        elif row.CS_1 and row["water by spout"]:
+            return "CS_1_success"
+        elif row.CS_2 and row["water by spout"]:
+            return "CS_2_success"
+        else:
+            return "undefined"
     else:
         if row.success:
             return "success"
@@ -642,6 +676,7 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
         "reaching_go_spout_bar_VR_April24_silent",
         "reaching_go_spout_bar_VR_Feb25",
         'reaching_go_spout_bar_VR_cued_random_June25'
+        "two_cue_reaching_task_January26"
     ]:
 
         if (
@@ -676,7 +711,7 @@ def compute_success(df_events_trials, df_cond, task_name, triggers=None, timelim
         if 'US_end_timer_trial_time' in df_events.columns:
             df_conditions['success'] = ~df_events.US_end_timer_trial_time.isna()
 
-    elif task_name in['pavlovian_task_August25','pavlovian_task_August25_silent']:
+    elif task_name in['pavlovian_task_August25','pavlovian_task_August25_silent','pavlovian_task_February26']:
         df_conditions["success"] = False
         
     return df_conditions

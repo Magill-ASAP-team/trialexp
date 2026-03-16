@@ -1978,7 +1978,7 @@ def preprocess_photometry(data_photometry, df_pycontrol):
                 logger.debug("I am processing data with optogenetics")
                 # do a special case for optogenetics
                 data_photometry = motion_correction_opto(data_photometry)
-            elif set(["Rdlight", "rDA", "tdTomato"]) & set(injection):
+            elif set(["Rdlight", "rDA", "tdTomato",'PinkyCaMP']) & set(injection):
                 logger.debug("Processing multicolor photometry")
                 if not "analog_3" in data_photometry:
                     baseline_correction_multicolor(data_photometry)
