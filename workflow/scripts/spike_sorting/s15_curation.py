@@ -28,7 +28,8 @@ df_info = pd.read_csv(ks_dir.parent/'rec_prop_ProbeA.csv')
 # extract the recording data path
 root_dir = Path(os.environ['SESSION_ROOT_DIR']).parents[1]/'Data'
 path = Path(df_info.iloc[0].full_path)
-recording_path = Path(root_dir).joinpath(*path.parts[7:])
+
+recording_path = Path(root_dir) / Path(*path.parts[path.parts.index('neuropixels'):])
 
 
 #%% load default parameters
