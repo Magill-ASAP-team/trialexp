@@ -945,6 +945,264 @@ def plot_timewarp_nan_debug(xr_warped, signal_var, extraction_specs, trigger,
 
     return fig, trial_info
 
+
+def plot_trial_warp_debug(
+    df_events_cond,
+    extraction_specs,
+    trigger,
+    trial_nbs=None,
+    max_trials=20,
+    output_file=None,
+    figsize=None,
+):
+    """Debug plot showing event geometry in original trial time.
+
+    For each trial, draws a timeline with:
+    - Protected event windows (colored solid bands)
+    - Padding regions (hatched bands)
+    - Overlapping regions (red bands with 'OVERLAP' label)
+    - Trigger position (black vertical line at x=0)
+    - Event timestamps as vertical dashed lines with annotations
+
+    Parameters
+    ----------
+    df_events_cond : pd.DataFrame
+        Events with columns: trial_nb, content, time, trial_outcome
+    extraction_specs : dict
+        Loaded from timewarp_spec.json (already filtered to task)
+    trigger : str
+        Trigger event name (must be a key in extraction_specs)
+    trial_nbs : list[int], optional
+        Explicit trial numbers to plot. If None, auto-detects failed trials.
+    max_trials : int
+        Max number of auto-detected failed trials to show (default 20)
+    output_file : str or Path, optional
+        Where to save the figure
+    figsize : tuple, optional
+        (width, height_per_subplot)
+
+    Returns
+    -------
+    fig, axes
+    """
+    # ---- Determine which trials to plot --------------------------------
+    if trial_nbs is None:
+        # Auto-detect failed trials by simulating interp_data logic
+        all_trial_nbs = df_events_cond['trial_nb'].unique()
+        failed_trial_nbs = []
+        for tnb in all_trial_nbs:
+            df_trial = df_events_cond[df_events_cond['trial_nb'] == tnb]
+            try:
+                _simulate_warp(df_trial, extraction_specs, trigger)
+            except ValueError:
+                failed_trial_nbs.append(tnb)
+        trial_nbs = failed_trial_nbs[:max_trials]
+    else:
+        trial_nbs = trial_nbs[:max_trials]
+
+    if len(trial_nbs) == 0:
+        logger.info('plot_trial_warp_debug: no trials to plot')
+        fig, ax = plt.subplots(1, 1, figsize=(12, 2))
+        ax.text(0.5, 0.5, 'No failed trials found', ha='center', va='center',
+                transform=ax.transAxes, fontsize=14)
+        ax.axis('off')
+        if output_file is not None:
+            fig.savefig(output_file, dpi=150, bbox_inches='tight')
+        return fig, [ax]
+
+    # ---- Color palette per event name ----------------------------------
+    event_names = list(extraction_specs.keys())
+    colors = plt.cm.tab10.colors
+    event_colors = {evt: colors[i % len(colors)] for i, evt in enumerate(event_names)}
+
+    # ---- Build figure --------------------------------------------------
+    n_trials = len(trial_nbs)
+    w, h_per = figsize if figsize else (14, 1.8)
+    fig, axes = plt.subplots(n_trials, 1, figsize=(w, h_per * n_trials),
+                             sharex=True, squeeze=False)
+    axes = axes[:, 0]
+
+    # Shared legend handles collected during first trial
+    legend_handles = {}
+
+    for ax, trial_nb in zip(axes, trial_nbs):
+        df_trial = df_events_cond[df_events_cond['trial_nb'] == trial_nb]
+
+        # Determine trial outcome
+        trial_outcome = 'unknown'
+        if 'trial_outcome' in df_trial.columns and len(df_trial) > 0:
+            trial_outcome = df_trial.iloc[0]['trial_outcome']
+
+        # Find trigger time
+        trig_rows = df_trial[df_trial['content'] == trigger]
+        if len(trig_rows) == 0:
+            ax.set_title(f'Trial {trial_nb} | {trial_outcome} — TRIGGER NOT FOUND',
+                         color='red', fontweight='bold', fontsize=9)
+            ax.axis('off')
+            continue
+        t_trigger = trig_rows.iloc[0]['time']
+
+        trigger_specs = extraction_specs[trigger]
+        event_specs = {k: v for k, v in extraction_specs.items() if k != trigger}
+
+        # cur_time tracks end of last event window (absolute ms)
+        cur_time = t_trigger + trigger_specs['event_window'][1]
+        padding = trigger_specs['padding']
+
+        failed = False
+        failure_msgs = []
+
+        # Draw trigger protected window
+        pre_t, post_t = trigger_specs['event_window']
+        rel_pre = pre_t   # relative to t_trigger
+        rel_post = post_t
+        color = event_colors[trigger]
+        h = ax.axvspan(rel_pre, rel_post, alpha=0.45, color=color,
+                       label=trigger if trigger not in legend_handles else '_nolegend_')
+        if trigger not in legend_handles:
+            legend_handles[trigger] = h
+        ax.axvline(0, color='black', linewidth=2, zorder=5)
+        ax.text(0, 1.02, f'{trigger}\n@0ms', ha='center', va='bottom',
+                fontsize=7, transform=ax.get_xaxis_transform(), color='black')
+
+        for evt, specs in event_specs.items():
+            dependent_event = specs.get('dependent_event', None)
+            alternative = specs.get('alternative', None)
+            event_row = extract_event(df_trial, evt, specs['order'], dependent_event, alternative)
+
+            if event_row is not None:
+                t_event = event_row['time']
+            else:
+                # Fallback: place event at cur_time + padding - pre_window
+                t_event = cur_time + padding - specs['event_window'][0]
+
+            pre, post = specs['event_window']
+            pre_abs = t_event + pre      # absolute
+            post_abs = t_event + post    # absolute
+
+            # Relative to trigger
+            rel_evt = t_event - t_trigger
+            rel_pre_evt = pre_abs - t_trigger
+            rel_post_evt = post_abs - t_trigger
+            rel_cur = cur_time - t_trigger
+
+            color = event_colors[evt]
+
+            # Padding region [cur_time, t_event+pre] — may be zero or negative
+            pad_start = rel_cur
+            pad_end = rel_pre_evt
+            if pad_end > pad_start:
+                h = ax.axvspan(pad_start, pad_end, alpha=0.18, color=color,
+                               hatch='///', label=f'{evt} (padding)' if f'{evt}_pad' not in legend_handles else '_nolegend_')
+                if f'{evt}_pad' not in legend_handles:
+                    legend_handles[f'{evt}_pad'] = h
+
+            # Check for overlap
+            overlap_amount = cur_time - pre_abs  # positive = overlap
+            if overlap_amount > 0:
+                failed = True
+                msg = (f'{evt}: cur_time={cur_time - t_trigger:.0f}ms > '
+                       f'{evt}_pre={rel_pre_evt:.0f}ms (overlap={overlap_amount:.0f}ms)')
+                failure_msgs.append(msg)
+                # Draw overlap region
+                overlap_start = rel_pre_evt
+                overlap_end = rel_cur
+                h = ax.axvspan(overlap_start, overlap_end, alpha=0.7, color='red',
+                               label='OVERLAP' if 'OVERLAP' not in legend_handles else '_nolegend_',
+                               zorder=4)
+                if 'OVERLAP' not in legend_handles:
+                    legend_handles['OVERLAP'] = h
+                ax.text((overlap_start + overlap_end) / 2, 0.5, 'OVERLAP',
+                        ha='center', va='center', fontsize=7, fontweight='bold',
+                        color='white', transform=ax.get_xaxis_transform(), zorder=5)
+
+            # Protected event window
+            h = ax.axvspan(rel_pre_evt, rel_post_evt, alpha=0.45, color=color,
+                           label=evt if evt not in legend_handles else '_nolegend_')
+            if evt not in legend_handles:
+                legend_handles[evt] = h
+
+            # Event timestamp line and annotation
+            ax.axvline(rel_evt, color=color, linestyle='--', linewidth=1.2, alpha=0.8, zorder=3)
+            label = specs.get('label', evt)
+            ax.text(rel_evt, 1.02, f'{label}\n@{rel_evt:.0f}ms',
+                    ha='center', va='bottom', fontsize=7,
+                    transform=ax.get_xaxis_transform(), color=color)
+
+            # Advance cur_time
+            cur_time = post_abs + 1
+            padding = specs['padding']
+
+        # Title
+        title = f'Trial {trial_nb} | {trial_outcome}'
+        title_color = 'red' if failed else 'green'
+        ax.set_title(title, color=title_color, fontweight='bold', fontsize=9)
+
+        # Failure reason text inside subplot
+        if failure_msgs:
+            ax.text(0.01, 0.1, '\n'.join(failure_msgs), ha='left', va='bottom',
+                    fontsize=6.5, transform=ax.transAxes, color='darkred',
+                    bbox=dict(boxstyle='round,pad=0.2', fc='lightyellow', alpha=0.8))
+
+        ax.set_yticks([])
+        ax.set_ylim(0, 1)
+        ax.grid(axis='x', alpha=0.3)
+
+    axes[-1].set_xlabel('Time relative to trigger (ms)')
+
+    # Shared legend at figure top
+    if legend_handles:
+        fig.legend(list(legend_handles.values()), list(legend_handles.keys()),
+                   loc='upper center', ncol=min(len(legend_handles), 6),
+                   fontsize=8, bbox_to_anchor=(0.5, 1.0),
+                   framealpha=0.9)
+
+    fig.suptitle(f'Time Warp Debug — trigger: {trigger}  ({n_trials} trials)',
+                 y=1.02 + 0.015, fontsize=11, fontweight='bold')
+    fig.tight_layout()
+
+    if output_file is not None:
+        fig.savefig(output_file, dpi=150, bbox_inches='tight')
+        logger.info(f'Timewarp debug plot saved: {output_file}')
+
+    return fig, axes
+
+
+def _simulate_warp(df_trial, extraction_specs, trigger):
+    """Replicate the overlap-check logic of interp_data() without signal data.
+
+    Raises ValueError if any event's protected window overlaps cur_time.
+    """
+    trig_rows = df_trial[df_trial['content'] == trigger]
+    if len(trig_rows) == 0:
+        raise ValueError(f'Trigger {trigger} not found in trial')
+
+    t_trigger = trig_rows.iloc[0]['time']
+    trigger_specs = extraction_specs[trigger]
+    cur_time = t_trigger + trigger_specs['event_window'][1]
+    padding = trigger_specs['padding']
+
+    event_specs = {k: v for k, v in extraction_specs.items() if k != trigger}
+    for evt, specs in event_specs.items():
+        dependent_event = specs.get('dependent_event', None)
+        alternative = specs.get('alternative', None)
+        event_row = extract_event(df_trial, evt, specs['order'], dependent_event, alternative)
+
+        if event_row is not None:
+            t_event = event_row['time']
+        else:
+            t_event = cur_time + padding - specs['event_window'][0]
+
+        if cur_time > t_event + specs['event_window'][0]:
+            raise ValueError(
+                f'Overlap detected for event {evt}: '
+                f'cur_time={cur_time:.1f} > t_event+pre={t_event + specs["event_window"][0]:.1f}'
+            )
+
+        cur_time = t_event + specs['event_window'][1] + 1
+        padding = specs['padding']
+
+
 def print_time_warping_summary(xr_warped, signal_var):
     """Print summary statistics of time warping results.
     

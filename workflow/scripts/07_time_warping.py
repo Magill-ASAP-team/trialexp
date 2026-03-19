@@ -107,6 +107,18 @@ logger.info('Ratio of valid successful trials:', ratio)
 
 lm.print_time_warping_summary(xr_warped, signal2analyze[0])
 
+#%%
+# Debug plot for failed trials (geometry view in original trial time)
+failed_mask = np.isnan(xr_warped[signal2analyze[0]].data).all(axis=1)
+trial_outcome_mask = (xr_warped.trial_outcome == 'success')
+failed_trial_nbs = xr_warped.trial_nb.values[failed_mask&trial_outcome_mask].tolist()
+if failed_trial_nbs:
+    fig, ax = lm.plot_trial_warp_debug(
+        df_events_cond, extraction_specs, trigger,
+        trial_nbs=failed_trial_nbs,
+        max_trials=10,
+        output_file=Path(soutput.figure_dir) / 'timewarp_debug.png'
+    )
 
 #%% Plot the time wrapped data
 for var in signal2analyze:

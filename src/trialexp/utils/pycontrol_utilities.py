@@ -502,3 +502,4 @@ def move_folders(df_pycontrol, export_base_path, ephys_base_path):
         except Exception as e:
             print(f'Error copying files for {row.session_id}')
             print(e)
+            logger.exception(f'Error copying files for {row.session_id}')
