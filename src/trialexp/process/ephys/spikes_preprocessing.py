@@ -48,7 +48,7 @@ def load_kilosort(ks_result_folder, skip_PC_feature=False):
     return ks_results
 
 
-def add_ks_metadata(ks_results, df_metrics, good_only=False):
+def add_ks_metadata(ks_results, df_metrics, good_only=True):
     """
     Adds metadata from ks_results to df_metrics DataFrame.
     
@@ -59,24 +59,31 @@ def add_ks_metadata(ks_results, df_metrics, good_only=False):
     Returns:
         None
     """
-    ks_labels = ks_results['cluster_KSLabel']['KSLabel'].values
-    good_idx = (ks_labels=='good')
-    
+    ks_labels = ks_results['cluster_KSLabel']['KSLabel'].values    
     sel_idx = np.arange(len(ks_labels))
-    if good_only:
-        sel_idx = good_idx
-            
-    templates = ks_results['templates']
-    max_chans = np.array([np.argmax(np.max(np.abs(te),axis=0)) for te in templates])
-    chan_pos = np.stack([ks_results['channel_positions'][ch] for ch in max_chans])
     
-    df_metrics['maxWaveformCh'] = max_chans[sel_idx]
-    df_metrics['ks_chan_pos_x'] = chan_pos[sel_idx,0]
-    df_metrics['ks_chan_pos_y'] = chan_pos[sel_idx,1]
-    df_metrics['ks_labels'] = ks_labels[sel_idx]
+    if good_only:
+        sel_idx = (ks_labels=='good')
+        
+    ks_labels = ks_labels[sel_idx]
+            
+    # Note: templates from kilosort is alredy whitened
+    # so its spatial feature may not match the original signal
+    # get the average spike location for a cluster
+    clus = ks_results['spike_clusters']
+    cluster_id	 = ks_results['cluster_KSLabel'].cluster_id[sel_idx]
+    spike_positions = ks_results['spike_positions']
+    chan_pos = np.zeros((len(cluster_id),2))
+
+    for i, id in enumerate(cluster_id):
+        chan_pos[i,:] = spike_positions[clus==id].mean(axis=0)
+    
+    df_metrics['ks_chan_pos_x'] = chan_pos[:,0]
+    df_metrics['ks_chan_pos_y'] = chan_pos[:,1]
+    df_metrics['ks_labels'] = ks_labels
     
     # make sure the order is correct
-    assert all(df_metrics['unit_id'].values == ks_results['cluster_KSLabel']['cluster_id'][sel_idx].values), 'unit_id mismatch'
+    assert all(df_metrics['unit_id'].values == cluster_id), 'unit_id mismatch'
 
 def get_spike_trains(
         synced_timestamp_files: list, 
@@ -179,7 +186,12 @@ def build_evt_fr_xarray(fr_xr, timestamps, trial_index, name, trial_window, bin_
     else:
         # Concatenate the timestamps
         timestamps = timestamps.dropna()
-        if len(timestamps)> 0:
+        
+        # note: trigger and behav event may have the same name (e.g. spout)
+        # need to processing them differently
+        
+        if len(timestamps)> 0 and isinstance(timestamps.iloc[0], list):
+            # series of list, combine them together
             timestamps = timestamps.sum() #concatenate list of lists
         trial_rates, trial_time_vec = extract_trial_data(fr_xr, timestamps, trial_window, bin_duration)
 
@@ -244,6 +256,7 @@ def merge_cell_metrics_and_spikes(
 
 
 def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
+    # Note: there may be error when the trigger event is also found in behavorial event
     # trial onset is the trigger time
     trial_onsets = df_trials[df_trials.valid == True].timestamp
 
@@ -258,17 +271,27 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
 
     # get the time for each important events
     df_aggregated = pd.concat([trial_outcomes, trial_onsets], axis=1)
-
+    
+    # rename the trigger properly
+    trigger = df_events_cond.attrs['triggers'][0]
+    df_aggregated.columns = ['trial_outcome', trigger]
+    col2add =[]
+    
     for ev_name, filter in behav_phases_filters.items():
-        # add timestamp of particuliar behavioral phases
-        df_aggregated = pd.concat([df_aggregated, event_filters.extract_event_time(df_events_cond, filter, dict())], axis=1)
-
+        if ev_name not in df_aggregated.columns:
+            # add timestamp of particuliar behavioral phases
+            df_aggregated = pd.concat([df_aggregated, event_filters.extract_event_time(df_events_cond, filter, dict())], axis=1)
+            col2add.append(ev_name)
+            
     #add any extra event triggers
     extra_event_triggers = df_events_cond.attrs['extra_event_triggers']
     for ev_name in extra_event_triggers:
-        df = event_filters.get_events_from_name(df_events_cond, ev_name)
-        evt_col = df.groupby('trial_nb')['time'].agg(list)
-        df_aggregated = pd.concat([df_aggregated, evt_col], axis=1)
+        if ev_name not in df_aggregated.columns:
+            # avoid duplicate extraction
+            df = event_filters.get_events_from_name(df_events_cond, ev_name)
+            evt_col = df.groupby('trial_nb')['time'].agg(list)
+            df_aggregated = pd.concat([df_aggregated, evt_col], axis=1)
+            col2add.append(ev_name)
 
     # add additional events
     # events in the `events` columns of the task_params.csv will not be automaticaly extracted by default
@@ -284,15 +307,15 @@ def make_evt_dataframe(df_trials, df_conditions, df_events_cond):
                 # prevent duplicate extraction
                 df = event_filters.extract_event_time(df_events_cond, event_filters.get_first_event_from_name, {'evt_name':evt})
                 df_evt_list.append(df)
-                additional_events2add.append(f'first_{evt}')
+                col2add.append(f'first_{evt}')
 
             # # combine dataframe
         df_aggregated = pd.concat([df_aggregated, *df_evt_list], axis=1)
     
     # rename the columns
-    trigger = df_events_cond.attrs['triggers'][0]
-    df_aggregated.columns = ['trial_outcome', trigger,  *behav_phases_filters.keys(),
-                              *extra_event_triggers, *additional_events2add]
+    # trigger = df_events_cond.attrs['triggers'][0]
+    df_aggregated.columns = [df_aggregated.columns[0], df_aggregated.columns[1],
+                             *col2add]
     df_aggregated['reward'] = df_aggregated.first_spout + 500 # Hard coded, 500ms delay, perhaps adapt to a parameter?
 
     return df_aggregated

@@ -148,7 +148,9 @@ def match_ephys(df_pycontrol, df_ephys_exp, ephys_base_path):
                 # find all potential match, choose the one that is earlier and closest
                 td = (row.timestamp - df_ephys_exp_subject.exp_datetime)
                 td = np.array([t.total_seconds() for t in td])
-                df_ephys_exp_subject = df_ephys_exp_subject[td>=-1] # pycontrol is later
+                df_ephys_exp_subject = df_ephys_exp_subject[td>=-3600] 
+                # Usually pycontrol is later, but sometimes it can also be earlier if forgot to start neuropixels
+                # allow for 1 hour max delay
                 
                 if len(df_ephys_exp_subject) > 0:
                     min_td = np.min(abs(row.timestamp - df_ephys_exp_subject.exp_datetime))

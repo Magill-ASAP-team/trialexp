@@ -14,4 +14,4 @@ For frontend, run ` npm --prefix apps/atlasaligner/frontend run dev`
 To test the built React app is working, `npx serve dist`
 
 ## Running the program
-run `just run-alinger`
+run `just run-aligner`

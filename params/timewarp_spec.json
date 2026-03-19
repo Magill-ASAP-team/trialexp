@@ -140,7 +140,7 @@
         },
         "bar_off": {
             "event_window": [
-                -200,
+                0,
                 50
             ],
             "order": "last_before_first",

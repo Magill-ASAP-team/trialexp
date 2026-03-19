@@ -6,6 +6,7 @@ import seaborn as sns
 from pathlib import Path
 from datetime import datetime
 import scipy.io as sio
+import xarray as xr
 
 def get_region_boundary(df_cell, dep_col,group_method='consecutive'):
     df_cell = df_cell.sort_values(dep_col)
@@ -410,3 +411,48 @@ def get_trajectory_areas(df_session, shift, root_path):
     trajectory_areas.attrs['original_coords'] = probe_coords
     
     return trajectory_areas
+
+
+
+def construct_localization_dataset(df_local, xr_spikes_trials):
+    '''
+    Allen CCF coordinates:
+    https://community.brain-map.org/t/how-to-transform-ccf-x-y-z-coordinates-into-stereotactic-coordinates/1858
+
+    With the nose pointing foward.
+    The origin is at upper left corner at the back
+    First axis is left-right
+    Second axis is top-down
+    Third axis is back-front
+    Note: the coordinate do not start at Bregma, and everything are positive only.
+    '''
+    
+        
+    chan_pos_x = xr_spikes_trials['ks_chan_pos_x']
+    chan_pos_y = xr_spikes_trials['ks_chan_pos_y']
+
+
+    # Get the actual unit position in CCF by shifting along the probe trajectory
+    shifted_coords = df_local.attrs['shifed_coords']*10 #left-right, DV, back-front , original unit is 10um
+    d = shifted_coords[1]-shifted_coords[0]
+    l = np.linalg.norm(d)
+    unit_vector = d/l
+    coords = shifted_coords[1][:, None] - chan_pos_y.data*unit_vector[:, None]  # pos_y count from tip
+
+    xr_local = xr.Dataset()
+
+    xr_coords = xr.DataArray(coords, dims=['atlas_axis','cluID'],
+                                coords={'cluID': xr_spikes_trials.cluID, 'atlas_axis':['LR','DV','AP']})
+
+    xr_local['axis_coords'] = xr_coords
+    #
+    # group the cell into brain regions
+    depth_start = df_local['depth_start'].values
+    idx = np.digitize(chan_pos_y.data, depth_start)-1
+    brain_region = df_local.iloc[idx]
+
+    #
+    xr_local['atlas_id'] = xr.DataArray(brain_region['atlas_id'], dims=['cluID'], coords={'cluID': xr_spikes_trials.cluID})
+    xr_local['brain_region'] = xr.DataArray(brain_region['acronym'], dims=['cluID'], coords={'cluID': xr_spikes_trials.cluID})
+
+    return xr_local
