@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from trialexp.process.pyphotometry.linear_modelling import compute_ticks, add_warp_info
 import seaborn as sns 
 from tqdm.auto import tqdm
+from loguru import logger
 
 def prepare_data_for_mi(fr, photom):
     # fr should be in the shsape trial x time x cluID
@@ -18,10 +19,15 @@ def prepare_data_for_mi(fr, photom):
 
     # filter invalid trials
     mask_idx = (~np.isnan(fr[0, :, 0])) & (~np.isnan(photom[:,0]))
+    
+    if not any(mask_idx):
+        logger.warning('No valid trials found after filtering for NaNs. Check your data and extraction windows.')
+        logger.warning('Number of valid spike trials', (~np.isnan(fr[0, :, 0])).sum())
+        logger.warning('Number of valid photometry trials', (~np.isnan(photom[:,0])).sum())
+        
     # Filter valid trials
     fr = fr[:, mask_idx, :]
     photom = photom[mask_idx,:]
-
     fr_stack = fr.reshape(fr.shape[0], -1) #reshape will start from the last dimension, and keep it intact
     photom_stack = photom.ravel()
     return fr_stack, photom_stack, mask_idx
@@ -107,7 +113,6 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
             xr_region = xr_session.sel(time=mask)
             fr = xr_region[fr_var].data  # trial x time x cluID
             photom = xr_region[photom_var].data  # trial x time
-            
             fr_stack, photom_stack, _ = prepare_data_for_mi(fr, photom)
             
             mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=10)

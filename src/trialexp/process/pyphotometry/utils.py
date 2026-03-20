@@ -249,13 +249,21 @@ def window_subtraction(analog1, analog2, sampling_rate, win_size_s=30) -> dict:
     ):
         try:
             slope, intercept, r_value, p_value, std_err = linregress(chunk2, chunk1)
+            if np.isnan(slope):
+                # chunk has zero variance (e.g. constant signal), skip correction
+                logger.warning(
+                    f"Warning: NaN slope from linregress (zero variance chunk). Skipping window subtraction for start_ind={start_ind}"
+                )
+                r_value = 0
+                p_value = 0
+                intercept = 0
+                slope = 0
         except ValueError as e:
             logger.warning(
                 f"Warning: regression error. I will skip wndow subtraction for {start_ind}"
             )
             r_value = 0
             p_value = 0
-            r_value = 0
             intercept = 0
             slope = 0
 
@@ -1777,6 +1785,18 @@ def motion_correction_multicolor(
             sampling_rate,
         )
 
+        if np.isnan(analog_2_corrected).any():
+            nan_count = np.isnan(analog_2_corrected).sum()
+            raise ValueError(
+                f"analog_2_corrected contains {nan_count} NaN(s) after window_subtraction."
+            )
+
+        if np.isnan(photometry_dict["analog_1_corrected"]).any():
+            nan_count = np.isnan(photometry_dict["analog_1_corrected"]).sum()
+            raise ValueError(
+                f"analog_1_corrected contains {nan_count} NaN(s) after motion correction."
+            )
+
         photometry_dict["analog_2_est_motion"] = analog_2_est_motion
         photometry_dict["analog_2_corrected"] = analog_2_corrected
 
@@ -1785,10 +1805,10 @@ def motion_correction_multicolor(
         return photometry_dict
 
     except ValueError as e:
-        print(e)
-        print("Motion correction failed. Skipping motion correction")
+        logger.warning(f"Motion correction failed ({e}). Skipping motion correction.")
         # probably due to saturation , do not do motion correction
         photometry_dict["analog_1_corrected"] = photometry_dict["analog_1_filt"]
+        photometry_dict["analog_2_corrected"] = photometry_dict["analog_2_filt"]
         photometry_dict["motion_corrected"] = 0
 
     return photometry_dict
