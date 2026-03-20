@@ -16,8 +16,25 @@ find-session pattern:
 find-data pattern:
   fd -e ppd -e tsv {{pattern}} $SESSION_ROOT_DIR 
 
+
+
 # Search for and execute workflow in a session folder
-make-session SEARCH_TERM *FLAGS:
+make-session SESSION_ID *FLAGS:
+  #!/usr/bin/bash 
+  #shebang is necessary otherwise it will be executed line by line indepedently
+  target=$(fd --type d --full-path '{{SESSION_ID}}$' $SESSION_ROOT_DIR)
+  echo "$target" | while read line; do echo "$line"; done
+  read -p "Are you sure you want to proceed? [y/N] " ans; \
+  if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then \
+      echo "Aborted."; exit 1; \
+  fi
+  targets=$(echo "$target" | awk '{printf "%sprocessed/pycontrol_workflow.done ", $0}')
+  echo $targets
+  uv run snakemake $targets --snakefile workflow/pycontrol.smk -c20 -k {{FLAGS}} -q rules --rerun-incomplete --rerun-triggers mtime
+
+
+# Search for and execute workflow in a session folder
+make SEARCH_TERM *FLAGS:
   #!/usr/bin/bash 
   #shebang is necessary otherwise it will be executed line by line indepedently
   target=$(fd --type d --full-path '{{SEARCH_TERM}}.*-[0-9]{6}$' $SESSION_ROOT_DIR)
