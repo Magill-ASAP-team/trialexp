@@ -120,6 +120,17 @@ function App() {
         })
         .catch((error) => {
           console.log(error);
+          const msg = error.response?.data?.detail ?? 'Failed to load cell metrics';
+          notifications.show({
+            title: 'Error',
+            message: msg,
+            color: 'red',
+          });
+          if (error.response?.status === 404) {
+            setCellMetricsData(null);
+            setPlotData([]);
+            setTrackDate('');
+          }
         });
     }
   }, [sessionID, binSize])
@@ -191,10 +202,11 @@ function App() {
                     max={2000}
                     labelAlwaysOn
                     style={{ width: 600 }} />
-                  <Button onClick={() => setDepthShift(0)}>Reset</Button>
+                  <Button onClick={() => setDepthShift(0)} disabled={cellMetricsData === null}>Reset</Button>
                   <Button
                     onClick={handleSave}
                     color={trajectoryInfoExists ? 'red' : 'blue'}
+                    disabled={cellMetricsData === null}
                   >
                     {trajectoryInfoExists ? 'Overwrite' : 'Save'}
                   </Button>

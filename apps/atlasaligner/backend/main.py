@@ -1,5 +1,6 @@
 #%%
 import fastapi
+from fastapi import HTTPException
 from enum import Enum
 from typing import Optional
 from trialexp.process.folder_org.utils import build_session_info_cohort
@@ -14,6 +15,7 @@ from datetime import datetime
 from pydantic import BaseModel
 import os 
 from dotenv import load_dotenv
+from loguru import logger
 #%%
 load_dotenv()
 root_path = os.environ['SESSION_ROOT_DIR']
@@ -107,8 +109,11 @@ async def get_firing_rate(session_id:str, bin_size:int=0):
         local_results = Path(root_path)/df.cohort/'histology'/df.animal_id/'RGB'/'Processed'
         probes_name = load_probe_dates(local_results/'probe_names.txt')
         probe_idx = np.where(probes_name == df.expt_datetime.date())[0]
+        if len(probe_idx) == 0:
+            msg = f'Probe for date {df.expt_datetime.date()} not found in probe_names.txt'
+            logger.error(msg)
+            raise HTTPException(status_code=404, detail=msg)
         probe_date = probes_name[probe_idx[0]]
-        print(probe_date)
         date_str = probe_date.strftime('%Y-%m-%d')
         trajectory_file = Path(local_results/f'aligned_trajectory_{date_str}.pkl')
         print(trajectory_file)
