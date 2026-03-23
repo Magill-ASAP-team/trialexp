@@ -103,6 +103,7 @@ function App() {
   //Get firing rate data
   useEffect(() => {
     if (sessionID) {
+      setDepthShift(0);
       axios.get(`/api/cell_metrics/${sessionID}`,
         { params: { bin_size: binSize } })
         .then((response) => {
