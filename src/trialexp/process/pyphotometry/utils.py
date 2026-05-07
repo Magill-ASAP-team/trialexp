@@ -645,6 +645,14 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
         digital_2 = digital[1::n_analog_signals] if n_digital_signals == 2 else None
     else:
         # work with the bleedthrough channel
+        '''
+        Note 
+        For opto data, only analog_1 and bleedthrough_ch2 is valid
+        analog_2 and bleedthrough_ch1 are baseline for analog1 and bleedthrough_ch2 respectively
+        analog_3 and bleedthrough_isos are the raw sample for analog1 and bleedthrough_ch2 respectively
+        '''
+        
+        
         analog_1 = analog[::n_analog_signals] * volts_per_division[0]
         analog_2 = analog[2::n_analog_signals] * volts_per_division[1]
         analog_3 = analog[4::n_analog_signals] * volts_per_division[0]
