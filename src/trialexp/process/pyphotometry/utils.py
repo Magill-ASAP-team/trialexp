@@ -647,7 +647,7 @@ def import_ppd_v2(file_path, low_pass=20, high_pass=0.01):
         # work with the bleedthrough channel
         '''
         Note 
-        For opto data, only analog_1 and bleedthrough_ch2 is valid
+        For opto acquisition mode, only analog_1 and bleedthrough_ch2 is valid
         analog_2 and bleedthrough_ch1 are baseline for analog1 and bleedthrough_ch2 respectively
         analog_3 and bleedthrough_isos are the raw sample for analog1 and bleedthrough_ch2 respectively
         '''
