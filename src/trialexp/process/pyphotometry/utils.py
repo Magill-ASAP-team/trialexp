@@ -1803,7 +1803,8 @@ def motion_correction_multicolor(
         photometry_dict["motion_corrected"] = 1
         
         # also analyze bleedthrough for quality control
-        if 'bleedthrough_ch1_filt' in photometry_dict:
+        subject_id = photometry_dict.get("subject_ID", "")
+        if 'bleedthrough_ch1_filt' in photometry_dict and ('RE' in subject_id or 'TT' in subject_id):
             analyze_bleedthrough(photometry_dict, sampling_rate)
 
         return photometry_dict
