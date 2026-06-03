@@ -125,7 +125,8 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
     return xr_mi
 
 def calculate_mi_per_event_shuffled(xr_session, event_win, n_shuffles=100, fr_var='spikes_FR_session',
-                                    photom_var='zscored_df_over_f_analog_2', random_seed=None):
+                                    photom_var='zscored_df_over_f_analog_2', random_seed=None,
+                                    n_jobs=-1):
     """
     Calculate null distribution of mutual information by shuffling photometry trials.
 
@@ -147,12 +148,17 @@ def calculate_mi_per_event_shuffled(xr_session, event_win, n_shuffles=100, fr_va
         Name of photometry variable to analyze (default: 'zscored_df_over_f_analog_2')
     random_seed : int, optional
         Random seed for reproducibility (default: None)
+    n_jobs : int, optional
+        Number of parallel jobs for the shuffle loop (default: -1, all CPUs).
+        Each job runs mutual_info_regression with n_jobs=1 to avoid over-subscription.
 
     Returns
     -------
     xr.DataArray
         Mutual information values with dimensions [shuffle, event, cluID]
     """
+    from joblib import Parallel, delayed
+
     if random_seed is not None:
         rng = np.random.default_rng(random_seed)
     else:
@@ -161,33 +167,52 @@ def calculate_mi_per_event_shuffled(xr_session, event_win, n_shuffles=100, fr_va
     t = xr_session.time
     n_trials = xr_session.sizes['trial_nb']
 
-    mi_shuffles = []
+    # Pre-extract event window data once — avoids repeating n_shuffles * n_events xarray ops
+    evt_list = []
+    event_data = {}  # evt -> (fr_transposed, photom, fr_not_nan, photom_not_nan)
+    for (evt, win) in event_win.items():
+        if (win[1] - win[0]):
+            mask = (t >= win[0]) & (t <= win[1])
+            xr_region = xr_session.sel(time=mask)
+            fr = xr_region[fr_var].data       # trial x time x cluID
+            photom = xr_region[photom_var].data  # trial x time
 
-    for _ in tqdm(range(n_shuffles)):
-        # Generate trial shuffle indices
-        shuffle_indices = rng.permutation(n_trials)
+            fr_T = fr.transpose([2, 0, 1])    # cluID x trial x time
+            fr_not_nan = ~np.isnan(fr_T[0, :, 0])       # (n_trials,) — constant across shuffles
+            photom_not_nan = ~np.isnan(photom[:, 0])     # (n_trials,) — permuted per shuffle
 
+            event_data[evt] = (fr_T, photom, fr_not_nan, photom_not_nan)
+            evt_list.append(evt)
+
+    # Pre-generate all shuffle indices to keep rng state deterministic
+    all_shuffle_indices = [rng.permutation(n_trials) for _ in range(n_shuffles)]
+
+    def _one_shuffle(shuffle_idx):
         mi_list = []
-        evt_list = []
+        for evt in evt_list:
+            fr_T, photom, fr_not_nan, photom_not_nan = event_data[evt]
 
-        for (evt, win) in event_win.items():
-            if (win[1] - win[0]):  # make sure there is data
-                mask = (t >= win[0]) & (t <= win[1])
-                xr_region = xr_session.sel(time=mask)
-                fr = xr_region[fr_var].data  # trial x time x cluID
-                photom = xr_region[photom_var].data  # trial x time
+            # NaN mask: fr NaNs are fixed; photom NaN positions change with the shuffle
+            combined_mask = fr_not_nan & photom_not_nan[shuffle_idx]
 
-                # Shuffle photometry by trial
-                photom_shuffled = photom[shuffle_indices, :]
+            fr_masked = fr_T[:, combined_mask, :]          # cluID x valid_trials x time
+            photom_masked = photom[shuffle_idx, :][combined_mask, :]  # valid_trials x time
 
-                fr_stack, photom_stack, _ = prepare_data_for_mi(fr, photom_shuffled)
+            if not combined_mask.any():
+                mi_list.append(np.zeros(fr_T.shape[0]))
+                continue
 
-                mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=-1)
-                mi_list.append(mi)
-                evt_list.append(evt)
+            fr_stack = fr_masked.reshape(fr_masked.shape[0], -1)  # cluID x (trials*time)
+            photom_stack = photom_masked.ravel()
 
-        mi_list = np.stack(mi_list)
-        mi_shuffles.append(mi_list)
+            # n_jobs=1 here because the outer Parallel already saturates CPUs
+            mi_vals = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=1)
+            mi_list.append(mi_vals)
+        return np.stack(mi_list)
+
+    mi_shuffles = Parallel(n_jobs=n_jobs)(
+        delayed(_one_shuffle)(idx) for idx in tqdm(all_shuffle_indices)
+    )
 
     mi_shuffles = np.stack(mi_shuffles)
     xr_mi_shuffled = xr.DataArray(

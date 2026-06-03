@@ -41,7 +41,8 @@ xr_all_trials = xr_spikes_all.merge(xr_photom_warp)
 
 
 xr_session = xr_all_trials
-xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan'))
+# aborted trial may contain overlapping signals
+xr_session = xr_session.sel(trial_nb = (xr_session.trial_outcome!='nan' ) & (xr_session.trial_outcome!='aborted'))
 signal2analyze_list = ['zscored_df_over_f', 'zscored_df_over_f_analog_2','lick_rate']
 
 #%%
