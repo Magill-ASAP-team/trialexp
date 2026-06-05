@@ -85,7 +85,7 @@ def extract_event_windows(extraction_specs, xr_session):
     
     return event_win
 
-def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', photom_var='zscored_df_over_f_analog_2'):
+def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', photom_var='zscored_df_over_f_analog_2', time_split=0.3):
     """
     Calculate mutual information between neural activity and photometry signal for different event windows.
     
@@ -97,31 +97,50 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
         Dictionary mapping event names to time windows (start, end)
     photom_var : str, optional
         Name of photometry variable to analyze (default: 'zscored_df_over_f_analog_2')
+    time_split : float, optional
+        Fraction of trials to use for early and late splits (default: 0.2)
     
     Returns
     -------
     xr.DataArray
-        Mutual information values with dimensions [event, cluID]
+        Mutual information values with dimensions [trial_split, event, cluID]
     """
     t = xr_session.time
-    mi_list = []
-    evt_list = []
+    n_trials = xr_session.sizes['trial_nb']
+    n_split = int(np.floor(n_trials * time_split))
     
-    for (evt, win) in event_win.items():
-        if (win[1] - win[0]):  # make sure there is data
-            mask = (t >= win[0]) & (t <= win[1])
-            xr_region = xr_session.sel(time=mask)
-            fr = xr_region[fr_var].data  # trial x time x cluID
-            photom = xr_region[photom_var].data  # trial x time
-            fr_stack, photom_stack, _ = prepare_data_for_mi(fr, photom)
-            
-            mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=10)
-            mi_list.append(mi)
-            evt_list.append(evt)
+    trial_splits = {
+        'early': np.arange(n_split),
+        'late': np.arange(n_trials - n_split, n_trials),
+        'all': np.arange(n_trials),
+    }
     
-    mi_list = np.stack(mi_list)
-    xr_mi = xr.DataArray(mi_list, dims=['event', 'cluID'], 
-                         coords={'event': evt_list, 'cluID': xr_session.cluID})
+    split_list = []
+    split_names = []
+
+    for split_name, trial_idx in trial_splits.items():
+        xr_split = xr_session.isel(trial_nb=trial_idx)
+        mi_list = []
+        evt_list = []
+
+        for (evt, win) in event_win.items():
+            if (win[1] - win[0]):  # make sure there is data
+                mask = (t >= win[0]) & (t <= win[1])
+                xr_region = xr_split.sel(time=mask)
+                fr = xr_region[fr_var].data  # trial x time x cluID
+                photom = xr_region[photom_var].data  # trial x time
+                fr_stack, photom_stack, _ = prepare_data_for_mi(fr, photom)
+                
+                mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=-1)
+                mi_list.append(mi)
+                evt_list.append(evt)
+
+        split_list.append(np.stack(mi_list))
+        split_names.append(split_name)
+
+    mi_array = np.stack(split_list)  # trial_split x event x cluID
+    xr_mi = xr.DataArray(mi_array, dims=['trial_split', 'event', 'cluID'],
+                         coords={'trial_split': split_names, 'event': evt_list, 'cluID': xr_session.cluID})
     return xr_mi
 
 def calculate_mi_per_event_shuffled(xr_session, event_win, n_shuffles=100, fr_var='spikes_FR_session',
