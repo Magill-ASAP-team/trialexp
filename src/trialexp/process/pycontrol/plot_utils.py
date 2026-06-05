@@ -1,3 +1,4 @@
+import re
 import matplotlib
 import matplotlib.pylab as plt
 import numpy as np
@@ -44,7 +45,11 @@ def plot_event_distribution(df2plot, x, y, xbinwidth = 100, ybinwidth=100, xlim=
         plt.rcParams['font.family'] = ['Lato']
 
     g = sns.JointGrid()
-    
+
+    # Strip CS_N_ prefixes so outcome names map to existing palette entries
+    df2plot = df2plot.copy()
+    df2plot['trial_outcome'] = df2plot['trial_outcome'].str.replace(r'^CS_\d+_', '', regex=True)
+
     #plot spout touch
     df_spout = df2plot[df2plot.content=='spout']
     if len(df_spout) == 0:
