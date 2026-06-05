@@ -85,7 +85,7 @@ def extract_event_windows(extraction_specs, xr_session):
     
     return event_win
 
-def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', photom_var='zscored_df_over_f_analog_2', time_split=0.3):
+def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', photom_var='zscored_df_over_f_analog_2', time_split=0.25):
     """
     Calculate mutual information between neural activity and photometry signal for different event windows.
     
