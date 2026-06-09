@@ -60,14 +60,10 @@ for sig_var in signal2analyze_list:
     xr_mi[f'mi_{sig_var}_comp_pvalue'] = xa_comp['p_value']
     xr_mi[f'mi_{sig_var}_trial'] = xa_mi_trial
 
-#%%
-xa_mi, xa_mi_trial = mi.calculate_mi_per_event(xr_session,event_win, photom_var=sig_var)
-
-
 #%% plot figures
 for sig_var, evt in itertools.product(signal2analyze_list, xr_mi.event.data):
     logger.info(f'Processing {evt} of {sig_var}')
-    fig = mi.plot_top_mi_cells(xa_mi, xr_session,sig_var, extraction_specs, event=evt, n_cells=5)
+    fig = mi.plot_top_mi_cells(xa_mi.sel(trial_split='all'), xr_session,sig_var, extraction_specs, event=evt, n_cells=5)
     
     fig.savefig(Path(soutput.figures_dir)/f'mi_{evt}_{sig_var}.png',dpi=200)
     
