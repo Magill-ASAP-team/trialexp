@@ -26,11 +26,11 @@ def prepare_data_for_mi(fr, photom):
         logger.warning('Number of valid photometry trials', (~np.isnan(photom[:,0])).sum())
         
     # Filter valid trials
-    fr = fr[:, mask_idx, :]
-    photom = photom[mask_idx,:]
-    fr_stack = fr.reshape(fr.shape[0], -1) #reshape will start from the last dimension, and keep it intact
-    photom_stack = photom.ravel()
-    return fr_stack, photom_stack, mask_idx
+    fr_valid = fr[:, mask_idx, :]
+    photom_valid = photom[mask_idx,:]
+    fr_stack = fr_valid.reshape(fr_valid.shape[0], -1) #reshape will start from the last dimension, and keep it intact
+    photom_stack = photom_valid.ravel()
+    return fr_stack, photom_stack, mask_idx, fr_valid, photom_valid
 
 def plot_fr_with_photom(xr_session, extraction_specs, photo_var, cluID, fr_var='spikes_FR_session', ax=None):
     if ax is None:
@@ -121,6 +121,7 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
     for split_name, trial_idx in trial_splits.items():
         xr_split = xr_session.isel(trial_nb=trial_idx)
         mi_list = []
+        mi_trial_list = []
         evt_list = []
 
         for (evt, win) in event_win.items():
@@ -129,7 +130,30 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
                 xr_region = xr_split.sel(time=mask)
                 fr = xr_region[fr_var].data  # trial x time x cluID
                 photom = xr_region[photom_var].data  # trial x time
-                fr_stack, photom_stack, _ = prepare_data_for_mi(fr, photom)
+                fr_stack, photom_stack, mask_idx, fr_valid, photo_valid = prepare_data_for_mi(fr, photom)
+                
+                # calculate per trial MI
+                if split_name == 'all':
+                    trial_nb = xr_split.trial_nb.data[mask_idx]
+                    logger.info(f'Calculating MI for {evt} using all trials. Number of valid')
+                    for i in range(fr_valid.shape[1]): # loop through trials
+                        fr_trial = fr_valid[:,i,:]
+                        photom_trial = photo_valid[i,:]
+                        mi_trial = mutual_info_regression(fr_trial.T, photom_trial, n_jobs=-1)
+
+                        xa_mi_trial = xr.DataArray(
+                            mi_trial[:, np.newaxis, np.newaxis],
+                            dims=['cluID', 'trial_nb', 'event'],
+                            coords={
+                                'cluID': xr_session.cluID,
+                                'trial_nb': [trial_nb[i]],
+                                'event': [evt],
+                            },
+                        )
+
+                        mi_trial_list.append(xa_mi_trial)
+                
+                    
                 
                 mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=-1)
                 mi_list.append(mi)
@@ -141,7 +165,11 @@ def calculate_mi_per_event(xr_session, event_win, fr_var ='spikes_FR_session', p
     mi_array = np.stack(split_list)  # trial_split x event x cluID
     xr_mi = xr.DataArray(mi_array, dims=['trial_split', 'event', 'cluID'],
                          coords={'trial_split': split_names, 'event': evt_list, 'cluID': xr_session.cluID})
-    return xr_mi
+    
+    xr_mi_trial = xr.combine_by_coords(mi_trial_list)
+    return xr_mi, xr_mi_trial
+
+
 
 def calculate_mi_per_event_shuffled(xr_session, event_win, n_shuffles=100, fr_var='spikes_FR_session',
                                     photom_var='zscored_df_over_f_analog_2', random_seed=None):
