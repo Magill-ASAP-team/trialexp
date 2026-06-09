@@ -227,7 +227,7 @@ def calculate_mi_per_event_shuffled(xr_session, event_win, n_shuffles=100, fr_va
                 # Shuffle photometry by trial
                 photom_shuffled = photom[shuffle_indices, :]
 
-                fr_stack, photom_stack, _ = prepare_data_for_mi(fr, photom_shuffled)
+                fr_stack, photom_stack, _,_,_ = prepare_data_for_mi(fr, photom_shuffled)
 
                 mi = mutual_info_regression(fr_stack.T, photom_stack, n_jobs=-1)
                 mi_list.append(mi)
