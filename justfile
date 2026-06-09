@@ -101,6 +101,10 @@ run-model-session SESSION_ID *FLAGS:
   echo $targets
   uv run snakemake $targets --snakefile workflow/modelling.smk -c20 -k {{FLAGS}} -q rules --rerun-incomplete --rerun-triggers mtime
 
+run-model-all *FLAGS:
+  #!/usr/bin/bash 
+  #shebang is necessary otherwise it will be executed line by line indepedently
+  uv run snakemake --snakefile workflow/modelling.smk -c20 -k {{FLAGS}} -q rules --rerun-incomplete --rerun-triggers mtime
 
 
 run-aligner:
