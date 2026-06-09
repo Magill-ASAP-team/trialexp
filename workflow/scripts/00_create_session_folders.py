@@ -29,10 +29,10 @@ tasks_params_path = PROJECT_ROOT / 'params' / 'tasks_params.csv'
 tasks_params_df = pd.read_csv(tasks_params_path)
 tasks = tasks_params_df.task.values.tolist()
 
-skip_existing = True #whether to skip existing folders
+skip_existing = False #whether to skip existing folders
 
 # cohort to copy, if empty then search for all cohorts
-cohort_to_copy = ['2025_July_cohort','2025_June_cohort','2025_October_cohort','2025_September_cohort','2026_January_cohort','2026_April_cohort'] 
+cohort_to_copy = ['2026_April_cohort'] 
 
 # %%
 
@@ -59,11 +59,11 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
     
     df_pycontrol = df_pycontrol[(df_pycontrol.subject_id!='00') & (df_pycontrol.subject_id!='01')] # do not copy the test data
 
-    try:
-        df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short, v2 uses second as unit
-    except AttributeError:
-        print(f'no session length, skipping folder')
-        continue
+    # try:
+    #     df_pycontrol = df_pycontrol[df_pycontrol.session_length>1000*60*3] #remove sessions that are too short, v2 uses second as unit
+    # except AttributeError:
+    #     print(f'no session length, skipping folder')
+    #     continue
 
     df_pyphoto = pd.DataFrame(list(map(parse_pyhoto_fn, pyphoto_files)))
         
@@ -87,7 +87,7 @@ for cohort_id, cohort in enumerate(cohort_to_copy):
                 df_pycontrol.loc[i, 'do_copy'] = False
                     
     df_pycontrol = df_pycontrol[df_pycontrol.do_copy==True]
-    # df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'TT008']
+    df_pycontrol= df_pycontrol[df_pycontrol.subject_id == 'AIRTEST']
     # df_pycontrol= df_pycontrol[df_pycontrol.session_id == 'TT008-2024-06-10-153517']
     # df_pycontrol= df_pycontrol[df_pycontrol.session_id.str.startswith('TT008')]
     
