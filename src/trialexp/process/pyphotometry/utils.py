@@ -2010,7 +2010,7 @@ def preprocess_photometry(data_photometry, df_pycontrol):
                     baseline_correction_multicolor(data_photometry)
                     data_photometry["motion_corrected"] = 1
                 else:
-                    if (set(['Jaw']) & set(injection)) and 'opto' in df_pycontrol.attrs['task_name'].lower():
+                    if data_photometry['mode']=='2color_opto_pulsed':
                         print("Processing jaw opto photometry, skipping motion correction")
                         process_opto_timediev(data_photometry)
                         
