@@ -1827,6 +1827,101 @@ def motion_correction_multicolor(
     return photometry_dict
 
 
+def process_opto_timediev(
+    photometry_dict, motion_smooth_win=1001, baseline_method="lowpass"
+):
+    """
+    Process opto time div data without motion correction.
+    data sequence:
+        GFP (analog_1)    
+        RFP (breedthrough_ch2)    
+        GFP baseline (analog_2)
+        RFP baseline (bleedthrough_ch1)
+        GFP raw_sample (analog_3)   
+        RFP raw_sample (breakthrough_isos)
+    """
+    sampling_rate = photometry_dict["sampling_rate"]
+
+    if any(
+        ["analog_1_filt" not in photometry_dict, "analog_2_filt" not in photometry_dict]
+    ):
+        raise Exception(
+            "Analog 1 and Analog 2 must be filtered before motion correction"
+        )
+
+    try:
+        # still do bleach correction for the raw signal, but do not do motion correction
+        analog_1_bleach_baseline = lowpass_baseline(
+            photometry_dict["analog_1_filt"], sampling_rate, 0.005
+        )  # low freq to only remove the baseline but not the motion artifact
+        # rfp_baseline = lowpass_baseline(
+        #     photometry_dict["analog_1_filt"], sampling_rate, 0.005
+        # )  # low freq to only remove the baseline but not the motion artifact
+        analog_1_detrend = photometry_dict["analog_1_filt"] - analog_1_bleach_baseline
+        # isos_detrend = photometry_dict["analog_3_filt"] - isos_bleach_baseline
+
+        # photometry_dict["isos_bleach_baseline"] = isos_bleach_baseline
+        photometry_dict["analog_1_bleach_baseline"] = analog_1_bleach_baseline
+        photometry_dict["analog_1_detrend"] = analog_1_detrend
+        # photometry_dict["isos_detrend"] = isos_detrend
+
+        # photometry_dict['isos_scaled'] = fit_a2b(isos_detrend, analog_1_detrend) # match the scale
+        # photometry_dict["analog_1_est_motion"] = lowpass_baseline(
+        #     isos_detrend, sampling_rate, 5
+        # )  # only subtract the motion
+        photometry_dict["analog_1_corrected"] = analog_1_detrend # don't do motion correction, just bleach correction
+
+
+        # For other signal, remove baseline for bleach correction, but do not do motion correction
+        if baseline_method == "lowpass":
+            RFP_baseline = lowpass_baseline(
+                photometry_dict["analog_2_filt"], sampling_rate
+            )
+            isos_baseline = lowpass_baseline(
+                photometry_dict["analog_3_filt"], sampling_rate
+            )
+        else:
+            RFP_baseline = fit_exp_baseline(
+                photometry_dict["analog_2_filt"], sampling_rate
+            )
+            isos_baseline = fit_exp_baseline(
+                photometry_dict["analog_3_filt"], sampling_rate
+            )
+
+        photometry_dict["analog_2_detrended"] = (
+            photometry_dict["analog_2_filt"] - RFP_baseline
+        )
+        photometry_dict["analog_3_detrended"] = (
+            photometry_dict["analog_3_filt"] - isos_baseline
+        )
+
+        # we need to remove the shadow artifact first
+        photometry_dict["analog_2_deshadow"], _ = remove_outliner_mad(
+            photometry_dict["analog_2_detrended"], 30
+        )
+        photometry_dict["analog_3_deshadow"], _ = remove_outliner_mad(
+            photometry_dict["analog_3_detrended"], 30
+        )
+
+        photometry_dict["analog_2_corrected"] = photometry_dict["analog_2_deshadow"]
+
+        photometry_dict["motion_corrected"] = 0
+        
+        # also analyze bleedthrough for quality control
+        subject_id = photometry_dict.get("subject_ID", "")
+        if 'bleedthrough_ch1_filt' in photometry_dict and ('RE' in subject_id or 'TT' in subject_id or 'TEST' in subject_id):
+            analyze_bleedthrough(photometry_dict, sampling_rate)
+
+        return photometry_dict
+
+    except ValueError as e:
+        logger.warning(f"Motion correction failed ({e}). Skipping motion correction.")
+        # probably due to saturation , do not do motion correction
+        photometry_dict["analog_1_corrected"] = photometry_dict["analog_1_filt"]
+        photometry_dict["analog_2_corrected"] = photometry_dict["analog_2_filt"]
+        photometry_dict["motion_corrected"] = 0
+
+    return photometry_dict
 
 
 def analyze_bleedthrough(photometry_dict,sampling_rate):
@@ -1847,6 +1942,14 @@ def analyze_bleedthrough(photometry_dict,sampling_rate):
         photometry_dict["bleedthrough_ch1_filt"] - bleedthrough_ch1_detrend_baseline
     )
     photometry_dict["bleedthrough_ch1_detrend"] = bleedthrough_ch1_detrend
+    
+    bleedthrough_isos_detrend_baseline = lowpass_baseline(
+        photometry_dict["bleedthrough_isos_filt"], sampling_rate, 0.005
+    )
+    bleedthrough_isos_detrend = (
+        photometry_dict["bleedthrough_isos_filt"] - bleedthrough_isos_detrend_baseline
+    )
+    photometry_dict["bleedthrough_isos_detrend"] = bleedthrough_isos_detrend
     
 
 def lowpass_baseline(curve, sampling_rate, corner_freq=0.02):
@@ -1906,10 +2009,17 @@ def preprocess_photometry(data_photometry, df_pycontrol):
                 if not "analog_3" in data_photometry:
                     baseline_correction_multicolor(data_photometry)
                     data_photometry["motion_corrected"] = 1
-
                 else:
-                    # Do multicolor correction
-                    data_photometry = motion_correction_multicolor(data_photometry)
+                    if (set(['Jaw']) & set(injection)) and 'opto' in df_pycontrol.attrs['task_name'].lower():
+                        print("Processing jaw opto photometry, skipping motion correction")
+                        process_opto_timediev(data_photometry)
+                        
+                        assert data_photometry['motion_corrected'] == 0, 'motion_corrected should be 0 for jaw opto photometry'
+                        assert 'analog2_est_motion' not in data_photometry, 'analog2_est_motion should not be in data_photometry for jaw opto photometry'
+                        
+                    else:
+                        # Do multicolor correction
+                        data_photometry = motion_correction_multicolor(data_photometry)
             else:
                 data_photometry = motion_correction_win(data_photometry)
     else:
