@@ -132,15 +132,15 @@
         "hold_for_water": {
             "event_window": [
                 -500,
-                0
+                200
             ],
             "order": "only",
-            "padding": 200,
+            "padding": 700,
             "label": "cue on"
         },
         "bar_off": {
             "event_window": [
-                0,
+                -100,
                 50
             ],
             "order": "last_before_first",
